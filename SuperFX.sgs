@@ -9,7 +9,7 @@ GSU_Code:
 cache	
 setColor:	
 	;rotate colors through palette
-	;set plot y = 0 or 80 (remember, we're only rendering and transferring 1/2 frame per vblank)
+	;set plot y = 0 or 80 (remember, we're only rendering and transferring 1/2 frame [split vertically] per vblank)
 	iwt r1, #frame_var
 	ldb (r1)
 	inc r0
@@ -28,16 +28,25 @@ setColor:
 	color
 :
 	iwt  r2,  #$a0
-    iwt  r12, #$80
+    iwt  r12, #$10
 	iwt  r13, #drawLine
 	iwt  r1,  #$0
 	
+;I've unrolled this loop here to draw 8 pixes then loop.
+;This is why R12 is 0x10 	
 drawLine:		
+	plot
+	plot
+	plot
+	plot
+	plot
+	plot
+	plot
 	loop
 	plot
 	
 	;reset loop
-	iwt  r12, #$80
+	iwt  r12, #$10
 	iwt  r1, #$0
 	with r2
 	sub #1
