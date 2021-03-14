@@ -1,0 +1,61 @@
+; SuperFX
+; David Lindecrantz <optiroc@gmail.com>
+;
+; Noperator-GS1
+
+.include "libSFX.i"
+
+.segment "GSUCODE"
+;lines = 0xA0
+GSU_Code:
+	
+	
+	
+cache	
+setColor:	
+	;rotate colors through palette
+	;set plot y = 0 or 80 (remember, we're only rendering and transferring 1/2 frame per vblank)
+	iwt r1, #frame_var
+	ldb (r1)
+	inc r0
+	and #$01
+	stb (r1)
+	;Frame_var is 1 if the color should be incrimented and Z = 0 
+	;Frame_var is 0 if the color should be kept as is  and Z = 1 
+	; because the instruction after a branch is always executed
+	beq :+
+	nop
+	iwt r1, #color_var
+	ldb (r1)
+	inc r0
+	and #$0F
+	stb (r1)
+	color
+:
+	iwt r2, #0000
+    iwt  r12, #$50
+	iwt  r13, #drawLine
+	iwt  r1, #$0
+	nop
+	;0xFF mask
+	iwt r3, #$0FF
+
+	plot
+
+drawLine:
+	from r1
+	sub r3
+	bne drawLine
+	plot
+	inc r2
+	iwt r1, #0
+	loop
+	nop
+	rpix
+	rpix
+	stop
+	nop
+	nop
+	nop
+color_var: .res 1,$01; what color are we
+frame_var: .res 1,$00; what half of the fb are we rendering
