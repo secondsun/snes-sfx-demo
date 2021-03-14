@@ -1,8 +1,3 @@
-; SuperFX
-; David Lindecrantz <optiroc@gmail.com>
-;
-; For now this merely gets code running on the GSU
-
 .include "libSFX.i"
 .include "pointers.s"
 .include "CpuMacros.s"
@@ -49,7 +44,7 @@ Main:
         stz z:SFX_buffer_position
 
         ;Set letterbox irq Interrupt
-        IRQ_V_set 170, Vblank
+        IRQ_V_set 199, Vblank
         IRQ_V_on
         
         ;Turn on screen

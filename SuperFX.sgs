@@ -1,8 +1,3 @@
-; SuperFX
-; David Lindecrantz <optiroc@gmail.com>
-;
-; Noperator-GS1
-
 .include "libSFX.i"
 
 .segment "GSUCODE"
@@ -32,25 +27,24 @@ setColor:
 	stb (r1)
 	color
 :
-	iwt r2, #0000
-    iwt  r12, #$50
+	iwt  r2,  #$a0
+    iwt  r12, #$80
 	iwt  r13, #drawLine
-	iwt  r1, #$0
-	nop
-	;0xFF mask
-	iwt r3, #$0FF
-
-	plot
-
-drawLine:
-	from r1
-	sub r3
-	bne drawLine
-	plot
-	inc r2
-	iwt r1, #0
+	iwt  r1,  #$0
+	
+drawLine:		
 	loop
+	plot
+	
+	;reset loop
+	iwt  r12, #$80
+	iwt  r1, #$0
+	with r2
+	sub #1
+	;have I finished?
+	bge drawLine
 	nop
+	
 	rpix
 	rpix
 	stop
