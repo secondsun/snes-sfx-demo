@@ -1,0 +1,13 @@
+.struct edgeEntry
+  startX .byte
+  endX  .byte
+  triangle .word
+.endstruct
+
+;each row is 1 + (20*4) bytes
+.struct edgeTableRow
+  size .byte
+  entries .res (.sizeof(edgeEntry) * 20)
+.endstruct
+
+.res (.sizeof(edgeTableRow) * 160)

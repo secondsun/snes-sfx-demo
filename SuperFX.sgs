@@ -60,5 +60,11 @@ drawLine:
 	nop
 	nop
 	nop
+
 color_var: .res 1,$01; what color are we
 frame_var: .res 1,$00; what half of the fb are we rendering
+
+.segment "GSURAM"
+
+edgeTable:
+.include "edgeTable.sgs"
