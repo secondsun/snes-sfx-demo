@@ -135,5 +135,5 @@ drawScreen1:
                                 ; 0 = $700400
                                 ; 1 = $702900
 .segment "RODATA"
-   incbin  Palette,        "Data/SNES.png.palette"
+   incbin  Palette,        "Data/superfx.palette.bin"
                                     

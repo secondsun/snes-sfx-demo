@@ -60,5 +60,10 @@ drawLine:
 	nop
 	nop
 	nop
-color_var: .res 1,$01; what color are we
-frame_var: .res 1,$00; what half of the fb are we rendering
+
+tree:
+.incbin Tree, "Data/test.
+
+.segment "GSURAM"
+color_var: .res 1; what color are we
+frame_var: .res 1; what half of the fb are we rendering
