@@ -5,13 +5,13 @@
 GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
 
 .macro initGSU_4bpp_160
-  lda     #$70
+  lda     #$03
   sta     GSU_PBR
   
   lda     #(.loword(screenbuffer)/$400)
   sta     GSU_SCBR
   
-  lda     #%00001101 ;4bpp_160 SuperFX controls ram and rom
+  lda     #%00011101 ;4bpp_160 SuperFX controls ram and rom
   sta     GSU_SCMR
   
   lda     #%10000000 ;mask interrupts from GSU
@@ -22,7 +22,7 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
 .endmac
 
 .macro gsuOn
-  ldx     __GSUCODE_RUN__
+  ldx     #$8000
   stx     GSU_R15
 .endmac
 

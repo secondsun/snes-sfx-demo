@@ -4,8 +4,9 @@
 
 Main:
 
-        ;Copy GSU code
-        memcpy GSU_SRAM, __GSUCODE_LOAD__, __GSUCODE_SIZE__
+        ;Copy SNES code
+        memcpy  __MAIN_LOOP_RUN__, __MAIN_LOOP_LOAD__, __MAIN_LOOP_SIZE__
+        memcpy  __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__
         
         ;Copy Palette
         CGRAM_memcpy 0, Palette, sizeof_Palette
@@ -16,7 +17,11 @@ Main:
         
         ;Configure GSU
         initGSU_4bpp_160 
+        
+        jml __MAIN_LOOP_RUN__
 
+.SEGMENT "MAIN_LOOP"
+Main2:
         ;Start GSU
         gsuOn
 
@@ -50,6 +55,7 @@ Main:
         ;Turn on screen
         lda     #inidisp(ON, DISP_BRIGHTNESS_MAX)
         sta     SFX_inidisp
+        ;VBL_set Vblank
         VBL_on
         
 
@@ -117,7 +123,7 @@ drawScreen1:
                 sta z:SFX_buffer_position
                 gsuOn
                 endVBlank
-
+.segment "RODATA"
 .include "backgroundMap.s"
 
 .segment "ZEROPAGE"
