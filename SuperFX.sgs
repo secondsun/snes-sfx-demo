@@ -62,7 +62,7 @@ drawLine:
 	nop
 
 tree:
-.incbin Tree, "Data/test.
+.incbin Tree, "Data/tree.bin
 
 .segment "GSURAM"
 color_var: .res 1; what color are we
