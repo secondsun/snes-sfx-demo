@@ -1,69 +1,50 @@
 .include "libSFX.i"
 
+;This draws tree.bin
+; Tree.bin is 0x1f columns 
+; Tree.bin is 4bpp data (two pixels per cell)
+; Tree.bin is 0x3f rows
+
 .segment "GSUCODE"
 ;lines = 0xA0
 GSU_Code:
+	cache	
+	;Start Tree buffering
+	iwt r14, #tree
 	
+	;Setup CMODE
 	
-	
-cache	
-setColor:	
-	;rotate colors through palette
-	;set plot y = 0 or 80 (remember, we're only rendering and transferring 1/2 frame [split vertically] per vblank)
-	iwt r1, #frame_var
-	ldb (r1)
-	inc r0
-	and #$01
-	stb (r1)
-	;Frame_var is 1 if the color should be incrimented and Z = 0 
-	;Frame_var is 0 if the color should be kept as is  and Z = 1 
-	; because the instruction after a branch is always executed
-	beq :+
-	nop
-	iwt r1, #color_var
-	ldb (r1)
-	inc r0
-	and #$0F
-	stb (r1)
-	color
-:
-	iwt  r2,  #$a0
-    iwt  r12, #$10
-	iwt  r13, #drawLine
-	iwt  r1,  #$0
-	
-;I've unrolled this loop here to draw 8 pixes then loop.
-;This is why R12 is 0x10 	
-drawLine:		
-	plot
-	plot
-	plot
-	plot
-	plot
-	plot
-	plot
-	loop
-	plot
-	
-	;reset loop
-	iwt  r12, #$10
-	iwt  r1, #$0
-	with r2
-	sub #1
-	;have I finished?
-	bge drawLine
-	nop
-	
+
+	ibt r2, #$FF ; plot y = -1 (roll over to zero at start of startRow)
+	startRow:
+	  	ibt r1, #$0; plot x = 0
+		inc r2; plot y ++ (initiallialy rolls over to 0)
+	    ibt r12, #$1f ; 0x1f is the number of bytes in a row of the tree sprite
+		iwt r13, #drawRow
+	drawRow:
+		ibt r0, #$3 ; transparency off, high nibble has color
+		cmode 
+	    getc
+		plot
+		ibt r0, #$1 ; transparency off, low nibble has color
+		cmode 
+		getc
+		inc r14 ; prefetch next byte
+		loop
+		plot
+	advanceLine: ; check if end
+	    ibt r0, #$3f
+		sub r2
+		bge startRow
+		nop ; instruction after jump always executed
+	shutdown:
 	rpix
 	rpix
 	stop
 	nop
 	nop
 	nop
-
 tree:
-.incbin Tree, "Data/tree.bin
+incbin Tree, "Data/tree.bin"
 
 .segment "GSURAM"
-color_var: .res 1; what color are we
-frame_var: .res 1; what half of the fb are we rendering
