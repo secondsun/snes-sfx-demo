@@ -8,6 +8,7 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
   lda     #$03
   sta     GSU_PBR
   
+  
   lda     #(.loword(screenbuffer)/$400)
   sta     GSU_SCBR
   
