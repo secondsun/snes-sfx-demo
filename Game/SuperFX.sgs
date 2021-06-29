@@ -13,19 +13,25 @@ GSU_Code:
 
 	cache	
 	;Start Tree buffering
-
+    
 	iwt r14, #tree
 	
-	;Setup CMODE
-	
-
 	ibt r2, #$FF ; plot y = -1 (roll over to zero at start of startRow)
+	to r10
+	getb ; first byte of image is width
+	;ibt r12, #$20 ; 0x1f is the number of bytes in a row of the tree sprite
+	inc r14 ; next byte is image height
+	to r11
+	getb ; store height to r11
+	inc r14 ; next byte is image data
+
+	; At this point r11 has height, r10 has width
 	startRow:
+		move r12, r10 ; set width to loop counter
 	  	ibt r1, #$0; plot x = 0
-		inc r2; plot y ++ (initiallialy rolls over to 0)
-	    ibt r12, #$20 ; 0x1f is the number of bytes in a row of the tree sprite
-		iwt r13, #drawRow
-	drawRow:
+		inc r2; plot y ++ (initiallialy rolls over to 0)	
+		iwt r13, #drawRow 
+    drawRow:
 		ibt r0, #$3 ; transparency off, high nibble has color
 		cmode 
 	    getc
@@ -37,7 +43,7 @@ GSU_Code:
 		loop
 		plot
 	advanceLine: ; check if end
-	    ibt r0, #$3e
+	    move r0, r11
 		sub r2
 		bge startRow
 		nop ; instruction after jump always executed
@@ -49,6 +55,6 @@ GSU_Code:
 	nop
 	nop
 tree:
-incbin Tree, "Data/tree.bin"
+incbin Tree, "Data/st_banner.bin"
 
 .segment "GSURAM"

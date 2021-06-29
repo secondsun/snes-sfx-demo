@@ -45,7 +45,7 @@ al 010000 .__EXRAM_SIZE__
 al 7F0000 .__EXRAM_START__
 al 038000 .__GSUCODE_LOAD__
 al 038000 .__GSUCODE_RUN__
-al 00082E .__GSUCODE_SIZE__
+al 000836 .__GSUCODE_SIZE__
 al 000000 .__HIRAM_FILEOFFS__
 al 7E2000 .__HIRAM_LAST__
 al 00E000 .__HIRAM_SIZE__
@@ -166,11 +166,11 @@ al 808F80 .Palette
 al 808000 .Main
 al 808800 .Map_end
 al 808080 .Map
-al 03802E .Tree
-al 038026 .shutdown
-al 038025 .@LOCAL-MACRO_SYMBOL-0000
-al 038020 .advanceLine
-al 038012 .drawRow
-al 03800A .startRow
-al 03802E .tree
+al 038034 .Tree
+al 03802C .shutdown
+al 03802B .@LOCAL-MACRO_SYMBOL-0000
+al 038026 .advanceLine
+al 038018 .drawRow
+al 038010 .startRow
+al 038034 .tree
 al 038000 .GSU_Code
