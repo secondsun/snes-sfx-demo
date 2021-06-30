@@ -1,6 +1,7 @@
 .include "libSFX.i"
 .include "pointers.s"
 .include "CpuMacros.s"
+.include "edgeEntry.i"
 
 Main:
 
@@ -17,7 +18,18 @@ Main:
         
         ;Configure GSU
         initGSU_4bpp_160 
+        phb
+
+        lda #$70
+        pha
+        plb
+        lda #$1;one sprite
         
+        
+
+        sta $0
+
+        plb
         jml __MAIN_LOOP_RUN__
 
 .SEGMENT "MAIN_LOOP"
