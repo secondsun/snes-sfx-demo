@@ -9,13 +9,27 @@
 .segment "GSUCODE"
 ;lines = 0xA0
 GSU_Code:
+.export GSU_Code
+
+createEdgeTable:
+  ;for 0 -> spritespace::counter
+  ; for 0 -> sprite height * scale
+  ;   addEdgeEntry (sprite, startX, scale)
+  ; end
+  ;end
+
+drawEdgeTable:
+  ; for (row : edgeTable)
+  ;  for (entry : row)
+  ;    prefill_transparent (write 0 to all pixels < first startX)
+  ;    drawEdgeTable
+
 	ibt r0, #$3
 	romb
 
 	cache	
-	;Start Tree buffering
     
-	iwt r14, #tree
+	lm r14, (.loword(spritespace + spritelist::sprites)); read address of sprite from sprite list
 	
 	ibt r2, #$FF ; plot y = -1 (roll over to zero at start of startRow)
 	to r10
@@ -55,19 +69,24 @@ GSU_Code:
 	nop
 	nop
 	nop
+
 tree:
-incbin Tree, "Data/tree.bin"
+.export tree
+  incbin Tree, "Data/tree.bin"
+
 pillar:
-incbin Pillar, "Data/pillar.bin"
+.export pillar
+  incbin Pillar, "Data/pillar.bin"
+
 banner1:
-incbin Banner1, "Data/st_banner.bin"
+.export  banner1
+  incbin Banner1, "Data/st_banner.bin"
+  
 banner2:
-incbin Banner2, "Data/art_banner.bin"
-
-
-
+.export  banner2
+  incbin Banner2, "Data/art_banner.bin"
 .segment "GSURAM"
-spriteList:
+spritespace:
   .res .sizeof(spritelist)
 edgeTable:
   .res .sizeof(edgetable)

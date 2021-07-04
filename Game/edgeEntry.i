@@ -8,6 +8,7 @@
 
 .struct edgerow
   count  .byte
+  pad .byte
   edges  .res 5 * .sizeof(edgeentry) ; each row can have 5 entries (number pulled firmly from keister)
 .endstruct
 
@@ -26,5 +27,6 @@
 
 .struct spritelist
   count .byte
+  pad .byte
   sprites .res 60* .sizeof(sprite) ; 60 sprites on screen max
 .endstruct

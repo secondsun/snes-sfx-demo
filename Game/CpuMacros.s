@@ -23,7 +23,7 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
 .endmac
 
 .macro gsuOn
-  ldx     #$8000
+  ldx     #.loword(GSU_Code)
   stx     GSU_R15
 .endmac
 

@@ -19,15 +19,43 @@ Main:
         ;Configure GSU
         initGSU_4bpp_160 
         phb
-
+        RW a8
         lda #$70
         pha
         plb
-        lda #$1;one sprite
-        
-        
+        lda #$3;three sprite
+        sta a:spritelist::count
 
-        sta $0
+;texture .word ; address
+;  xLoc .byte
+;  yLoc .byte
+;  scale .word ; 8.8 fixed point
+; setup sprite list
+        
+        ldx #.loword(pillar)
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
+        ldx #$00
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
+        ldx #$0100
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+
+        ldx #.loword(banner1)
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
+        ldx #$00
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
+        ldx #$0100
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+
+        ldx #.loword(tree)
+        stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
+        ldx #$10
+        stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
+        stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
+        ldx #$0100
+        stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
+
 
         plb
         jml __MAIN_LOOP_RUN__
@@ -137,6 +165,7 @@ drawScreen1:
                 endVBlank
 .segment "RODATA"
 .include "backgroundMap.s"
+
 
 .segment "ZEROPAGE"
    VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_VRAM in todo.pointers
