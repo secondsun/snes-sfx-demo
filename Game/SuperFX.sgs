@@ -42,8 +42,8 @@ createEdgeTable:
   	iwt r0,# (spritespace + spritelist::count) ; address of number of sprites
   	to r3
   	ldb (r0) ;get number of sprites to r3
+cache
     addEdgeEntry:
-cache	
 	; umult = r5 * r6 => [R0]
 	; r5 is sprite index.
 	; r6 will have size of sprite
@@ -136,22 +136,17 @@ lob
 
 ibt r10, #.sizeof(edgeentry)
 addEdgeRow:
-	
-	move r1, r2
+    move r1, r0
+	move r0, r2
 	from r10
-	to r1
 	umult r2
-	with r1
 	add #2
-	with r1 
 	add r7
 	from r8
-	stw (r1)
-	with r1
+	stw (r0)
 	add #2
 	from r9
-	stb (r1)
-	with r1
+	stb (r0)
 	add #1
 	to r10
 	lob
@@ -162,15 +157,22 @@ addEdgeRow:
 	with r10
 	fmult 
 	from r10
-	stb (r1)
-	with r1
+	stb (r0)
 	add #1
 	from r6
-	stw (r1)
+	stw (r0)
 	inc r2
 	from r2
 	stb (r7)
-	inc r4
+    move r0, r1
+    ;update count
+      ;update count_address
+	  ; load new count
+	iwt r10, #.sizeof(edgerow)
+	with r7
+	add r10
+	to r2
+	ldb (r7)
 	dec r11
 	bne addEdgeRow
 	ibt r10, #.sizeof(edgeentry)
