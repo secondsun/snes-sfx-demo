@@ -11,12 +11,105 @@
 GSU_Code:
 .export GSU_Code
 
+initializeEdgeTable:
+  ;set all counters to 0 in 
+  cache
+  iwt r12, #159
+  iwt r13, #:+
+  :
+  ibt r0, #.sizeof(edgerow)
+  umult r12
+  iwt r1, #edgeTable
+  to r1
+  add r1
+  ibt r0, #0
+  stb (r1)
+  loop
+nop
+
 createEdgeTable:
-  ;for 0 -> spritespace::counter
-  ; for 0 -> sprite height * scale
-  ;   addEdgeEntry (sprite, startX, scale)
-  ; end
-  ;end
+  ibt r0, #3 ; sprite index counter
+  romb 
+
+  ibt r5, #0 ; sprite index counter
+
+  
+  
+  ;for 0 -> spritespace::count
+  	iwt r0,# (spritespace + spritelist::count) ; address of number of sprites
+  	to r3
+  	ldb (r0) ;get number of sprites to r3
+    addEdgeEntry:
+cache	
+	; umult = r5 * r6 => [R0]
+	; r5 is sprite index.
+	; r6 will have size of sprite
+	; spritespace + r0 => r14 which is the start of the sprite list to draw
+	iwt r6, #.sizeof(sprite)
+	from r6
+	umult r5
+	iwt r1, #(spritespace + 2)
+	add r1; skip pad byte and r0 = address of address
+	to r14
+	ldw (r0) ; r14 has address of texture and loads first byte
+	
+    
+	; optimize we need to interleave instructions so the rom buffer can fill
+	; calculate and update the count of the line index of edge entries
+	;   count := (edgeTable + yLoc * sizeof(edgeentry) )
+	;   yLoc = r0+3
+	ibt r1, #$3
+	to r1
+	add r1
+	to r6
+	ldb (r1) ; r6 now has yLoc
+
+	;load texture address to r0 interleaving load
+	move r8, r0
+	getbl
+	inc r14
+
+	ibt r7, #.sizeof(edgerow)
+	with r6
+	umult r7 ; r6 = yLoc* sizeof(edgerow)
+	iwt r1, #edgeTable
+	with r6
+	add r1; r6 = address of count
+
+	
+	getbh
+	;end interleave
+    ; r0 = [w/2][h]
+    ; r3 = #ofSprites
+	; r5 = spriteIndex
+	; r6 = address of count of edgeentries in this row
+	;
+	; Texture@r8 := {W/2 (bh), h(bl), 4bpp[]}
+	; r8+2 = xLoc
+	; r8+3 = yLoc
+	; r8+4/5 = scale
+	;
+    ; we need to write an edgeEntry from yLoc -> yLoc + (h*scale).
+	;   each entry is ++count _pad_ entries[]{texture, xLoc, w*2*scale, scale}
+	;   count := (edgeTable + yLoc * sizeof(edgeentry) )
+	
+	
+	; for 0 -> sprite height * scale
+  	;   addEdgeEntry (sprite, startX, scale)
+  	; end
+
+	inc r5
+	from r3
+	sub r5
+	branch:
+	bne addEdgeEntry
+	nop
+  	;TODO subtracing spriteIndex - spriteCount and branching if the index is past the count may be faster by 1 - 2cycles
+  	
+
+  ;end 
+  
+  
 
 drawEdgeTable:
   ; for (row : edgeTable)

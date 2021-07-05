@@ -42,7 +42,7 @@ Main:
 
         ldx #.loword(banner1)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
-        ldx #$00
+        ldx #$08
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
