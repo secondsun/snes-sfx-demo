@@ -144,31 +144,28 @@ addEdgeRow:
 	add #2
 	add r7
 	from r8
-	stw (r0)
+	stw (r0) ; address
 	add #2
 	from r9
-	stb (r0)
+	stb (r0) ; xloc
 	add #1
+	from r1
 	to r10
 	lob
-	with r10
-	rol
 	with r10
 	swap
 	with r10
 	fmult 
 	from r10
-	stb (r0)
+	stb (r0) ; width
 	add #1
 	from r6
-	stw (r0)
+	stw (r0) ; scale
 	inc r2
 	from r2
-	stb (r7)
+	stb (r7) ; count++
     move r0, r1
-    ;update count
-      ;update count_address
-	  ; load new count
+	; fetch next row and count
 	iwt r10, #.sizeof(edgerow)
 	with r7
 	add r10
