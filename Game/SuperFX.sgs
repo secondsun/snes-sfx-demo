@@ -26,6 +26,9 @@ initializeEdgeTable:
   stb (r1)
   loop
 nop
+  iwt r1, #edgeTable
+  ibt r0, #0
+  stb (r1)
 
 createEdgeTable:
   ibt r0, #3 ; sprite index counter
@@ -49,7 +52,7 @@ cache
 	from r6
 	umult r5
 	iwt r1, #(spritespace + 2)
-	add r1; skip pad byte and r0 = address of address
+	add r1; skip pad byte and r0 = address of address of textur
 	to r14
 	ldw (r0) ; r14 has address of texture and loads first byte
 	
@@ -58,12 +61,21 @@ cache
 	; calculate and update the count of the line index of edge entries
 	;   count := (edgeTable + yLoc * sizeof(edgeentry) )
 	;   yLoc = r0+3
+	ibt r1, #$2
+	to r1
+	add r1
+	to r9
+	ldb (r1) ; r9 now has xLoc
+
 	ibt r1, #$3
 	to r1
 	add r1
 	to r6
 	ldb (r1) ; r6 now has yLoc
-
+	move r4, r6 ; r4 has yLoc
+	inc r1 ; r1 + 1 = scaleAddress
+	to r2
+	ldw (r1); r2 has scale
 	;load texture address to r0 interleaving load
 	move r8, r0
 	getbl
@@ -73,27 +85,97 @@ cache
 	with r6
 	umult r7 ; r6 = yLoc* sizeof(edgerow)
 	iwt r1, #edgeTable
-	with r6
-	add r1; r6 = address of count
+	from r6
+	to r7
+	add r1; r7 = address of count
+	to r6
+	ldb (r7)
+	to r8
+	ldw(r8)
 
-	
 	getbh
+;how many rows?
+; r0[h] * r6
+move r10, r6
+move r6, r2
+move r2, r10
+
+to r11
+hib
+with r11
+swap
+with r11
+fmult
+with r11
+lob	
+
+
 	;end interleave
-    ; r0 = [w/2][h]
-    ; r3 = #ofSprites
+    ; r0 = [h][w/2]
+	; r2 = count
+	; r6 = scale
+	; r3 = #ofSprites
+	; r4 = yLoc
 	; r5 = spriteIndex
-	; r6 = address of count of edgeentries in this row
+	; r7 = count address
+	; r8 = spriteAddress
+	; r9 = xLoc
+	; r11 = rendered height
+	;============================
 	;
-	; Texture@r8 := {W/2 (bh), h(bl), 4bpp[]}
+	;
+	;r8 = spriteAddress := {W/2 (bh), h(bl), 4bpp[]}
+	;
 	; r8+2 = xLoc
 	; r8+3 = yLoc
 	; r8+4/5 = scale
 	;
     ; we need to write an edgeEntry from yLoc -> yLoc + (h*scale).
 	;   each entry is ++count _pad_ entries[]{texture, xLoc, w*2*scale, scale}
-	;   count := (edgeTable + yLoc * sizeof(edgeentry) )
+	;write to count_address + 2 +  count*sizeof(edgeentry) the following {r8, r9, r0[low]*2*r6, r6}
+
+ibt r10, #.sizeof(edgeentry)
+addEdgeRow:
 	
-	
+	move r1, r2
+	from r10
+	to r1
+	umult r2
+	with r1
+	add #2
+	with r1 
+	add r7
+	from r8
+	stw (r1)
+	with r1
+	add #2
+	from r9
+	stb (r1)
+	with r1
+	add #1
+	to r10
+	lob
+	with r10
+	rol
+	with r10
+	swap
+	with r10
+	fmult 
+	from r10
+	stb (r1)
+	with r1
+	add #1
+	from r6
+	stw (r1)
+	inc r2
+	from r2
+	stb (r7)
+	inc r4
+	dec r11
+	bne addEdgeRow
+	ibt r10, #.sizeof(edgeentry)
+	; this writes one edge entry 
+
 	; for 0 -> sprite height * scale
   	;   addEdgeEntry (sprite, startX, scale)
   	; end
@@ -183,3 +265,4 @@ spritespace:
   .res .sizeof(spritelist)
 edgeTable:
   .res .sizeof(edgetable)
+
