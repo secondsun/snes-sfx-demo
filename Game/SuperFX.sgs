@@ -134,8 +134,9 @@ lob
 	;   each entry is ++count _pad_ entries[]{texture, xLoc, w*2*scale, scale}
 	;write to count_address + 2 +  count*sizeof(edgeentry) the following {r8, r9, r0[low]*2*r6, r6}
 
-ibt r10, #.sizeof(edgeentry)
+
 addEdgeRow:
+    ibt r10, #.sizeof(edgeentry)
     move r1, r0
 	move r0, r2
 	from r10
@@ -175,7 +176,7 @@ addEdgeRow:
 	ldb (r7)
 	dec r11
 	bne addEdgeRow
-	ibt r10, #.sizeof(edgeentry)
+	nop
 	; this writes one edge entry 
 
 	; for 0 -> sprite height * scale
