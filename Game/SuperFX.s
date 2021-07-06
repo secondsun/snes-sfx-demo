@@ -37,7 +37,7 @@ Main:
         ldx #$00
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0100
+        ldx #$0080
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         ldx #.loword(banner1)
@@ -63,7 +63,7 @@ Main:
 .SEGMENT "MAIN_LOOP"
 Main2:
         ;Start GSU
-        gsuOn
+        ;gsuOn
 
         RW a16
         lda #0
