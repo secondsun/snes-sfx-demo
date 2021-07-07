@@ -208,9 +208,9 @@ addEdgeRow:
 	add r10
 	to r2
 	ldb (r7)
-	dec r11
 	with r12
 	add r13
+	dec r11
 	bne addEdgeRow
 	nop
 	; this writes one edge row entry 
