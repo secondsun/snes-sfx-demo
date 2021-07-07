@@ -2,7 +2,7 @@
   texture .word ;address
   start   .byte
   length  .byte
-  scale   .word ; 8.8 fixed point
+  scale_r   .word ; 8.8 fixed point reciprocal of sprite:scale
 
 .endstruct
 
@@ -22,6 +22,7 @@
   texture .word ; address
   xLoc .byte
   yLoc .byte
+  scale_r .word ; 8.8 fixed point
   scale .word ; 8.8 fixed point
 .endstruct
 

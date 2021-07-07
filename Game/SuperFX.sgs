@@ -73,7 +73,11 @@ cache
 	to r6
 	ldb (r1) ; r6 now has yLoc
 	move r4, r6 ; r4 has yLoc
-	inc r1 ; r1 + 1 = scaleAddress
+	inc r1 ; r1 + 1 = scale_rAddress
+	to r13
+	ldw (r1); r13 has scale_r
+	inc r1 ; 
+	inc r1 ; r1 + 2 = scaleAddress
 	to r2
 	ldw (r1); r2 has scale
 	;load texture address to r0 interleaving load
@@ -160,8 +164,8 @@ addEdgeRow:
 	from r10
 	stb (r0) ; width
 	add #1
-	from r6
-	stw (r0) ; scale
+	from r13
+	stw (r0) ; scale_r
 	inc r2
 	from r2
 	stb (r7) ; count++
@@ -215,9 +219,9 @@ drawEdgeTable:
 	cmode 
 	ibt r0, #0 ; set color to black
 	color
-
+   
 	ibt r0, #$20 ; 128 pixel 
-	drawFour:
+	drawFour: 
 	  plot
 	  plot
 	  plot
@@ -232,58 +236,65 @@ drawEdgeTable:
 	inc r2
 	bra finish
 	nop
+  ; above if there are no sprites, draw a black line
+  ; below draw the black preamble, then sprites (and fill gaps with black), then end black
+  
   drawLine: 
-    ; r3 = number of edgeEntries
-  ibt r3, #.sizeof(edgerow)
-  add r3
-  loop
-  inc r2
-  nop
+  	add #2 ; r0 points to first edge entry
+drawLine2: 
+    ; r3 = number of edgeEntries on row
+	; r0 = first entry of row on edgetable
+	to r5
+	ldw (r0); r5 has address of textur
+	with r5
+	add #2 ; skip h/w info in texture
+	add #2 ; r0 points to start
+	;
+	to r8
+	ldb (r0) ; r8 has start
+	add #1 ; r0 points to length
+	to r7
+	ldb (r0) ; r7 has length
+	add #1 ; r0 points to scale
+	to r6
+    ldw (r0) ; r6 has scale_r
+	add #2 ; r0 points to next entry if any
+
+    move r13, r0 ; backup next address to r13
+    
+	
+	ibt r0, #$3 ; transparency off, high nibble has color
+	cmode 
+	ibt r0, #0 ; set color to black
+	color
+
+	padStart:
+	  from r8
+	  sub r1
+	  beq drawSpriteLine
+	  nop
+	  plot
+	  bra padStart
+	nop
+	drawSpriteLine:
+      
+	dec r3
+	bne drawLine2
+    nop
+	; set r0 to next entry, update y pos, loop
+  	ibt r6, #.sizeof(edgerow)
+	inc r2
+  	from r2
+	umult r6
+  	iwt r3, #edgeTable
+	iwt r13, #drawEdgeTable  
+	loop
+	add r3 ; r0 = next entry in table
+
+  	nop
 
 finish:
-  ; for (row : edgeTable)
-  ;  for (entry : row)
-  ;    prefill_transparent (write 0 to all pixels < first startX)
-  ;    drawEdgeTable
 
-	ibt r0, #$3
-	romb
-
-	cache	
-    
-	lm r14, (.loword(spritespace + spritelist::sprites)); read address of sprite from sprite list
-	
-	ibt r2, #$FF ; plot y = -1 (roll over to zero at start of startRow)
-	to r10
-	getb ; first byte of image is width
-	;ibt r12, #$20 ; 0x1f is the number of bytes in a row of the tree sprite
-	inc r14 ; next byte is image height
-	to r11
-	getb ; store height to r11
-	inc r14 ; next byte is image data
-
-	; At this point r11 has height, r10 has width
-	startRow:
-		move r12, r10 ; set width to loop counter
-	  	ibt r1, #$0; plot x = 0
-		inc r2; plot y ++ (initiallialy rolls over to 0)	
-		iwt r13, #drawRow 
-    drawRow:
-		ibt r0, #$3 ; transparency off, high nibble has color
-		cmode 
-	    getc
-		plot
-		ibt r0, #$1 ; transparency off, low nibble has color
-		cmode 
-		getc
-		inc r14 ; prefetch next byte
-		loop
-		plot
-	advanceLine: ; check if end
-	    move r0, r11
-		sub r2
-		bge startRow
-		nop ; instruction after jump always executed
 	shutdown:
 	rpix
 	rpix
