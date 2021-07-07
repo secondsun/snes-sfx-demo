@@ -96,6 +96,8 @@ cache
 	ldb (r7)
 	to r8
 	ldw(r8)
+    with r8
+	add #2
 
 	getbh
 ;how many rows?
@@ -117,7 +119,7 @@ move r4, r10
 
 	;end interleave
     ; r0 = [h][w/2]
-	; r2 = count
+	; r2 = indexOfEntryOnRow (maxes out at r3, #of Sprites)
 	; r6 = scale
 	; r3 = #ofSprites
 	; r4 = yLoc
@@ -126,6 +128,9 @@ move r4, r10
 	; r8 = spriteAddress
 	; r9 = xLoc
 	; r11 = rendered height
+	; r13 = scale_r
+	; r12 = lineBeingDrawn
+	; r10 = scratch
 	;============================
 	;
 	;
@@ -138,21 +143,43 @@ move r4, r10
     ; we need to write an edgeEntry from yLoc -> yLoc + (h*scale).
 	;   each entry is ++count _pad_ entries[]{texture, xLoc, w*2*scale, scale}
 	;write to count_address + 2 +  count*sizeof(edgeentry) the following {r8, r9, r0[low]*2*r6, r6}
-
-
+ibt r12, #0; start with first line
 addEdgeRow:
-    ibt r10, #.sizeof(edgeentry)
+    ibt r10, #.sizeof(edgeentry) ; r10 is a scratch register
     move r1, r0 ; r1 = [h][w/2]
-	move r0, r2
+	move r0, r2 ; 
 	from r10
 	umult r2
 	add #2
-	add r7
-	from r8
-	stw (r0) ; address
+	add r7 ; r0 is now the address to write the row
+
+	;begin calculate row of texture to read from on this line
+    move r10, r6
+	move r6, r12
+	move r12, r10 ; swap r6 and r 12
+
+	from r1
+	to r10
+	lob ; r10 = with/2 aka #of bytes
+	with r10	
+	swap ; r10 = w/2.8 fixed
+	with r10
+	fmult ; r10 = scaled texture offset
+
+	from r8 ; base address
+	to r10 
+	add r10 ; r10 = r8 + scaledOffset
+	from r10
+	stw (r0) ; texture start address scaled 
+	
+	move r10, r6
+	move r6, r12
+	move r12, r10 ; swap r6 and r12 back
+
 	add #2
 	from r9
 	stb (r0) ; xloc
+
 	add #1
 	from r1
 	to r10
@@ -160,12 +187,17 @@ addEdgeRow:
 	with r10
 	swap
 	with r10
+	rol ; r10 = w.8
+
+	with r10
 	fmult 
+	
 	from r10
 	stb (r0) ; width
+
 	add #1
 	from r13
-	stw (r0) ; scale_r
+	stw (r0) ; scale_r/2 (pixels are stored 2 per byte so when we draw a line we only want to travel half as far)
 	inc r2
 	from r2
 	stb (r7) ; count++
@@ -177,9 +209,11 @@ addEdgeRow:
 	to r2
 	ldb (r7)
 	dec r11
+	with r12
+	add r13
 	bne addEdgeRow
 	nop
-	; this writes one edge entry 
+	; this writes one edge row entry 
 
 	; for 0 -> sprite height * scale
   	;   addEdgeEntry (sprite, startX, scale)
@@ -247,7 +281,6 @@ drawLine2:
 	to r5
 	ldw (r0); r5 has address of textur
 	with r5
-	add #2 ; skip h/w info in texture
 	add #2 ; r0 points to start
 	;
 	to r8
@@ -258,6 +291,8 @@ drawLine2:
 	add #1 ; r0 points to scale
 	to r6
     ldw (r0) ; r6 has scale_r
+	with r6
+	div2 ; r6 = scale / 2 because two pixels are stored in a byte
 	add #2 ; r0 points to next entry if any
 
     move r13, r0 ; backup next address to r13
@@ -299,18 +334,18 @@ drawLine2:
 	  to r9
 	  from r4
 	  hib
-	  with r5
-	  add r9
-	  getc ; prefethc should be complete
-	  move r14, r5 ; start next load
-	  
-	  with r9 
-	  ror ; is r9 odd if so, color low nibble
-	  bcs :+
-	  	ibt r0, #$3 ; transparency off, high nibble has color
-		bra drawPixel
-		nop
-	:	ibt r0, #$1 ; transparency off, low nibble has color  
+	  getc ; prefetch should be complete
+	  from r5
+	  to r14
+	  add r9 ; load next byte
+
+;	  with r9 
+;	  ror ; is r9 odd if so, color low nibble
+;	  bcs :+
+;	  	ibt r0, #$5 ; transparency off, high nibble has color
+;		bra drawPixel
+;		nop
+		ibt r0, #$5 ; transparency off, low nibble has color  
       drawPixel:
 	    cmode
 	    plot

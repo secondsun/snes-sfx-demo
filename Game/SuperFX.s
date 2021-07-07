@@ -37,9 +37,9 @@ Main:
         ldx #$00
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0200
+        ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0080
+        ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         ldx #.loword(banner1)
