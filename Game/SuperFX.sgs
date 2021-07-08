@@ -235,7 +235,7 @@ next:
   
 
   iwt r0, #edgeTable
-  iwt r12, #160 ;160 rows in table
+  iwt r12, #80 ;160 rows in table (TODO DOUBLE SPEED OF PROGRAM)
   iwt r13, #drawEdgeTable
   ibt r2, #0
   cache
@@ -272,7 +272,7 @@ drawEdgeTable:
 	nop
   ; above if there are no sprites, draw a black line
   ; below draw the black preamble, then sprites (and fill gaps with black), then end black
-  
+  cache
   drawLine: 
   	add #2 ; r0 points to first edge entry
 drawLine2: 
@@ -280,7 +280,6 @@ drawLine2:
 	; r0 = first entry of row on edgetable
 	to r5
 	ldw (r0); r5 has address of textur
-	with r5
 	add #2 ; r0 points to start
 	;
 	to r8
@@ -351,17 +350,18 @@ drawLine2:
 	    plot
 	  dec r7
 	  bne drawSpriteLine1
-	  nop  
-	dec r3
+	  nop 
+	  
 	; r0 = first entry of row on edgetable
-	move r0, r13
+	move r0, r13 
+	dec r3
 	bne drawLine2
     nop
 	; set r0 to next entry, update y pos, loop
-  	ibt r6, #.sizeof(edgerow)
+  	ibt r10, #.sizeof(edgerow)
 	inc r2
   	from r2
-	umult r6
+	umult r10
   	iwt r3, #edgeTable
 	iwt r13, #drawEdgeTable  
 	loop
