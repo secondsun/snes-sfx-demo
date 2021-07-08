@@ -235,7 +235,7 @@ next:
   
 
   iwt r0, #edgeTable
-  iwt r12, #80 ;160 rows in table (TODO DOUBLE SPEED OF PROGRAM)
+  iwt r12, #160 ;160 rows in table (TODO DOUBLE SPEED OF PROGRAM)
   iwt r13, #drawEdgeTable
   ibt r2, #0
   cache
@@ -287,11 +287,13 @@ drawLine2:
 	add #1 ; r0 points to length
 	to r7
 	ldb (r0) ; r7 has length
+	with r7
+	ror
 	add #1 ; r0 points to scale
 	to r6
     ldw (r0) ; r6 has scale_r
-	with r6
-	div2 ; r6 = scale / 2 because two pixels are stored in a byte
+	;with r6
+	;div2 ; r6 = scale / 2 because two pixels are stored in a byte
 	add #2 ; r0 points to next entry if any
 
     move r13, r0 ; backup next address to r13
@@ -344,10 +346,11 @@ drawLine2:
 ;	  	ibt r0, #$5 ; transparency off, high nibble has color
 ;		bra drawPixel
 ;		nop
-		ibt r0, #$5 ; transparency off, low nibble has color  
+		ibt r0, #$1 ; transparency off, low nibble has color  
       drawPixel:
 	    cmode
 	    plot
+		plot
 	  dec r7
 	  bne drawSpriteLine1
 	  nop 
