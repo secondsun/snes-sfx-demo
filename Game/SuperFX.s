@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$3;three sprite
+        lda #$2;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -34,34 +34,39 @@ Main:
         
         ldx #.loword(pillar)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$00
+        ldx #$0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
+        ldx #$0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0200
+        ldx #$00AC
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0080
+        ldx #$0180
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         ldx #.loword(banner1)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
-        ldx #$08
+        ldx #$0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
+        ldx #$0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0100
+        ldx #$00AC
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0100
+        ldx #$0180
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
-        ldx #$10
+        ldx #$0
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
+        ldx #$0
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0100
+        ldx #$00AC
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0100
+        ldx #$0180
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
 
+        ldx #$0
+        stx z:Scale_index_counter
 
         plb
         jml __MAIN_LOOP_RUN__
@@ -141,6 +146,32 @@ drawScreen2:
                 stz z:VRAM_screen_select ; write to the other screen
                 ldx     #bg12nba(VRAM_screen_2, VRAM_screen_1)
                 stx     BG12NBA
+
+                phb
+                lda #$70
+                pha
+                plb
+                RW_push set:a16i16
+                ;update and store counter
+                lda z:Scale_index_counter
+                dec
+                and #$0F
+                sta z:Scale_index_counter
+                
+                asl a ; shift A left
+                asl a ; shift A left
+                tax ; move a (offset) to X
+                lda f:Scale, X
+                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
+                lda f:Scale+2, X
+                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
+                
+                RW_pull
+                plb
                 gsuOn
                 endVBlank
         :;copyFromStart:        
@@ -174,13 +205,16 @@ drawScreen1:
 
 
 .segment "ZEROPAGE"
-   VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_VRAM in todo.pointers
+VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_VRAM in todo.pointers
                                 ; This is where SFX buffers are copied to.
                                 ; 0 = screen 1
                                 ; 1 = screen 2
-   SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram; 
+SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram; 
                                 ; 0 = $700400
                                 ; 1 = $702900
+Scale_index_counter: .res 1 ; scale index counter
+
 .segment "RODATA"
    incbin  Palette,        "Data/superfx.palette.bin"
+   incbin  Scale,          "Data/scale.bin"
                                     

@@ -161,10 +161,13 @@ addEdgeRow:
 	from r1
 	to r10
 	lob ; r10 = with/2 aka #of bytes
-	with r10	
-	swap ; r10 = w/2.8 fixed
+	with r6	
+	swap ; r6 = low byte of r6 is int part of offset multiplier
 	with r10
-	fmult ; r10 = scaled texture offset
+	mult r6; r10 = scaled texture offset
+	
+	with r6	
+	swap ; r6 = restore r6 to normal order
 
 	from r8 ; base address
 	to r10 
@@ -235,7 +238,7 @@ next:
   
 
   iwt r0, #edgeTable
-  iwt r12, #160 ;160 rows in table (TODO DOUBLE SPEED OF PROGRAM)
+  iwt r12, #160 
   iwt r13, #drawEdgeTable
   ibt r2, #0
   cache
@@ -352,7 +355,7 @@ drawLine2:
 	    plot
 		plot
 	  dec r7
-	  bne drawSpriteLine1
+	  bge drawSpriteLine1
 	  nop 
 	  
 	; r0 = first entry of row on edgetable
@@ -360,6 +363,24 @@ drawLine2:
 	dec r3
 	bne drawLine2
     nop
+	;clear rest of line
+	
+	ibt r0, #0 ; set color to black
+	color
+   
+	ibt r0, #$80 ; 128 pixel 
+	sub r1
+	bge drawFour2
+	 nop
+	drawFour2: 
+	  plot
+	  plot
+	  plot
+	  plot
+	  sub r1
+      bge drawFour2
+	  nop
+
 	; set r0 to next entry, update y pos, loop
   	ibt r10, #.sizeof(edgerow)
 	inc r2
