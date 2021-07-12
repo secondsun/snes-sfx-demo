@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$1;three sprite
+        lda #$2;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -31,17 +31,20 @@ Main:
 ;  yLoc .byte
 ;  scale .word ; 8.8 fixed point
 ; setup sprite list
-        
+
+
+
         ldx #.loword(tree)
-        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::texture
-        ldx #$20
-        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
-        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::yLoc
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
+        ldx #$00
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
+        ldx #$00
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
-        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
         ldx #$0100
-        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
@@ -77,17 +80,17 @@ Main:
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
 
-
-        ldx #.loword(banner1)
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$00
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$00
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
+        
+        ldx #.loword(tree)
+        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::texture
+        ldx #$0
+        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::xLoc
+        ldx #$0
+        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
         ldx #$0100
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+        stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
 
         
 
@@ -187,12 +190,12 @@ drawScreen2:
                 asl a ; shift A left
                 tax ; move a (offset) to X
                 lda f:Scale, X
-               ; sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
                 sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
                 sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
                 sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
                 lda f:Scale+2, X
-             ;   sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
                 sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
                 sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
                 sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
