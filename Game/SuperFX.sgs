@@ -252,9 +252,10 @@ predrawEdgeTable:
   ibt r1, #0 ; x = 0;
   to r3
   ldb (r0) ; read count
+  
   with r3
   add #0 ; set flags
-  bne drawBlack ; if count != 0 then draw the edge lines, else draw transparent
+  bne drawBlackSetup ; if count != 0 then draw the edge lines, else draw transparent
   nop
 	move r4, r0 ; backup memory location
 
@@ -277,7 +278,8 @@ predrawEdgeTable:
 	inc r2
 	bra finish1
 	nop
-	
+  drawBlackSetup:	
+  	;add #1 ; point r0 to start of first sprite
   drawBlack:
     add #4  ; r0 points to start value of current edge entry
 
@@ -287,17 +289,40 @@ predrawEdgeTable:
 	to r7
 	ldb (r0) ; r7 has length
 	
+	;is the start before the current plot point?
+    from r8
+	cmp r1
+	beq nextSprite
+	nop
+	bmi nextSprite
+	nop
+
+    padStartOdd: ; clear out the one
+    with r8 
+	asr
+	bcc padStartEven
+	nop
+	plot
+	
+	padStartEven: ; clear out the one
+    with r8 
+	asr
+	bcc padStart
+    nop
+	plot
+	plot
+
 	padStart:
-	  from r8
-	  to r10
-	  sub r1
-	  beq nextSprite
-	  nop
+	  dec r8
 	  bmi nextSprite
 	  nop
-	  plot ; TODO this might be able to be made faster by double plotting
+	  plot
+	  plot
+	  plot
+	  plot
 	  bra padStart
 	  nop
+
     nextSprite:
       with r1 
 	  add r7 ; plot x=  plot x + length
@@ -307,19 +332,41 @@ predrawEdgeTable:
 	  bne drawBlack
 	  nop
 	
-
+	;is the start before the current plot point?
 	iwt r8, #128  
+    with r8
+	sub r1
+	beq nextLine1
+	nop
+	bmi nextLine1
+	nop
+
+    padEndOdd: ; clear out the one
+    with r8 
+	asr
+	bcc padEndEven
+	nop
+	plot
+	
+	padEndEven: ; clear out the one
+    with r8 
+	asr
+	bcc padEnd
+    nop
+	plot
+	plot
+
 	padEnd:
-	  from r8
-	  to r10
-	  sub r1
-	  beq nextLine1
-	  nop
+	  dec r8
 	  bmi nextLine1
 	  nop
-	  plot ; TODO this might be able to be made faster by checking if r8 is even and double plotting
+	  plot
+	  plot
+	  plot
+	  plot
 	  bra padEnd
-	nop
+	  nop
+
   nextLine1:
   ibt r3, #.sizeof(edgerow)
 	with r11
@@ -374,6 +421,48 @@ drawLine2:
     ldw (r0) ; r6 has scale_r
 	add #2 ; r0 points to next entry if any
 
+    ;if r8 > r1
+	; r1 = r8
+	; else if r1 > r8
+	;   if r1 < r8+r7
+	;      r7 = r1-r8
+    ; else 
+	;   next3
+
+    from r8 ; if r8 > r1
+	cmp r1
+	bge setX ; r1 = r8
+	nop
+
+	from r1 ; else if r1 > r8
+	cmp r8
+	beq drawSpriteLine
+	nop
+
+	adjustX: ;r1 < r8+r7?
+  		to r4 ; r4 = r8+r7
+		from r7
+		add r8
+		cmp r1
+		bge next4 ; trampoline to next sprite
+		nop
+		to r7
+		from r1
+		sub r8 ; r7 = r1 - r8
+        
+		bra drawSpriteLine
+		nop
+		
+		next4: 
+		  iwt r15, #next3
+		  nop
+ 	bra drawSpriteLine
+	nop
+
+
+    setX: 
+	  move r1, r8
+      
 
 	; r0 = scratch
 	; r1 = plotX
