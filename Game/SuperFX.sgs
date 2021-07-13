@@ -464,7 +464,7 @@ drawLine2:
 	  move r1, r8
       
 
-	; r0 = maxX
+	; r11 = maxX
 	; r1 = plotX
 	; r2 = plotY
 	; r3 = number of edgeEntries on row
