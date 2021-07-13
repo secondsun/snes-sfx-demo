@@ -236,6 +236,98 @@ next:
   ;end 
   
   
+  iwt r12, #160 
+  iwt r13, #predrawEdgeTable
+  ibt r2, #0
+  ibt r0, #$3 ; transparency off, high nibble has color
+  cmode 
+  ibt r0, #0 ; set color to black
+  color
+  
+  cache
+  ;black out all spaces that don't have sprites
+predrawEdgeTable:
+
+  ibt r10, #.sizeof(edgerow)
+  from r2
+  umult r10
+  ibt r3, #.sizeof(edgerow)
+  add r3
+  
+  ibt r1, #0 ; x = 0;
+  to r3
+  ldb (r0) ; read count
+  with r3
+  add #0 ; set flags
+  bne drawBlack ; if count != 0 then draw the edge lines, else draw transparent
+  nop
+	move r3, r0 ; backup memory location
+
+	ibt r0, #$20 ; 128 pixel 
+	drawFour: 
+	  plot
+	  plot
+	  plot
+	  plot
+	  dec r0
+      bne drawFour
+	  nop
+	  move r0, r3;restore edge table loc
+	  ibt r3, #.sizeof(edgerow)
+	  add r3
+	loop ; loop back to predrawEdgeTable
+	inc r2
+	bra finish1
+	nop
+	
+  drawBlack:
+    add #4  ; r0 points to start value of current edge entry
+
+	to r8
+	ldb (r0) ; r8 has start
+	add #1 ; r0 points to length
+	to r7
+	ldb (r0) ; r7 has length
+	
+	padStart:
+	  from r8
+	  to r10
+	  sub r1
+	  beq nextSprite
+	  nop
+	  bmi nextSprite
+	  nop
+	  plot ; TODO this might be able to be made faster by double plotting
+	  bra padStart
+	  nop
+    nextSprite:
+      with r1 
+	  add r7 ; plot x=  plot x + length
+	  add #1 ; we add 4 before we load, this lines that add up so we point to the right number of things
+	  ;If more sprites, loop, otherwise, draw end
+	  dec r3
+	  bne drawBlack
+	  nop
+	
+
+	iwt r8, #128  
+	padEnd:
+	  from r8
+	  to r10
+	  sub r1
+	  beq nextLine1
+	  nop
+	  bmi nextLine1
+	  nop
+	  plot ; TODO this might be able to be made faster by checking if r8 is even and double plotting
+	  bra padEnd
+	nop
+  nextLine1:
+  loop
+  inc r2
+  nop
+
+finish1:
 
   iwt r0, #edgeTable
   iwt r12, #160 
@@ -250,25 +342,8 @@ drawEdgeTable:
   add #0 ; set flags
   bne drawLine ; if count != 0 then draw the edge lines, else draw transparent
 	nop
-	move r3, r0 ; backup memory location
-
-	ibt r0, #$3 ; transparency off, high nibble has color
-	cmode 
-	ibt r0, #0 ; set color to black
-	color
-   
-	ibt r0, #$20 ; 128 pixel 
-	drawFour: 
-	  plot
-	  plot
-	  plot
-	  plot
-	  dec r0
-      bne drawFour
-	  nop
-	  move r0, r3;restore edge table loc
-	  ibt r3, #.sizeof(edgerow)
-	  add r3
+	ibt r3, #.sizeof(edgerow)
+	add r3
 	loop ; loop back to drawEdgeTable
 	inc r2
 	bra finish
@@ -295,28 +370,8 @@ drawLine2:
 	add #1 ; r0 points to scale
 	to r6
     ldw (r0) ; r6 has scale_r
-	;with r6
-	;div2 ; r6 = scale / 2 because two pixels are stored in a byte
 	add #2 ; r0 points to next entry if any
 
-    move r13, r0 ; backup next address to r13
-    
-	
-	ibt r0, #$3 ; transparency off, high nibble has color
-	cmode 
-	ibt r0, #0 ; set color to black
-	color
-
-	padStart:
-	  from r8
-	  sub r1
-	  beq drawSpriteLine
-	  nop
-	  bmi drawSpriteLine
-	  nop
-	  plot
-	  bra padStart
-	nop
 
 	; r0 = scratch
 	; r1 = plotX
@@ -342,14 +397,7 @@ drawLine2:
 	  from r5
 	  to r14
 	  add r9 ; load next byte
-
-;	  with r9 
-;	  ror ; is r9 odd if so, color low nibble
-;	  bcs :+
-;	  	ibt r0, #$5 ; transparency off, high nibble has color
-;		bra drawPixel
-;		nop
-		ibt r0, #$1 ; transparency off, low nibble has color  
+      ibt r0, #$1 ; transparency off, low nibble has color  
       drawPixel:
 	    cmode
 	    plot
