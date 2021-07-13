@@ -12,20 +12,19 @@ GSU_Code:
 .export GSU_Code
 
 initializeEdgeTable:
-  ;set all counters to 0 in 
+  ;set all counters to 0 in
+  iwt r0, #edgeTable
+  ibt r1, #.sizeof(edgerow)
+  ibt r2, #0 
   cache
-  iwt r12, #159
+  iwt r12, #161
   iwt r13, #:+
   :
-  ibt r0, #.sizeof(edgerow)
-  umult r12
-  iwt r1, #edgeTable
-  to r1
-  add r1
-  ibt r0, #0
-  stb (r1)
+  from r2
+  stb (r0)  
   loop
-nop
+add r1
+
   iwt r1, #edgeTable
   ibt r0, #0
   stb (r1)
@@ -246,13 +245,9 @@ next:
   
   cache
   ;black out all spaces that don't have sprites
+iwt r0, #edgeTable
+iwt r11, #edgeTable  
 predrawEdgeTable:
-
-  ibt r10, #.sizeof(edgerow)
-  from r2
-  umult r10
-  ibt r3, #.sizeof(edgerow)
-  add r3
   
   ibt r1, #0 ; x = 0;
   to r3
@@ -261,7 +256,7 @@ predrawEdgeTable:
   add #0 ; set flags
   bne drawBlack ; if count != 0 then draw the edge lines, else draw transparent
   nop
-	move r3, r0 ; backup memory location
+	move r4, r0 ; backup memory location
 
 	ibt r0, #$20 ; 128 pixel 
 	drawFour: 
@@ -272,9 +267,12 @@ predrawEdgeTable:
 	  dec r0
       bne drawFour
 	  nop
-	  move r0, r3;restore edge table loc
-	  ibt r3, #.sizeof(edgerow)
-	  add r3
+	move r0, r4;restore edge table loc
+	ibt r3, #.sizeof(edgerow)
+	with r11
+	add r3
+	move r0, r11
+
 	loop ; loop back to predrawEdgeTable
 	inc r2
 	bra finish1
@@ -323,6 +321,10 @@ predrawEdgeTable:
 	  bra padEnd
 	nop
   nextLine1:
+  ibt r3, #.sizeof(edgerow)
+	with r11
+	add r3
+	move r0, r11
   loop
   inc r2
   nop
@@ -350,7 +352,7 @@ drawEdgeTable:
 	nop
   ; above if there are no sprites, draw a black line
   ; below draw the black preamble, then sprites (and fill gaps with black), then end black
-  cache
+  
   drawLine: 
   	add #2 ; r0 points to first edge entry
 drawLine2: 
@@ -397,37 +399,21 @@ drawLine2:
 	  from r5
 	  to r14
 	  add r9 ; load next byte
-      ibt r0, #$1 ; transparency off, low nibble has color  
       drawPixel:
-	    cmode
 	    plot
 		plot
 	  dec r7
-	  bge drawSpriteLine1
+	  beq next3
 	  nop 
+	  bpl drawSpriteLine1
+	  nop 
+next3:
 	  
-	; r0 = first entry of row on edgetable
-	move r0, r13 
+	;move r0, r13 
 	dec r3
 	bne drawLine2
     nop
-	;clear rest of line
 	
-	ibt r0, #0 ; set color to black
-	color
-   
-	ibt r0, #$80 ; 128 pixel 
-	sub r1
-	bge drawFour2
-	 nop
-	drawFour2: 
-	  plot
-	  plot
-	  plot
-	  plot
-	  sub r1
-      bge drawFour2
-	  nop
 
 	; set r0 to next entry, update y pos, loop
   	ibt r10, #.sizeof(edgerow)
