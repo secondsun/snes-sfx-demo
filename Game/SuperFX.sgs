@@ -464,7 +464,7 @@ drawLine2:
 	  move r1, r8
       
 
-	; r0 = scratch
+	; r0 = maxX
 	; r1 = plotX
 	; r2 = plotY
 	; r3 = number of edgeEntries on row
@@ -476,9 +476,11 @@ drawLine2:
 	; r9 = scratch
 	; r10+ scratch 
 	drawSpriteLine:
+		iwt r11, #128
 		move r14, r5 ; begin prefetch
 		iwt r4, #0 ; r4 will be 8.8 with integer part added to r5 as offset
 	drawSpriteLine1:
+	  
 	  with r4
 	  add r6
 	  to r9
@@ -491,6 +493,9 @@ drawLine2:
       drawPixel:
 	    plot
 		plot
+	  from r1
+	  cmp r11
+	  bge next3
 	  dec r7
 	  beq next3
 	  nop 
