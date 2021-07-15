@@ -30,7 +30,7 @@ add r1
   stb (r1)
 
 createEdgeTable:
-  ibt r0, #3 ; sprite index counter
+  ibt r0, #3 ; data bank 3
   romb 
 
   ibt r5, #0 ; sprite index counter
@@ -119,7 +119,7 @@ move r4, r10
 	;end interleave
     ; r0 = [h][w/2]
 	; r2 = indexOfEntryOnRow (maxes out at r3, #of Sprites)
-	; r6 = scale
+	; r6 = scale ; will be needed in #adjustEdgeEntries
 	; r3 = #ofSprites
 	; r4 = yLoc
 	; r5 = spriteIndex
@@ -133,7 +133,7 @@ move r4, r10
 	;============================
 	;
 	;
-	;r8 = spriteAddress := {W/2 (bh), h(bl), 4bpp[]}
+	;r8 = spriteAddress => {W/2 (bh), h(bl), table, 4bpp[]}
 	;
 	; r8+2 = xLoc
 	; r8+3 = yLoc
@@ -153,53 +153,49 @@ addEdgeRow:
 	add r7 ; r0 is now the address to write the row
 
 	;begin calculate row of texture to read from on this line
-    move r10, r6
-	move r6, r12
-	move r12, r10 ; swap r6 and r 12
-
 	from r1
 	to r10
 	lob ; r10 = with/2 aka #of bytes
-	with r6	
-	swap ; r6 = low byte of r6 is int part of offset multiplier
+	with r12
+	swap ; r12 = low byte of r12 is int part of offset multiplier
 	with r10
-	mult r6; r10 = scaled texture offset
-	
-	with r6	
-	swap ; r6 = restore r6 to normal order
+	mult r12; r10 = scaled texture offset
 
-	from r8 ; base address
-	to r10 
-	add r10 ; r10 = r8 + scaledOffset
-	from r10
-	stw (r0) ; texture start address scaled 
-	
-	move r10, r6
-	move r6, r12
-	move r12, r10 ; swap r6 and r12 back
+	move r10,r6
+	move r6, r13
+	move r13, r10 ; swap r13 and r6
+
+	; todo get the skip to scale correctly.
+	; r12 has the line we're on (scaled value)
+	; need to multiply it by something, #4 is wrong
+	from r12
+	to r10
+	mult #4
+	with r10
+	add r8; next header entry
+
+
+	from r10 ; base address
+	stw (r0) ; texture start address. Will become start address of pixel data in adjustEdgeEntries
+		
+	move r10, r13
+	move r13, r6
+	move r6, r10 ; swap r13 and r6
+
+
+	with r12	
+	swap ; r12 = restore r12 to normal order
 
 	add #2
 	from r9
 	stb (r0) ; xloc
 
 	add #1
-	from r1
-	to r10
-	lob
-	with r10
-	swap
-	with r10
-	rol ; r10 = w.8
-
-	with r10
-	fmult 
-	
-	from r10
-	stb (r0) ; width
+	;skip length byte for adjustEdgeEntries
 
 	add #1
 	from r13
-	stw (r0) ; scale_r/2 (pixels are stored 2 per byte so when we draw a line we only want to travel half as far)
+	stw (r0) ; scale_r
 	inc r2
 	from r2
 	stb (r7) ; count++
@@ -225,12 +221,97 @@ addEdgeRow:
 	from r3
 	sub r5
 	branch:
-	beq next
+	beq adjustEdgeEntries
 	nop
 	iwt r15, #addEdgeEntry
 	nop
-  	;TODO subtracing spriteIndex - spriteCount and branching if the index is past the count may be faster by 1 - 2cycles
-  	
+
+; Right now the edge entry is [textureStartAddress][xPos][undefined][scale_r]
+; we need to make it [pixelDataStartAddress][xPos + padding*scale][length*scale][scale_r]
+; r6 coming in is assumed to be scale
+; for each edgeEntry
+; lookup textureStartAddress + 2 + intval[yPos * scale_r]*4
+; this is the rowEntry
+; yPos = #160 - r12
+; pixelDataStartAddress = rowEntry + word@(rowEntry)
+; padding = byte@(rowEntry+1)
+; length = byte@(rowEntry+2)
+; write
+; 
+; r6 = scale
+; all other registers are fair game
+; r3 = scratch
+
+adjustEdgeEntries:
+	; 160 rows in edgeTable
+	iwt r12, #160 
+    iwt r0, #edgeTable ; r0 holds the memory we are readin
+	iwt r11, #edgeTable   ; r11 holds the start of the current row
+    ibt r7, #0; yPos
+	
+	adjustEdgeEntriesBody:
+	    
+		to r1
+		ldb(r0) ; r1 = count
+		with r1 ; reset flags
+		add #0
+		
+		bne :+
+			nop
+			iwt r15, #nextRow2 ; count == 0, skip to the next row
+			nop
+	    :
+		adjustNextEdgeEntryBody:
+		add #2
+        to r2
+		ldw (r0) ; r2 = texturestartAddress
+		move r14, r2 ; start load for texture
+		add #2 ; r0 ;points to xPos
+		to r3
+		ldb (r0) ; r3 = xPos
+ 
+		to r5
+		getb
+		with r2
+		add #1 ; 
+		move r14, r2 ; start load for texture high byte
+		
+
+
+		
+		
+ 		add #2 ; r0 points to scale_r
+		to r4
+		ldb (r0) ; r4 = scale_r
+
+		with r5
+		getbh ; r5 has skip Bytes
+		with r5 
+		; r2 + r5  = pixelBytes
+		with r2
+		add r5
+		sub #4
+		from r2
+		stw(r0)
+
+		add #4 ; r0 points to next entry if it exists
+
+		with r1
+		sub #1
+		beq nextRow2
+		nop
+		iwt r15, #adjustNextEdgeEntryBody
+		nop
+
+		nextRow2:
+			ibt r3, #.sizeof(edgerow)
+			with r11
+			add r3
+			move r0, r11
+	iwt r13, #adjustEdgeEntriesBody
+	loop
+	inc r7
+
 next:
   ;end 
   

@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$5;three sprite
+        lda #$1;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -36,9 +36,9 @@ Main:
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::texture
-        ldx #$0
+        ldx #$40
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$20
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
@@ -48,9 +48,9 @@ Main:
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::texture
-        ldx #$10
+        ldx #$30
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::xLoc
-        ldx #$10
+        ldx #$0
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
@@ -71,9 +71,9 @@ Main:
         
         ldx #.loword(tree)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
-        ldx #$30
+        ldx #$60
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
-        ldx #$30
+        ldx #$20
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
@@ -83,13 +83,13 @@ Main:
         
         ldx #.loword(tree)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$40
+        ldx #$10
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$40
+        ldx #$20
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0100
+        ldx #$0200
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0100
+        ldx #$0080
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         
@@ -189,17 +189,18 @@ drawScreen2:
                 asl a ; shift A left
                 asl a ; shift A left
                 tax ; move a (offset) to X
-                lda f:Scale, X
-                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
-                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
-                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
-                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
-                lda f:Scale+2, X
-               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
-                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
-                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
-                
+;                lda f:Scale, X
+;                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
+;                lda f:Scale+2, X
+;               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
                 RW_pull
                 plb
                 gsuOn
@@ -213,8 +214,9 @@ drawScreen2:
 drawScreen1:        
                 ;Where do we copy from?
                 lda z:SFX_buffer_position
-                beq :+
-        ;copyFromHalf:
+                bne copyFromHalf
+                jmp copyFromStart
+        copyFromHalf:
                 VRAM_memcpy (VRAM_screen_1 + screenbuffer_len), (screenbuffer ), screenbuffer_len
                 lda #$00
                 sta z:SFX_buffer_position ;sfx reads from start of work ram
@@ -237,23 +239,25 @@ drawScreen1:
                 asl a ; shift A left
                 asl a ; shift A left
                 tax ; move a (offset) to X
-                lda f:Scale, X
-                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
-                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
-                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
-                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
-                lda f:Scale+2, X
-                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
-                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
-                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
+                ;                lda f:Scale, X
+;                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
+;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
+;                lda f:Scale+2, X
+;               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
+;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
                 
                 RW_pull
                 plb
 
                 gsuOn
                 endVBlank
-        : ;copyFromStart:        
+        copyFromStart:        
                 VRAM_memcpy VRAM_screen_1, screenbuffer, screenbuffer_len
                 lda #$01 ;sfx reads from middle of work ram
                 sta z:SFX_buffer_position
