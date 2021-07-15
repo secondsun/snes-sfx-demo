@@ -191,7 +191,7 @@ addEdgeRow:
 	stb (r0) ; xloc
 
 	add #1
-	;skip length byte for adjustEdgeEntries
+	;we calculate length byte in adjustEdgeEntries
 
 	add #1
 	from r13
@@ -242,13 +242,14 @@ addEdgeRow:
 ; all other registers are fair game
 ; r3 = scratch
 
+
 adjustEdgeEntries:
 	; 160 rows in edgeTable
 	iwt r12, #160 
     iwt r0, #edgeTable ; r0 holds the memory we are readin
 	iwt r11, #edgeTable   ; r11 holds the start of the current row
     ibt r7, #0; yPos
-	
+	cache	
 	adjustEdgeEntriesBody:
 	    
 		to r1
@@ -275,7 +276,9 @@ adjustEdgeEntries:
 		with r2
 		add #1 ; 
 		move r14, r2 ; start load for texture high byte
-		
+		move r8, r2 
+		with r8
+		add #1 ; r8 points to pad
 
 
 		
@@ -294,7 +297,37 @@ adjustEdgeEntries:
 		from r2
 		stw(r0)
 
-		add #4 ; r0 points to next entry if it exists
+		add #2 ; r0 points to xLoc
+		to r9 
+		ldb (r0) ; r9 has xLoc
+
+
+		move r14, r8; load pad
+		with r8
+		add #1 ; r8 points to length
+		to r5
+		getb ; r5 has pad
+		move r14, r8; load length
+		with r5
+		swap
+		with r5
+		fmult 
+		with r5
+		add r9 ; r5 = scale pad + xLoc
+		from r5
+		stb(r0) ; save scaledAdjustedXLoc
+
+		add #1 ; r0 points to length
+		to r5
+		getb ; r5 has length
+		with r5
+		swap
+		with r5 ; scale length
+		fmult 
+		from r5
+		stb(r0) ; save scaledLength
+		
+		add #1 ; setup r0 to next entry, if any
 
 		with r1
 		sub #1

@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$1;three sprite
+        lda #$2;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -71,7 +71,7 @@ Main:
         
         ldx #.loword(tree)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
-        ldx #$60
+        ldx #$0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
         ldx #$20
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
@@ -81,7 +81,7 @@ Main:
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
 
         
-        ldx #.loword(tree)
+        ldx #.loword(banner1)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
         ldx #$10
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
@@ -189,18 +189,18 @@ drawScreen2:
                 asl a ; shift A left
                 asl a ; shift A left
                 tax ; move a (offset) to X
-;                lda f:Scale, X
-;                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
-;                lda f:Scale+2, X
-;               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
+                lda f:Scale, X
+                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
+                lda f:Scale+2, X
+               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
                 RW_pull
                 plb
                 gsuOn
@@ -239,18 +239,18 @@ drawScreen1:
                 asl a ; shift A left
                 asl a ; shift A left
                 tax ; move a (offset) to X
-                ;                lda f:Scale, X
-;                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
-;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
-;                lda f:Scale+2, X
-;               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
-;                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
+                lda f:Scale, X
+                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
+                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
+                lda f:Scale+2, X
+               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
                 
                 RW_pull
                 plb
