@@ -529,7 +529,15 @@ drawLine2:
 	to r7
 	ldb (r0) ; r7 has length
 	with r7
-	ror
+	add #0
+	bne :+
+	nop
+	add #3
+	iwt r15, #next3
+	
+	:
+	with r7
+	asr
 	add #1 ; r0 points to scale
 	to r6
     ldw (r0) ; r6 has scale_r
