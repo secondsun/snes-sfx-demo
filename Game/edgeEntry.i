@@ -12,6 +12,16 @@
   edges  .res 5 * .sizeof(edgeentry) ; each row can have 5 entries (number pulled firmly from keister)
 .endstruct
 
+;edgeRows are copied to bigedgeRow and potentiall split into two
+.struct bigedgerow
+  count  .byte
+  pad .byte
+  edges  .res 10 * .sizeof(edgeentry) ; each row can have 10 entries (2x from edgerow)
+.endstruct
+
+.struct bigedgetable
+  rows .res 160 * .sizeof(bigedgerow) ; 160 rows of edges
+.endstruct
 
 
 .struct edgetable

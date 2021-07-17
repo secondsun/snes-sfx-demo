@@ -11,6 +11,21 @@
 GSU_Code:
 .export GSU_Code
 
+initializeBigEdgeTable:
+  ;set all counters to 0 in
+  iwt r0, #immediateDrawLedger
+  ibt r1, #.sizeof(bigedgerow)
+  ibt r2, #4 
+  cache
+  iwt r12, #161
+  iwt r13, #:+
+  :
+  from r2
+  stb (r0)  
+  loop
+add r1
+
+
 initializeEdgeTable:
   ;set all counters to 0 in
   iwt r0, #edgeTable
@@ -24,6 +39,7 @@ initializeEdgeTable:
   stb (r0)  
   loop
 add r1
+
 
   iwt r1, #edgeTable
   ibt r0, #0
@@ -361,6 +377,7 @@ next:
   ;black out all spaces that don't have sprites
 iwt r0, #edgeTable
 iwt r11, #edgeTable  
+;TODO remove black drawing, the new method will work better
 predrawEdgeTable:
   
   ibt r1, #0 ; x = 0;
@@ -392,6 +409,7 @@ predrawEdgeTable:
 	inc r2
 	bra finish1
 	nop
+	;TODO remove black drawing
   drawBlackSetup:	
   	;add #1 ; point r0 to start of first sprite
   drawBlack:
@@ -673,4 +691,5 @@ spritespace:
   .res .sizeof(spritelist)
 edgeTable:
   .res .sizeof(edgetable)
-
+immediateDrawLedger:  
+  .res .sizeof(bigedgetable)

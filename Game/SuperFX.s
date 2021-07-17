@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$5;three sprite
+        lda #$2;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -59,7 +59,7 @@ Main:
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
-        ldx #$20
+        ldx #$40
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
         ldx #$20
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
@@ -83,9 +83,9 @@ Main:
         
         ldx #.loword(tree)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$40
+        ldx #$60
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$40
+        ldx #$70
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
         ldx #$0200
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
@@ -232,7 +232,7 @@ drawScreen1:
                 RW_push set:a16i16
                 ;update and store counter
                 lda z:Scale_index_counter
-                dec
+               ;dec
                 and #$1F
                 sta z:Scale_index_counter
                 

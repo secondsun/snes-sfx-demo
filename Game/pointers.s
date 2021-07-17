@@ -8,7 +8,7 @@ sfx_code_start = $700000 ;address of the first sfx instruction
 sfx_code_size  = $200 ;space allocated to the sfx code; we've default to 512 bytes
                         ;because it is the cache size of the sfxcpu 
 
-screenbuffer = $701800 ; start of the SFX screen buffer 
+screenbuffer = $704000 ; start of the SFX screen buffer 
                        ; This memory will be DMA'd into VRAM during V-Blank
 
 screenbuffer_len = $2800 ; Size of the SB. We're using a 160 line 4 bpp screen mode
