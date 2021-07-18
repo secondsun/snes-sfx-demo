@@ -11,11 +11,23 @@
 GSU_Code:
 .export GSU_Code
 
+resetFrameBuffer:
+iwt r0,#0
+iwt r1, #$4000
+iwt r12, #$1400
+cache
+move r13, r15
+  stw(r1)
+  inc r1
+  loop
+  inc r1
+  
+
 initializeBigEdgeTable:
   ;set all counters to 0 in
   iwt r0, #bigEdgeTable
   ibt r1, #.sizeof(bigedgerow)
-  ibt r2, #4 
+  ibt r2, #0
   cache
   iwt r12, #161
   iwt r13, #:+
@@ -421,7 +433,7 @@ next:
 	  stb (r7) ; write - to row count
 	  loop ;adjustToBigTable
 	  nop
-	  iwt r15, #afterAdjustBigTable
+	  iwt r15, #finish1
 	  nop
     :
  
@@ -497,150 +509,6 @@ next:
   ;   write original entry to big entry
   ;}
   ; load second entry
-
-afterAdjustBigTable:
-  iwt r12, #160 
-  iwt r13, #predrawEdgeTable
-  ibt r2, #0
-  ibt r0, #$3 ; transparency off, high nibble has color
-  cmode 
-  ibt r0, #0 ; set color to black
-  color
-  
-  cache
-  ;black out all spaces that don't have sprites
-iwt r0, #edgeTable
-iwt r11, #edgeTable  
-;TODO remove black drawing, the new method will work better
-predrawEdgeTable:
-  
-  ibt r1, #0 ; x = 0;
-  to r3
-  ldb (r0) ; read count
-  
-  with r3
-  add #0 ; set flags
-  bne drawBlackSetup ; if count != 0 then draw the edge lines, else draw transparent
-  nop
-	move r4, r0 ; backup memory location
-
-	ibt r0, #$20 ; 128 pixel 
-	drawFour: 
-	  plot
-	  plot
-	  plot
-	  plot
-	  dec r0
-      bne drawFour
-	  nop
-	move r0, r4;restore edge table loc
-	ibt r3, #.sizeof(edgerow)
-	with r11
-	add r3
-	move r0, r11
-
-	loop ; loop back to predrawEdgeTable
-	inc r2
-	bra finish1
-	nop
-	;TODO remove black drawing
-  drawBlackSetup:	
-  	;add #1 ; point r0 to start of first sprite
-  drawBlack:
-    add #4  ; r0 points to start value of current edge entry
-
-	to r8
-	ldb (r0) ; r8 has start
-	add #1 ; r0 points to length
-	to r7
-	ldb (r0) ; r7 has length
-	
-	;is the start before the current plot point?
-    from r8
-	cmp r1
-	beq nextSprite
-	nop
-	bmi nextSprite
-	nop
-
-    padStartOdd: ; clear out the one
-    with r8 
-	asr
-	bcc padStartEven
-	nop
-	plot
-	
-	padStartEven: ; clear out the one
-    with r8 
-	asr
-	bcc padStart
-    nop
-	plot
-	plot
-
-	padStart:
-	  dec r8
-	  bmi nextSprite
-	  nop
-	  plot
-	  plot
-	  plot
-	  plot
-	  bra padStart
-	  nop
-
-    nextSprite:
-      with r1 
-	  add r7 ; plot x=  plot x + length
-	  add #1 ; we add 4 before we load, this lines that add up so we point to the right number of things
-	  ;If more sprites, loop, otherwise, draw end
-	  dec r3
-	  bne drawBlack
-	  nop
-	
-	;is the start before the current plot point?
-	iwt r8, #128  
-    with r8
-	sub r1
-	beq nextLine1
-	nop
-	bmi nextLine1
-	nop
-
-    padEndOdd: ; clear out the one
-    with r8 
-	asr
-	bcc padEndEven
-	nop
-	plot
-	
-	padEndEven: ; clear out the one
-    with r8 
-	asr
-	bcc padEnd
-    nop
-	plot
-	plot
-
-	padEnd:
-	  dec r8
-	  bmi nextLine1
-	  nop
-	  plot
-	  plot
-	  plot
-	  plot
-	  bra padEnd
-	  nop
-
-  nextLine1:
-  ibt r3, #.sizeof(edgerow)
-	with r11
-	add r3
-	move r0, r11
-  loop
-  inc r2
-  nop
 
 finish1:
 
