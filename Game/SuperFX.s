@@ -87,9 +87,9 @@ Main:
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
         ldx #$70
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0200
+        ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0080
+        ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         

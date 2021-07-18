@@ -16,6 +16,7 @@
 .struct bigedgerow
   count  .byte
   pad .byte
+  pad2 .word ; makes this double the size of the edgeRow. We use this to shortcut calculating offsets
   edges  .res 10 * .sizeof(edgeentry) ; each row can have 10 entries (2x from edgerow)
 .endstruct
 

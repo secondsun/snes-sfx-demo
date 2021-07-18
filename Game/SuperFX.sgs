@@ -13,7 +13,7 @@ GSU_Code:
 
 initializeBigEdgeTable:
   ;set all counters to 0 in
-  iwt r0, #immediateDrawLedger
+  iwt r0, #bigEdgeTable
   ibt r1, #.sizeof(bigedgerow)
   ibt r2, #4 
   cache
@@ -131,7 +131,20 @@ to r11
 hib	
 move r4, r10
 
+;clip the sprite if it draws below the screen
+iwt r12, #160
+; if r11 + r4 > 160 r11 = 160 - r4
+to r10
+from r11
+add r4
+from r12
+cmp r10
+bge :+
+  to r11
+  from r12
+  sub r4 
 
+:
 	;end interleave
     ; r0 = [h][w/2]
 	; r2 = indexOfEntryOnRow (maxes out at r3, #of Sprites)
@@ -258,11 +271,21 @@ addEdgeRow:
 ; all other registers are fair game
 ; r3 = scratch
 
-
+; free register; 
+; r6, r10, r13*
+; r1 = count
+; r2 = romtextureStart
+; r3 = xPos
+; r4 = scale_r 
+; r5 = memoryTexturePointer
+; r8 = pointer to adjusted row
+; r9 = adjusted location
+; r11 = pointer to edge thing
+; r7 = row
 adjustEdgeEntries:
 	; 160 rows in edgeTable
 	iwt r12, #160 
-    iwt r0, #edgeTable ; r0 holds the memory we are readin
+    iwt r0, #edgeTable ; r0 holds the memory we are reading
 	iwt r11, #edgeTable   ; r11 holds the start of the current row
     ibt r7, #0; yPos
 	cache	
@@ -364,7 +387,118 @@ adjustEdgeEntries:
 next:
   ;end 
   
+  iwt r12, #160 
+  iwt r13, #adjustToBigTable
   
+  
+  cache
+  adjustToBigTable:
+    ; set r0 to edgeTable + line
+	; and set r7 to bigEdgeTable + line
+	ibt r8, #0 ; bigEdgeTableCount
+	iwt r0, #edgeTable
+    iwt r7, #bigEdgeTable
+    ibt r1, #.sizeof(edgerow)
+	iwt r6, #160
+	with r6
+	sub r12 ; r6 = current row
+	with r6 
+	mult r1 ; r6 = offset for edgeTable
+	from r6
+	add r0
+	with r6
+	add r6 ; double r6 which is the offset for bigedgetable
+	with r7
+	add r6
+
+	to r1
+	ldb(r0) ; r1 has count of original edgeEntries
+	with r1
+	add #0 ; reset flags
+	bne :+
+	nop
+	  from r8
+	  stb (r7) ; write - to row count
+	  loop ;adjustToBigTable
+	  nop
+	  iwt r15, #afterAdjustBigTable
+	  nop
+    :
+ 
+    inc r0
+	inc r0 ; r0 points to firstEdgeEntry
+	; load first entry
+	to r2
+	ldw (r0) ; r2 has textureStartAddress
+	inc r0
+	to r3
+	ldb (r0) ; r3 has original.x
+	inc r0
+	to r4
+	ldb (r0) ; r4 has original.length
+	inc r0
+	to r6
+	ldb (r0) ; r6 has original.scale_r
+	; r5 unused
+
+	; copy first Entry to bigedgetable
+	inc r8
+	from r8
+	stb (r7) ; write 1 to row count
+	with r7 
+	add #4 ; r7 points to first entry in big table
+	from r2
+	stw(r7) ; write texture address
+	with r7 
+	inc r7
+	inc r7 ; r7 points to start
+	from r3
+	stb (r7) ; store start
+	inc r7
+	from r4
+	stb (r7) ; store length
+	inc r7
+	from r6
+	stw (r7) ; store scale_r
+	inc r7
+	inc r7
+
+    nextLine2:
+	loop ;adjustToBigTable
+	nop
+
+  
+  ; copy first Entry to bigedgetable
+  ; 
+  ; for (var originalEntry in edgeTable) {
+  ;	  var maysplit = false;
+  ;   for (var bigEntry in begTable) {
+  ;     if (originalEntry.x + originalEntry.length < bigEntry.x ) {
+  ;	       continue;
+  ;      } else if  (originalEntry.x + originalEntry.length < bigEntry.x + bigEntry.length) {
+  ;	       continue;
+  ;      } 
+  ;       if (originalEntry.x < bigEntry.x) {
+  ;      	originalEntry.length = bigEntry.x - originalEntry.x;
+  ;         maysplit = true;
+  ;      }
+  ;      if  (originalEntry.x + originalEntry.length > bigEntry.x + bigEntry.length) {
+  ;        if (maysplit){
+  ;           write originalEntry to bigEntry;
+  ;              reloadOriginalEntry();
+  ;              originalEntry.texture =  originalEntry.texture + bigEntry.x + bigEntry.length - originalEntry.x
+  ;              originalEntry.x = bigEntry.x + bigEntry.length
+  ;
+  ;         }
+  ;	       continue;
+  ;      } 
+  ;      
+  ;   }
+  ;   write original entry to big entry
+  ;}
+  ; load second entry
+
+afterAdjustBigTable:
   iwt r12, #160 
   iwt r13, #predrawEdgeTable
   ibt r2, #0
@@ -691,5 +825,5 @@ spritespace:
   .res .sizeof(spritelist)
 edgeTable:
   .res .sizeof(edgetable)
-immediateDrawLedger:  
+bigEdgeTable:  
   .res .sizeof(bigedgetable)
