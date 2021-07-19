@@ -272,12 +272,15 @@ addEdgeRow:
 ; r3 = scratch
 
 ; free register; 
-; r6, r10, r13*
+; r13*
 ; r1 = count
 ; r2 = romtextureStart
 ; r3 = xPos
 ; r4 = scale_r 
 ; r5 = memoryTexturePointer
+; r6 = scale
+; r10 = pixel budget (128 * 70 )
+; r13 = number of pixels allowed to be drawn on this line (default 148 ; 128 + a few more)
 ; r8 = pointer to adjusted row
 ; r9 = adjusted location
 ; r11 = pointer to edge thing
@@ -286,6 +289,7 @@ adjustEdgeEntries:
 	; 160 rows in edgeTable
 	iwt r12, #160 
     iwt r0, #edgeTable ; r0 holds the memory we are reading
+	iwt r10, #(128*65)
 	iwt r11, #edgeTable   ; r11 holds the start of the current row
     ibt r7, #0; yPos
 	cache	
@@ -293,9 +297,21 @@ adjustEdgeEntries:
 	    
 		to r1
 		ldb(r0) ; r1 = count
+
+		with r10 
+		add #0
+		bpl :+
+		  nop
+		  ibt r1, #0
+		  from r1
+		  stb (r0)
+		  iwt r15, #nextRow2 ; count == 0, skip to the next row
+		  nop
+		:
+		
+		iwt r13, #158
 		with r1 ; reset flags
 		add #0
-		
 		bne :+
 			nop
 			iwt r15, #nextRow2 ; count == 0, skip to the next row
@@ -365,11 +381,29 @@ adjustEdgeEntries:
 		fmult 
 		from r5
 		stb(r0) ; save scaledLength
-		
+		with r13 
+		sub r5
+		bpl :+
+			nop
+			with r5
+			add r13
+			with r5
+			stb(r0) ; save scaledLength
+			to r5
+			ldb (r11)
+			inc r5
+			with r5
+			sub r1
+			with r5
+			stb (r11)
+			
+			ibt r1, #1 ; short circuit this
+		:
+		with r10
+		sub r5
 		add #1 ; setup r0 to next entry, if any
 
-		with r1
-		sub #1
+		dec r1
 		beq nextRow2
 		nop
 		iwt r15, #adjustNextEdgeEntryBody

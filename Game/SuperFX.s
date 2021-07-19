@@ -38,7 +38,7 @@ Main:
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$00
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
@@ -46,22 +46,22 @@ Main:
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
 
 
-        ldx #.loword(banner1)
+        ldx #.loword(tree)
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::texture
-        ldx #$0
+        ldx #$30
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$30
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
 
-        ldx #.loword(banner1)
+        ldx #.loword(tree)
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$20
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
@@ -73,7 +73,7 @@ Main:
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$10
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
@@ -81,7 +81,7 @@ Main:
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
 
         
-        ldx #.loword(banner1)
+        ldx #.loword(tree)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
