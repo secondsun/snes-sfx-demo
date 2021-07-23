@@ -87,7 +87,18 @@ cache
 	add r1
 	to r6
 	ldb (r1) ; r6 now has yLoc
+	with r6
+	sex ; r6 may be negativ and we need to handle this below
 	move r4, r6 ; r4 has yLoc
+	with r6
+	add #0
+	bpl :+ ; is r6 negative? set to 0
+		nop 
+		iwt r6, #0
+	:
+
+
+	
 	inc r1 ; r1 + 1 = scale_rAddress
 	to r13
 	ldw (r1); r13 has scale_r
@@ -121,9 +132,23 @@ move r10, r6
 move r6, r2
 move r2, r10
 move r10, r4
+
 ;calculate height of sprite
 to r11
 hib
+
+with r4
+add #0
+bpl :+ ; if r4 is negative, r4 = r11 - abs(r4)
+  nop
+  with r4
+  not
+  with r4
+  add #1
+  with r11
+  sub r4
+:
+
 with r11
 lmult
 from r4
@@ -172,6 +197,19 @@ bge :+
 	;   each entry is ++count _pad_ entries[]{texture, xLoc, w*2*scale, scale}
 	;write to count_address + 2 +  count*sizeof(edgeentry) the following {r8, r9, r0[low]*2*r6, r6}
 ibt r12, #0; start with first line
+with r4
+add #0
+bpl :+ ; if r4 is negative, r12 =  abs(r4)
+  nop
+  with r4
+  not
+  from r4
+  to r12
+  add #1
+  with r12
+  swap
+  
+:
 addEdgeRow:
     ibt r10, #.sizeof(edgeentry) ; r10 is a scratch register
     move r1, r0 ; r1 = [h][w/2]
@@ -196,7 +234,7 @@ addEdgeRow:
 
 	; todo get the skip to scale correctly.
 	; r12 has the line we're on (scaled value)
-	; need to multiply it by something, #4 is wrong
+	; need to multiply it by  #4
 	from r12
 	to r10
 	mult #4
@@ -325,7 +363,7 @@ adjustEdgeEntries:
 		add #2 ; r0 ;points to xPos
 		to r3
 		ldb (r0) ; r3 = xPos
- 
+
 		to r5
 		getb
 		with r2
@@ -344,7 +382,6 @@ adjustEdgeEntries:
 
 		with r5
 		getbh ; r5 has skip Bytes
-		with r5 
 		; r2 + r5  = pixelBytes
 		with r2
 		add r5
@@ -369,6 +406,7 @@ adjustEdgeEntries:
 		fmult 
 		with r5
 		add r9 ; r5 = scale pad + xLoc
+
 		from r5
 		stb(r0) ; save scaledAdjustedXLoc
 

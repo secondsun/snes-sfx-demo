@@ -48,9 +48,9 @@ Main:
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::texture
-        ldx #$30
+        ldx #$0E
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::xLoc
-        ldx #$30
+        ldx #$50
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
@@ -59,9 +59,9 @@ Main:
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
-        ldx #$0
+        ldx #$40
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
-        ldx #$20
+        ldx #$FFF0
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
@@ -73,7 +73,7 @@ Main:
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
-        ldx #$10
+        ldx #$00
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
