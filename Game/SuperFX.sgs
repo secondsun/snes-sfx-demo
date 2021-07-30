@@ -565,7 +565,8 @@ drawLine2:
 		  with r9
 		  asr
 		  move r4, r9
-		  with r5
+		  from r5
+		  to r14
 		  add r4
 		  bra :++
 		  nop
@@ -576,7 +577,6 @@ drawLine2:
 		:
 		with r4
 		swap
-		move r14, r5 ; begin prefetch
 		with r7
 		asr ; halve length because we double plot
 	drawSpriteLine1:
