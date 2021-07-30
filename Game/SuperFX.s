@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$4;three sprite
+        lda #$1;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -59,9 +59,9 @@ Main:
 
         ldx #.loword(tree)
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
-        ldx #$40
+        ldx #$20
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
-        ldx #$FFF0
+        ldx #$F0
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
@@ -69,28 +69,28 @@ Main:
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
 
         
-        ldx #.loword(banner1)
-        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
-        ldx #$0
-        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
-        ldx #$00
-        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0100
-        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0100
-        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
-
-        
         ldx #.loword(tree)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$E0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
         ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
+
+        
+        ldx #.loword(tree)
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
+        ldx #$0
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
+        ldx #$0
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
+        ldx #$0100
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
+        ldx #$0100
+        stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
 
         
 

@@ -137,17 +137,6 @@ move r10, r4
 to r11
 hib
 
-with r4
-add #0
-bpl :+ ; if r4 is negative, r4 = r11 - abs(r4)
-  nop
-  with r4
-  not
-  with r4
-  add #1
-  with r11
-  sub r4
-:
 
 with r11
 lmult
@@ -199,17 +188,41 @@ bge :+
 ibt r12, #0; start with first line
 with r4
 add #0
-bpl :+ ; if r4 is negative, r12 =  abs(r4)
+bpl :+ ; if r4 is negative, r11 = r11 - abs(r4), r12 = abs(r4)
   nop
-  with r4
-  not
   from r4
   to r12
+  not
+  with r12
   add #1
+  with r11
+  sub r12
   with r12
   swap
-  
+  ; if  r11 is negative skip
+  with r11
+  add #0
+  beq skipTo
+    nop
+  bpl :+
+    nop
+	skipTo:
+	inc r5
+	from r3
+	to r10
+	sub r5
+	bne edgeTrampolie
+	nop
+	iwt r15, #adjustEdgeEntries
+	nop
+	edgeTrampolie:
+	  iwt r15, #addEdgeEntry
+	  nop
 :
+
+
+
+
 addEdgeRow:
     ibt r10, #.sizeof(edgeentry) ; r10 is a scratch register
     move r1, r0 ; r1 = [h][w/2]
