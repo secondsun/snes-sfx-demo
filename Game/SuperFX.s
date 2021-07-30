@@ -23,7 +23,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$1;three sprite
+        lda #$4;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -57,11 +57,11 @@ Main:
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
 
-        ldx #.loword(tree)
+        ldx #.loword(banner1)
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::texture
-        ldx #$20
+        ldx #$0
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::xLoc
-        ldx #$F0
+        ldx #$10
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
@@ -69,11 +69,11 @@ Main:
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
 
         
-        ldx #.loword(pillar)
+        ldx #.loword(tree)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$F0
+        ldx #$E8
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$F0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
@@ -81,11 +81,11 @@ Main:
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         
-        ldx #.loword(banner1)
+        ldx #.loword(pillar)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
         ldx #$F0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
-        ldx #$0
+        ldx #$10
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r

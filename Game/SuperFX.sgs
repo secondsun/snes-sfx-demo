@@ -339,7 +339,7 @@ adjustEdgeEntries:
 	; 160 rows in edgeTable
 	iwt r12, #160 
     iwt r0, #edgeTable ; r0 holds the memory we are reading
-	iwt r10, #(128*65)
+	iwt r10, #(128*73)
 	iwt r11, #edgeTable   ; r11 holds the start of the current row
     ibt r7, #0; yPos
 	cache	
