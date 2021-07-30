@@ -71,9 +71,9 @@ Main:
         
         ldx #.loword(pillar)
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$0
+        ldx #$F0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$01
+        ldx #$0
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r

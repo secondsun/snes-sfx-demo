@@ -491,7 +491,7 @@ drawEdgeTable:
 	add r3
 	loop ; loop back to drawEdgeTable
 	inc r2
-	bra finish
+	iwt r15, #finish
 	nop
   ; above if there are no sprites, draw a black line
   ; below draw the black preamble, then sprites (and fill gaps with black), then end black
@@ -510,6 +510,9 @@ drawLine2:
 	add #1 ; r0 points to length
 	to r7
 	ldb (r0) ; r7 has length
+	move r9, r8
+	with r9 
+	sex
 	with r7
 	add #0
 	bne :+
@@ -518,8 +521,7 @@ drawLine2:
 	iwt r15, #next3
 	
 	:
-	with r7
-	asr
+	
 	add #1 ; r0 points to scale
 	to r6
     ldw (r0) ; r6 has scale_r
@@ -560,9 +562,9 @@ drawLine2:
 		  swap
 		  with r9
 		  lmult
+		  with r9
+		  asr
 		  move r4, r9
-	      with r4
-		  swap
 		  with r5
 		  add r4
 		  bra :++
@@ -572,7 +574,11 @@ drawLine2:
 		  nop
 
 		:
+		with r4
+		swap
 		move r14, r5 ; begin prefetch
+		with r7
+		asr ; halve length because we double plot
 	drawSpriteLine1:
 	  
 	  with r4
@@ -592,6 +598,7 @@ drawLine2:
 	  bge next3
 	  dec r7
 	  bmi next3
+	  nop
 	  beq next3
 	  nop 
 	  bpl drawSpriteLine1
