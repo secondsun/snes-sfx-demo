@@ -81,7 +81,6 @@ cache
 	add r1
 	to r9
 	ldb (r1) ; r9 now has xLoc
-
 	ibt r1, #$3
 	to r1
 	add r1
@@ -405,7 +404,8 @@ adjustEdgeEntries:
 		add #2 ; r0 points to xLoc
 		to r9 
 		ldb (r0) ; r9 has xLoc
-
+		with r9
+		sex
 
 		move r14, r8; load pad
 		with r8
@@ -537,12 +537,42 @@ drawLine2:
     ; r6 = scale_r
 	; r7 = length
 	; r8 = startX, available to scratch
-	; r9 = scratch
+	; r9 = scratch after drawSpriteLine1?
 	; r10+ scratch 
 	drawSpriteLine:
 		iwt r11, #128
-		move r14, r5 ; begin prefetch
+		
 		iwt r4, #0 ; r4 will be 8.8 with integer part added to r5 as offset
+		with r9
+		add #0
+		bpl :++
+		  nop
+          ibt r1, #0
+		  with r7
+		  add r9
+		  bmi :+
+		  nop
+		  with r9
+		  not
+		  with r9
+		  add #1 ;r9 = abs (r9) / how many pixels to skip
+		  with r9
+		  swap
+		  with r9
+		  lmult
+		  move r4, r9
+	      with r4
+		  swap
+		  with r5
+		  add r4
+		  bra :++
+		  nop
+		  :
+		  iwt r15, #next3 ; negative so skip
+		  nop
+
+		:
+		move r14, r5 ; begin prefetch
 	drawSpriteLine1:
 	  
 	  with r4
@@ -561,6 +591,7 @@ drawLine2:
 	  cmp r11
 	  bge next3
 	  dec r7
+	  bmi next3
 	  beq next3
 	  nop 
 	  bpl drawSpriteLine1
