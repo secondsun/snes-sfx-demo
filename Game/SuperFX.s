@@ -11,9 +11,13 @@ Main:
         
         ;Copy Palette
         CGRAM_memcpy 0, Palette, sizeof_Palette
-
+        CGRAM_memcpy sizeof_Palette, Road_Palette, sizeof_Road_Palette
         ;Copy SuperFX tileMap
 	VRAM_memcpy VRAM_tilemap, Map, Map_end - Map
+        ;Copy Road tileMap
+        VRAM_memcpy VRAM_road_tilemap, Road_TileMap, sizeof_Road_TileMap
+        ;Copy Road Tiles
+        VRAM_memcpy VRAM_road_tiles, Road_Tiles, sizeof_Road_Tiles
 
         
         ;Configure GSU
@@ -117,10 +121,11 @@ Main2:
         sta     BGMODE
         lda     #bgsc(VRAM_tilemap, SC_SIZE_32X32)	;position of map and tiles for images
         sta     BG1SC
+        lda     #bgsc(VRAM_road_tilemap, SC_SIZE_64X32)        ;position of map and tiles for images
         sta     BG2SC
-        ldx     #bg12nba(VRAM_screen_1, VRAM_screen_2)
+        ldx     #bg12nba(VRAM_screen_1, VRAM_road_tiles)
         stx     BG12NBA
-        lda     #tm(ON, OFF, OFF, OFF, OFF)	;screen buffer use
+        lda     #tm(ON, ON, OFF, OFF, OFF)	;screen buffer use
         sta     TM
 
         ;initialize screen buffer indexes
@@ -172,7 +177,7 @@ drawScreen2:
                 VRAM_memcpy (VRAM_screen_2 + screenbuffer_len), (screenbuffer ), screenbuffer_len
                 stz z:SFX_buffer_position ;sfx reads from start of work ram
                 stz z:VRAM_screen_select ; write to the other screen
-                ldx     #bg12nba(VRAM_screen_2, VRAM_screen_1)
+                ldx     #bg12nba(VRAM_screen_2, VRAM_road_tiles)
                 stx     BG12NBA
 
                 phb
@@ -222,7 +227,7 @@ drawScreen1:
                 sta z:SFX_buffer_position ;sfx reads from start of work ram
                 lda #$01
                 sta z:VRAM_screen_select ; write to the other screen
-                ldx #bg12nba(VRAM_screen_1, VRAM_screen_2)
+                ldx #bg12nba(VRAM_screen_1, VRAM_road_tiles)
                 stx BG12NBA
 
                 phb
@@ -265,6 +270,8 @@ drawScreen1:
                 endVBlank
 .segment "RODATA"
 .include "backgroundMap.s"
+incbin  Road_TileMap,   "Data/road.png.map"
+incbin  Road_Tiles,   "Data/road.png.tile"
 
 
 .segment "ZEROPAGE"
@@ -279,5 +286,6 @@ Scale_index_counter: .res 1 ; scale index counter
 
 .segment "RODATA"
    incbin  Palette,        "Data/superfx.palette.bin"
+   incbin  Road_Palette,   "Data/road.png.pal"
    incbin  Scale,          "Data/scale.bin"
                                     

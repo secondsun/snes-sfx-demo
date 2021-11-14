@@ -17,11 +17,11 @@ screenbuffer_len = $2800 ; Size of the SB. We're using a 160 line 4 bpp screen m
 screenbuffer_copy_len = $2800 ; How much to copy per vblank
 
 ;VRAM Constants
-VRAM_tilemap = $F800; start of tileMap
-VRAM_road_tilemap = $F000 ; start of road tile Data
+VRAM_tilemap = $F000; start of tileMap
+VRAM_road_tilemap = $F800 ; start of road tile Data
 
 VRAM_screen_1 = $0 ; Start of first frame of background
-VRAM_screen_2 = $2800 ; start of second frame of background
-VRAM_road_tiles = $5000 ; start of road tile map Data
+VRAM_screen_2 = $6000 ; start of second frame of background
+VRAM_road_tiles = $C000 ; start of road tile map Data
 
 
