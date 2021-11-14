@@ -57,6 +57,14 @@ createEdgeTable:
   	iwt r0,# (spritespace + spritelist::count) ; address of number of sprites
   	to r3
   	ldb (r0) ;get number of sprites to r3
+	
+	from r3
+	cmp r5
+	bne:+
+      nop
+	  stop
+	:
+
 cache
     addEdgeEntry:
 	; umult = r5 * r6 => [R0]
