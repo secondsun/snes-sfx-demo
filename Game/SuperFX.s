@@ -19,7 +19,15 @@ Main:
         ;Copy Road Tiles
         VRAM_memcpy VRAM_road_tiles, Road_Tiles, sizeof_Road_Tiles
 
+        RW a8
+        lda #$3F
+        sta $210F
+        sta $210F
         
+        lda #$70
+        sta $210F
+        sta $210F
+
         ;Configure GSU
         initGSU_4bpp_160 
         phb
@@ -128,6 +136,9 @@ Main2:
         lda     #tm(ON, ON, OFF, OFF, OFF)	;screen buffer use
         sta     TM
 
+        ;intialize road palette
+        
+
         ;initialize screen buffer indexes
         stz z:VRAM_screen_select
         stz z:SFX_buffer_position
@@ -145,6 +156,12 @@ Main2:
 
 ;infinite loop
 :       wai
+        ;set hdma to draw 80 lines of black
+        ;create hdma road palette changes
+        ;create hdma road table y offsets
+        ;create hdma road table x offsets
+
+        
         bra     :-
 
 Vblank:
