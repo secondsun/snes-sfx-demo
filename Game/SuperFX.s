@@ -19,6 +19,10 @@ Main:
         ;Copy Road Tiles
         VRAM_memcpy VRAM_road_tiles, Road_Tiles, sizeof_Road_Tiles
 
+        ; .out (.sprintf("%d",__HDMA_RUN__))
+        HDMA_set_absolute 2, 2, $D, HDMA
+        HDMA_set_absolute 3, 2, $E, HDMA2
+
         RW a8
         lda #$3F
         sta $210F
@@ -35,7 +39,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$4;three sprite
+        lda #$2;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -46,7 +50,7 @@ Main:
 
 
 
-        ldx #.loword(banner1)
+        ldx #.loword(pillar)
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::texture
         ldx #$0
         stx a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::xLoc
@@ -81,28 +85,28 @@ Main:
         stx a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale
 
         
-        ldx #.loword(tree)
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
-        ldx #$E8
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
-        ldx #$F0
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
-        ldx #$0100
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
-        ldx #$0100
-        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
-
-        
         ldx #.loword(pillar)
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::texture
-        ldx #$F0
+        ldx #$E8
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::xLoc
-        ldx #$10
+        ldx #$F0
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
         ldx #$0100
         stx a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale
+
+        
+        ldx #.loword(pillar)
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::texture
+        ldx #$F0
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::xLoc
+        ldx #$10
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::yLoc
+        ldx #$0100
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+        ldx #$0100
+        stx a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale
 
         
 
@@ -150,6 +154,15 @@ Main2:
         ;Turn on screen
         lda     #inidisp(ON, DISP_BRIGHTNESS_MAX)
         sta     SFX_inidisp
+
+        ;Setup HDMA for sfx mosaic compression
+        lda #$0
+        sta $210E
+        lda #$0
+        sta $210D
+        lda #$11
+        sta $2106
+        
         ;VBL_set Vblank
         VBL_on
         
@@ -160,12 +173,20 @@ Main2:
         ;create hdma road palette changes
         ;create hdma road table y offsets
         ;create hdma road table x offsets
-
-        
         bra     :-
 
 Vblank:
-        ;if vblank NMI just skip, we're waiting on the IRQ
+        ;if vblank NMI just skip, we're waiting on the IR
+        stz HDMAEN ; disable HDMA
+        lda #$0
+        sta $210E
+        lda #$0
+        sta $210D
+        lda #$11
+        sta $2106
+        lda #$0C
+        sta HDMAEN
+        
         bne transfer
         endVBlank
 
@@ -285,6 +306,7 @@ drawScreen1:
                 sta z:SFX_buffer_position
                 gsuOn
                 endVBlank
+.include "Data/hdma.s"                
 .segment "RODATA"
 .include "backgroundMap.s"
 incbin  Road_TileMap,   "Data/road.png.map"

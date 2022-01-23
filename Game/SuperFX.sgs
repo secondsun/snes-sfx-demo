@@ -587,6 +587,26 @@ drawLine2:
 		swap
 		with r7
 		asr ; halve length because we double plot
+;
+    ;adjust r2 and r1 for mosaic
+	from r2
+	and #1
+	beq :+ ; branch if y/r2 is even
+	nop
+	;odd line, use odd x
+	with r1
+	or #1
+	with r2
+	lsr
+	bra drawSpriteLine1
+	nop
+:; even line use even x
+    iwt r13, #$FFFE
+    with r1
+	and r13
+	with r2
+	lsr
+
 	drawSpriteLine1:
 	  
 	  with r4
@@ -600,23 +620,46 @@ drawLine2:
 	  add r9 ; load next byte
       drawPixel:
 	    plot
-		plot
+		inc r1
 	  from r1
 	  cmp r11
-	  bge next3
+	  bge adjustFornext3
 	  dec r7
-	  bmi next3
+	  bmi adjustFornext3
 	  nop
-	  beq next3
+	  beq adjustFornext3
 	  nop 
 	  bpl drawSpriteLine1
 	  nop 
+adjustFornext3:
+;adjust r2 and r1 for mosaic
+	from r1
+	and #1
+	beq :+
+	nop
+	dec r1
+	with r1
+	add #0 ; clear carry
+	with r2
+	rol
+	inc r2
+	bra next3
+	nop
+:;noshiftr1
+	add #0 ; clear carry
+	with r2
+	rol
+	
+
 next3:
 	  
-	;move r0, r13 
+
 	dec r3
-	bne drawLine2
+	beq :+ 
     nop
+	iwt r15, #drawLine2
+	nop
+:
 	
 
 	; set r0 to next entry, update y pos, loop
