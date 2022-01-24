@@ -148,8 +148,8 @@ Main2:
         stz z:SFX_buffer_position
 
         ;Set letterbox irq Interrupt
-        IRQ_V_set 199, Vblank
-        IRQ_V_on
+        ;IRQ_V_set 199, Vblank
+        ;IRQ_V_on
         
         ;Turn on screen
         lda     #inidisp(ON, DISP_BRIGHTNESS_MAX)
@@ -163,17 +163,19 @@ Main2:
         lda #$11
         sta $2106
         
-        ;VBL_set Vblank
+        VBL_set Vblank
         VBL_on
         
 
 ;infinite loop
 :       wai
-        ;set hdma to draw 80 lines of black
-        ;create hdma road palette changes
-        ;create hdma road table y offsets
-        ;create hdma road table x offsets
-        bra     :-
+      
+      
+        gsuRunning
+        bne :+  
+        gsuOn
+
+:        bra     :--
 
 Vblank:
         ;if vblank NMI just skip, we're waiting on the IR
@@ -187,8 +189,6 @@ Vblank:
         lda #$0C
         sta HDMAEN
         
-        bne transfer
-        endVBlank
 
         ;RW_forced a8i8
         ;prepare for dma to vram
@@ -246,13 +246,13 @@ drawScreen2:
                 sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale_r
                 RW_pull
                 plb
-                gsuOn
+               ; gsuOn
                 endVBlank
         :;copyFromStart:        
                 VRAM_memcpy VRAM_screen_2, screenbuffer, screenbuffer_len
                 lda #$01;sfx reads from middle of work ram
                 sta z:SFX_buffer_position        
-                gsuOn
+                ;gsuOn
                 endVBlank
 drawScreen1:        
                 ;Where do we copy from?
@@ -298,13 +298,13 @@ drawScreen1:
                 RW_pull
                 plb
 
-                gsuOn
+                ;gsuOn
                 endVBlank
         copyFromStart:        
                 VRAM_memcpy VRAM_screen_1, screenbuffer, screenbuffer_len
                 lda #$01 ;sfx reads from middle of work ram
                 sta z:SFX_buffer_position
-                gsuOn
+                ;gsuOn
                 endVBlank
 .include "Data/hdma.s"                
 .segment "RODATA"

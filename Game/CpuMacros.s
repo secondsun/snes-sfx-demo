@@ -62,8 +62,8 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
 
 .macro endVBlank
         ;display on
-        lda #inidisp(ON, DISP_BRIGHTNESS_MAX)
-        sta SFX_inidisp
+        ;lda #inidisp(ON, DISP_BRIGHTNESS_MAX)
+        ;sta SFX_inidisp
         rtl
 .endmac
 
