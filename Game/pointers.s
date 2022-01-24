@@ -11,10 +11,10 @@ sfx_code_size  = $200 ;space allocated to the sfx code; we've default to 512 byt
 screenbuffer = $704000 ; start of the SFX screen buffer 
                        ; This memory will be DMA'd into VRAM during V-Blank
 
-screenbuffer_len = $2800 ; Size of the SB. We're using a 160 line 4 bpp screen mode
+screenbuffer_len = $1400 ; Size of the SB. We're using a 160 line 4 bpp screen mode
                           ; So 160 (lines) * 256 (dots / line) * 4 (bpp)                       
                           ; = 0x5000 bytes (20480 ) in decimal. 
-screenbuffer_copy_len = $2800 ; How much to copy per vblank
+screenbuffer_copy_len = $1400 ; How much to copy per vblank
 
 ;VRAM Constants
 VRAM_tilemap = $E800; start of tileMap

@@ -347,7 +347,7 @@ adjustEdgeEntries:
 	; 160 rows in edgeTable
 	iwt r12, #160 
     iwt r0, #edgeTable ; r0 holds the memory we are reading
-	iwt r10, #(128*73)
+	iwt r10, #(128*120)
 	iwt r11, #edgeTable   ; r11 holds the start of the current row
     ibt r7, #0; yPos
 	cache	
@@ -590,6 +590,7 @@ drawLine2:
 ;
     ;adjust r2 and r1 for mosaic
 	from r2
+	to r13
 	and #1
 	beq :+ ; branch if y/r2 is even
 	nop
@@ -634,10 +635,10 @@ drawLine2:
 adjustFornext3:
 ;adjust r2 and r1 for mosaic
 	from r1
+	to r13
 	and #1
 	beq :+
 	nop
-	dec r1
 	with r1
 	add #0 ; clear carry
 	with r2
@@ -653,7 +654,6 @@ adjustFornext3:
 
 next3:
 	  
-
 	dec r3
 	beq :+ 
     nop

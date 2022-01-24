@@ -22,6 +22,25 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
   sta     GSU_CLSR
 .endmac
 
+.macro initGSU_4bpp_obj
+  lda     #$03
+  sta     GSU_PBR
+  
+  
+  lda     #(.loword(screenbuffer)/$400)
+  sta     GSU_SCBR
+  
+  lda     #%00111101 ;4bpp_obj SuperFX controls ram and rom
+  sta     GSU_SCMR
+  
+  lda     #%10000000 ;mask interrupts from GSU
+  sta     GSU_CFGR
+  
+  lda     #$01 ; 21.4 MHZ speed
+  sta     GSU_CLSR
+.endmac
+
+
 .macro gsuOn
   ldx     #.loword(GSU_Code)
   stx     GSU_R15
