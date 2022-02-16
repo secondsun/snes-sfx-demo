@@ -1,0 +1,64 @@
+table : 
+ nextFreeEntry: pointer ; memory will be allocated dynamically for the table
+ entryRows: entryRow[160]
+ scratchEntries : entry[5]
+
+entryRow  :
+ nextEntry: pointer
+
+entry: 
+ start: number
+ length: number
+ textureStart: pointer
+ textureXincriment: number
+ textureYincriment: number
+ nextEntry: pointer
+ 
+
+;This will create an empty table of pointers to the first 
+InitTable : 
+  for i in 0 until 160
+   table.entryRow[i].nextEntry = 0
+
+
+;Entries must be ordered front to back before they are added
+AddEntry(newEntry: entry, row: number, ) : 
+  currentEntry := entryRows[row].nextEntry
+  if (currentEntry == 0) {
+    write newEntry to table
+    return
+  }
+
+  currentStart := (*currentEntry).start
+  currentEnd := (*currentEntry).end
+  newStart := (*newEntry).start
+  newEnd := (*newEntry).end
+  if (currentEnd < newStart) {
+    write newEntry to end of table
+    updateCurrent next pointer to point to newEntry
+    return	
+  } else if (currentEnd < newEnd) { the old line covers part of the new line
+     if (newStart > currentStart) {
+       return
+     } else { //split end by trimming start of new entry
+       copyNewEntry
+       delta = currentEnd - newStart
+       newStart = currentEnd + 1
+       newEntry.textureStart = delta*textureXInc*textureWidth + delta*texYInc
+       write newStart to end of table
+       updateCurrent Next to point to newStart
+        
+     }
+  }
+
+  if (newEnd < currentStart) {
+    write newEntry to end of table
+    update first row pointer to point to new entry
+    update new entry next to point to current
+    return	
+  }  else if (newEnd < currentEnd) { // Is it covered
+    return 
+  } else {
+     //split start by trimming the end of new entry
+  }
+
