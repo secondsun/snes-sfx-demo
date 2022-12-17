@@ -157,11 +157,11 @@ Main2:
 
         ;Setup HDMA for sfx mosaic compression
         lda #$0
-        sta $210E
+        sta BG1VOFS
         lda #$0
-        sta $210D
+        sta BG1HOFS
         lda #$11
-        sta $2106
+        sta MOSAIC
         
         VBL_set Vblank
         VBL_on
@@ -181,11 +181,11 @@ Vblank:
         ;if vblank NMI just skip, we're waiting on the IR
         stz HDMAEN ; disable HDMA
         lda #$0
-        sta $210E
+        sta BG1VOFS
         lda #$0
-        sta $210D
+        sta BG1HOFS
         lda #$11
-        sta $2106
+        sta MOSAIC
         lda #$0C
         sta HDMAEN
         
