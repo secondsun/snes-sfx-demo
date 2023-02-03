@@ -1,50 +1,82 @@
 ; SuperFX
 ; Summers Pittman <secondsun@gmail.com>
-; fixed point squar root algorithm ported from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
-; Sqrt88-GS1
+; 16-bit square root algorithm ported from http://6502org.wikidot.com/software-math-sqrt
+; Sqrt816GS1
 
 .include "libSFX.i"
 
 .segment "GSUCODE"
 
 GSU_Code:
-	nop
-	iwt r1, #$6E40 ; 110.25(#6E40) has a sqrt of 10.5 (#0A80) (r)
-	iwt r2, #$4000 ; test value? Need to research (b)
-	iwt r3, #0 ; r3 = return value (q)
-	iwt r4, #0 ; intermediate value (t)
-	top:
-		iwt r0, #$40 
-		cmp r2 ; while (0x40 < r2)
-		blt next
-		
-		nop
-		move r0, r3 ; R0 = r3
-		lsr
-		lsr
-		lsr
-		lsr
-		stop
-		nop
-	next:
-		to r4
-		from r3
-		add r2
-		from r1
-		cmp r4
-		bmi adjust
-		nop
-		with r1
-		sub r4
-		to r3
-		from r4
-		add r2
 
-		adjust:
-		with r1
-		add r1
-		with r2
-		lsr
-		bra top
-		nop
-	stop
+;square_root (n):
+;  dividend = n
+;  root = 0
+;  LOOP 8 TIMES
+;    dividend <<= 2
+;    NOTE: discard the lower 16 bits to produce the partial dividend
+;    partial_dividend = dividend >> 16
+;    divisor = (4 * root + 1) * 1
+;    IF partial_dividend >= divisor 
+;      partial_dividend -= divisor
+;      root = root * 2 + 1
+;    ELSE
+;      root = root * 2
+
+;  remainder = partial_dividend
+;  RETURN (root, remainder)
+
+iwt r1, #$DD93 ; 56723   (dividend) 
+iwt r2, #$0 ; partial_dividend
+iwt r12, #$8 ; loop 8 times 
+iwt r3, #0 ; r3 =  (root)  [should end up 238/EE]
+iwt r0, #0 ; r0 =  (divisor) 
+iwt r5, #0 ; (remainder) 	[should end up 79/4F]
+
+iwt	r13, #square_root_loop
+
+square_root_loop:
+
+;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
+	with r1
+	add r1
+	with r2 
+	rol
+
+	with r1
+	add r1
+	with r2 
+	rol
+
+;divisor = 4*root+1
+	from r3
+	add r3 ; r0 = 2*root
+	add r0; r0 = 4*root
+	add #$1 ; divisor = $*root+1
+; cmp divisor < partial_dividend
+	cmp r2; r0-r2
+	bmi sqrtElse;
+	nop
+	beq sqrtElse;
+	nop
+;      root = root * 2
+	with r3
+	add r3 ; root = 2*root
+	bra lp
+	nop
+sqrtElse:
+;      partial_dividend -= divisor
+;      root = root * 2 + 1
+    with r2
+	sub r0
+	with r3
+	add r3 
+	with r3
+	add #$1 	
+	
+lp:
+  move r5,r2
+  loop
+  nop
+  stop
+  nop
