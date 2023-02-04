@@ -8,75 +8,84 @@
 .segment "GSUCODE"
 
 GSU_Code:
+.PROC square_root
+	;square_root (n):
+	;  dividend = n
+	;  root = 0
+	;  LOOP 8 TIMES
+	;    dividend <<= 2
+	;    NOTE: discard the lower 16 bits to produce the partial dividend
+	;    partial_dividend = dividend >> 16
+	;    divisor = (4 * root + 1) * 1
+	;    IF partial_dividend >= divisor 
+	;      partial_dividend -= divisor
+	;      root = root * 2 + 1
+	;    ELSE
+	;      root = root * 2
 
-;square_root (n):
-;  dividend = n
-;  root = 0
-;  LOOP 8 TIMES
-;    dividend <<= 2
-;    NOTE: discard the lower 16 bits to produce the partial dividend
-;    partial_dividend = dividend >> 16
-;    divisor = (4 * root + 1) * 1
-;    IF partial_dividend >= divisor 
-;      partial_dividend -= divisor
-;      root = root * 2 + 1
-;    ELSE
-;      root = root * 2
+	;  remainder = partial_dividend
+	;  RETURN (root, remainder)
 
-;  remainder = partial_dividend
-;  RETURN (root, remainder)
+	.define dividend r1
+	.define partial_dividend r2
+	.define root r3
+	.define divisor r0
+	.define remainder r5
 
-iwt r1, #$DD93 ; 56723   (dividend) 
-iwt r2, #$0 ; partial_dividend
-iwt r12, #$8 ; loop 8 times 
-iwt r3, #0 ; r3 =  (root)  [should end up 238/EE]
-iwt r0, #0 ; r0 =  (divisor) 
-iwt r5, #0 ; (remainder) 	[should end up 79/4F]
+	iwt dividend, #$DD93 ; 56723   () 
+	iwt partial_dividend, #$0 ; 
+	iwt r12, #$8 ; loop 8 times 
+	iwt root, #0 ; r3 =  ()  [should end up 238/EE]
+	iwt divisor, #0 ; r0 =  () 
+	iwt remainder, #0 ; () 	[should end up 79/4F]
 
-iwt	r13, #square_root_loop
+	iwt	r13, #square_root_loop
 
-square_root_loop:
+	square_root_loop:
 
-;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
-	with r1
-	add r1
-	with r2 
-	rol
+	;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
+		with dividend
+		add dividend
+		with partial_dividend 
+		rol
 
-	with r1
-	add r1
-	with r2 
-	rol
+		with dividend
+		add dividend
+		with partial_dividend
+		rol
 
-;divisor = 4*root+1
-	from r3
-	add r3 ; r0 = 2*root
-	add r0; r0 = 4*root
-	add #$1 ; divisor = $*root+1
-; cmp divisor < partial_dividend
-	cmp r2; r0-r2
-	bmi sqrtElse;
+	;divisor = 4*root+1
+		from root
+		add root ; r0 = 2*root
+		add divisor; r0 = 4*root
+		add #$1 ; divisor = $*root+1
+	; cmp divisor < partial_dividend
+		cmp partial_dividend; r0-r2
+		bmi sqrtElse;
+		nop
+		beq sqrtElse;
+		nop
+	;      root = root * 2
+		with root
+		add root ; root = 2*root
+		bra lp
+		nop
+	sqrtElse:
+	;      partial_dividend -= divisor
+	;      root = root * 2 + 1
+		with partial_dividend
+		sub divisor
+		with root
+		add root
+		with root
+		add #$1 	
+		
+	lp:
+	move remainder,partial_dividend
+	loop
 	nop
-	beq sqrtElse;
+	stop
 	nop
-;      root = root * 2
-	with r3
-	add r3 ; root = 2*root
-	bra lp
+	stop
 	nop
-sqrtElse:
-;      partial_dividend -= divisor
-;      root = root * 2 + 1
-    with r2
-	sub r0
-	with r3
-	add r3 
-	with r3
-	add #$1 	
-	
-lp:
-  move r5,r2
-  loop
-  nop
-  stop
-  nop
+.endproc
