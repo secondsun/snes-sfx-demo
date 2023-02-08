@@ -1,0 +1,91 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit square root algorithm ported from http://6502org.wikidot.com/software-math-sqrt
+; Sqrt816GS1
+
+.include "libSFX.i"
+
+.segment "GSUCODE"
+
+gsu_sqrt:
+.PROC square_root
+	;square_root (n):
+	;  dividend = n
+	;  root = 0
+	;  LOOP 8 TIMES
+	;    dividend <<= 2
+	;    NOTE: discard the lower 16 bits to produce the partial dividend
+	;    partial_dividend = dividend >> 16
+	;    divisor = (4 * root + 1) * 1
+	;    IF partial_dividend >= divisor 
+	;      partial_dividend -= divisor
+	;      root = root * 2 + 1
+	;    ELSE
+	;      root = root * 2
+
+	;  remainder = partial_dividend
+	;  RETURN (root, remainder)
+
+	.define dividend r1
+	.define partial_dividend r2
+	.define root r3
+	.define divisor r0
+	.define remainder r5
+
+	iwt dividend, #$DD93 ; 56723   () 
+	iwt partial_dividend, #$0 ; 
+	iwt r12, #$8 ; loop 8 times 
+	iwt root, #0 ; r3 =  ()  [should end up 238/EE]
+	iwt divisor, #0 ; r0 =  () 
+	iwt remainder, #0 ; () 	[should end up 79/4F]
+
+	iwt	r13, #square_root_loop
+
+	square_root_loop:
+
+	;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
+		with dividend
+		add dividend
+		with partial_dividend 
+		rol
+
+		with dividend
+		add dividend
+		with partial_dividend
+		rol
+
+	;divisor = 4*root+1
+		from root
+		add root ; r0 = 2*root
+		add divisor; r0 = 4*root
+		add #$1 ; divisor = $*root+1
+	; cmp divisor < partial_dividend
+		cmp partial_dividend; r0-r2
+		bmi sqrtElse;
+		nop
+		beq sqrtElse;
+		nop
+	;      root = root * 2
+		with root
+		add root ; root = 2*root
+		bra lp
+		nop
+	sqrtElse:
+	;      partial_dividend -= divisor
+	;      root = root * 2 + 1
+		with partial_dividend
+		sub divisor
+		with root
+		add root
+		with root
+		add #$1 	
+		
+	lp:
+	move remainder,partial_dividend
+	loop
+	nop
+	stop
+	nop
+	stop
+	nop
+.endproc

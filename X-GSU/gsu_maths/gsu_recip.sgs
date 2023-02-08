@@ -1,0 +1,62 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocol
+; reciprocol
+
+.include "libSFX.i"
+
+.segment "GSUCODE"
+
+GSU_Code:
+cache
+
+.PROC reciprocol
+reciprocol:
+	;   int dividend = 1;
+    ;    int quotient = 0;
+    ;    int remainder = dividend;
+    ;    for (int x = 0; x < 8; x++) {
+    ;        remainder = (remainder << 1);
+    ;        if (divisor <= remainder) {
+    ;            quotient =  (quotient<<1);
+    ;            quotient++;
+    ;            remainder -=divisor;
+    ;        } else {
+    ;            quotient =  (quotient<<1);
+    ;        }
+    ;    }
+
+
+	.define dividend r1
+	.define divisor r2
+	.define remainder r3
+	.define quotient r0
+
+	iwt dividend, #$1
+	iwt divisor, #$37
+	iwt r12, #$10; loop 8 times 
+	move remainder, dividend; 
+	iwt quotient, #0 ; r0 =  () 
+	
+
+	iwt	r13, #divide_loop
+	
+	divide_loop:
+		with remainder
+		add remainder
+		
+		from divisor
+		cmp remainder
+		bpl lp
+		add quotient
+		add 1 ;quotient++
+		with remainder
+		sub divisor
+	lp: 	
+		loop
+		nop
+	stop
+	nop
+	stop
+	nop
+.endproc

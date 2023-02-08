@@ -1,89 +1,80 @@
 ; SuperFX
 ; Summers Pittman <secondsun@gmail.com>
-; 16-bit square root algorithm ported from http://6502org.wikidot.com/software-math-sqrt
-; Sqrt816GS1
+; 16-bit 0.16-fixed point reciprocol
+; reciprocol
 
 .include "libSFX.i"
 
+;The GSU stack is 16 bit values
+.struct gsu_stack
+  entries  .res $200 ; 512 Bytes of stack
+.endstruct
+
+.define stackPointer r10
+
+.segment "GSURAM"
+gsu_stack_ram:
+  .res .sizeof(gsu_stack)
+
 .segment "GSUCODE"
 
+; Pushes the value stored in R to the stack
+; R can not be 0 or 3, assumes r10 is stack pointer
+
+.macro gsu_stack_push R
+	.if .not(.blank ({R}))
+		from	R
+	.endif
+	stw	(stackPointer)
+	inc	stackPointer
+	inc	stackPointer
+.endmacro
+
+; Pops the value stored in R to the stack
+; R can not be 0 3 or 4
+; clobbers r0, r3
+
+.macro gsu_stack_pop R
+	dec	stackPointer
+	dec	stackPointer
+	.if .not( .blank({R}))
+		to	R
+	.endif
+	ldw	(stackPointer)
+.endmacro
+
 GSU_Code:
-.PROC square_root
-	;square_root (n):
-	;  dividend = n
-	;  root = 0
-	;  LOOP 8 TIMES
-	;    dividend <<= 2
-	;    NOTE: discard the lower 16 bits to produce the partial dividend
-	;    partial_dividend = dividend >> 16
-	;    divisor = (4 * root + 1) * 1
-	;    IF partial_dividend >= divisor 
-	;      partial_dividend -= divisor
-	;      root = root * 2 + 1
-	;    ELSE
-	;      root = root * 2
 
-	;  remainder = partial_dividend
-	;  RETURN (root, remainder)
 
-	.define dividend r1
-	.define partial_dividend r2
-	.define root r3
-	.define divisor r0
-	.define remainder r5
+.PROC stack_demo
+stack_demo:
+	cache
 
-	iwt dividend, #$DD93 ; 56723   () 
-	iwt partial_dividend, #$0 ; 
-	iwt r12, #$8 ; loop 8 times 
-	iwt root, #0 ; r3 =  ()  [should end up 238/EE]
-	iwt divisor, #0 ; r0 =  () 
-	iwt remainder, #0 ; () 	[should end up 79/4F]
+	;initialize stackPointer to stack ram;
+	iwt stackPointer, #gsu_stack_ram
+	
 
-	iwt	r13, #square_root_loop
+	iwt r2, #$4
+	gsu_stack_push r2
 
-	square_root_loop:
+	iwt r2, #$5
+	gsu_stack_push(r2)
 
-	;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
-		with dividend
-		add dividend
-		with partial_dividend 
-		rol
+	iwt r2, #$6
+	gsu_stack_push(r2)
 
-		with dividend
-		add dividend
-		with partial_dividend
-		rol
+	iwt r2, #$7
+	gsu_stack_push (r2)
 
-	;divisor = 4*root+1
-		from root
-		add root ; r0 = 2*root
-		add divisor; r0 = 4*root
-		add #$1 ; divisor = $*root+1
-	; cmp divisor < partial_dividend
-		cmp partial_dividend; r0-r2
-		bmi sqrtElse;
-		nop
-		beq sqrtElse;
-		nop
-	;      root = root * 2
-		with root
-		add root ; root = 2*root
-		bra lp
-		nop
-	sqrtElse:
-	;      partial_dividend -= divisor
-	;      root = root * 2 + 1
-		with partial_dividend
-		sub divisor
-		with root
-		add root
-		with root
-		add #$1 	
-		
-	lp:
-	move remainder,partial_dividend
-	loop
-	nop
+	iwt r2, #$8
+	gsu_stack_push (r2)
+
+	iwt r2, #$9
+	gsu_stack_push (r2)
+
+	iwt r2, #$A
+	gsu_stack_push (r2)
+
 	stop
 	nop
 	stop
