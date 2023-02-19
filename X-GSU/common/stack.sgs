@@ -1,0 +1,42 @@
+;The GSU stack is 16 bit values
+.struct gsu_stack
+  entries  .res $200 ; 512 Bytes of stack
+.endstruct
+
+.define stackPointer r10
+
+gsu_stack_ram:
+  .res .sizeof(gsu_stack)
+  
+; Pushes the value stored in R to the stack
+; assumes r10 is stack pointer
+;Example :
+;   iwt r2, #$4
+;	gsu_stack_push r2
+.macro gsu_stack_push R
+	.if .not(.blank ({R}))
+		from	R
+	.endif
+	stw	(stackPointer)
+	inc	stackPointer
+	inc	stackPointer
+.endmacro
+
+; Pops the value stored in R to the stack
+; assumes r10 is stack pointer
+;Example :
+;   iwt r2, #$4
+;	gsu_stack_pop r2
+.macro gsu_stack_pop R
+	dec	stackPointer
+	dec	stackPointer
+	.if .not( .blank({R}))
+		to	R
+	.endif
+	ldw	(stackPointer)
+.endmacro
+
+;initialize stackPointer to stack ram;
+.macro init_stack
+	iwt stackPointer, #gsu_stack_ram
+.endmacro 
