@@ -4,79 +4,100 @@
 ; reciprocol
 
 .include "libSFX.i"
-
-;The GSU stack is 16 bit values
-.struct gsu_stack
-  entries  .res $200 ; 512 Bytes of stack
-.endstruct
-
-.define stackPointer r10
+.include "structs/structs.sgs"
 
 .segment "GSURAM"
-gsu_stack_ram:
-  .res .sizeof(gsu_stack)
+camera_mem:
+  .res .sizeof(camera)
+world_matrix_mem:
+  .res .sizeof(matrix4)
+.include "common/stack.sgs"
 
 .segment "GSUCODE"
-
-; Pushes the value stored in R to the stack
-; R can not be 0 or 3, assumes r10 is stack pointer
-
-.macro gsu_stack_push R
-	.if .not(.blank ({R}))
-		from	R
-	.endif
-	stw	(stackPointer)
-	inc	stackPointer
-	inc	stackPointer
-.endmacro
-
-; Pops the value stored in R to the stack
-; R can not be 0 3 or 4
-; clobbers r0, r3
-
-.macro gsu_stack_pop R
-	dec	stackPointer
-	dec	stackPointer
-	.if .not( .blank({R}))
-		to	R
-	.endif
-	ldw	(stackPointer)
-.endmacro
-
 GSU_Code:
+.PROC camera_demo
+.define zaxis r1
+.define xaxis r2
+.define yaxis r3
+.define stackbackup r4
 
+camera_demo:
+	;init_camera ; I've hardcoded eye 0,0,0 lookAt -1.5,0,-1.5, up 0,1,0 
 
-.PROC stack_demo
-stack_demo:
+	iwt r1, #(camera_mem + camera::eye + vector3::xPos)
+	iwt r0, #0
+	stw (r1)
+
+	iwt r1, #(camera_mem + camera::eye + vector3::yPos)
+	iwt r0, #0
+	stw (r1)
+	
+	iwt r1, #(camera_mem + camera::eye + vector3::zPos)
+	iwt r0, #0
+	stw (r1)
+	
+	;Create lookAt
+	iwt r1, #(camera_mem + camera::lookAt + vector3::xPos)
+	iwt r0, #$FF80 ; -1.5 in 8.8 twos compliment fixed point
+	stw (r1)
+
+	iwt r1, #(camera_mem + camera::lookAt + vector3::yPos)
+	iwt r0, #0
+	stw (r1)
+	
+	iwt r1, #(camera_mem + camera::lookAt + vector3::zPos)
+	iwt r0, #$FF80 ; -1.5 in 8.8 twos compliment fixed point
+	stw (r1)
+	
+	;Create up
+	iwt r1, #(camera_mem + camera::up + vector3::xPos)
+	iwt r0, #0
+	stw (r1)
+
+	iwt r1, #(camera_mem + camera::up + vector3::yPos)
+	iwt r0, #0100; 1.0 in 8.8 twos compliment fixed point
+	stw (r1)
+	
+	iwt r1, #(camera_mem + camera::up + vector3::zPos)
+	iwt r0, #0
+	stw (r1)
+
 	cache
-
-	;initialize stackPointer to stack ram;
-	iwt stackPointer, #gsu_stack_ram
 	
 
-	iwt r2, #$4
-	gsu_stack_push r2
+	;backup stack pointer
+	move stackbackup, stackPointer
 
-	iwt r2, #$5
-	gsu_stack_push(r2)
+	;subtract lookAt-eye
+    ;ALLOCATE Three VECTORS
+	iwt r0, #0
 
-	iwt r2, #$6
-	gsu_stack_push(r2)
+	move zaxis, stackPointer
+	
+	gsu_stack_push;zaxis.x
+	gsu_stack_push;zaxis.y
+	gsu_stack_push;zaxis.z
 
-	iwt r2, #$7
-	gsu_stack_push (r2)
+	move xaxis, stackPointer
+	
+	gsu_stack_push;xaxis.x
+	gsu_stack_push;xaxis.y
+	gsu_stack_push;xaxis.z
 
-	iwt r2, #$8
-	gsu_stack_push (r2)
+	move yaxis, stackPointer
+	
+	gsu_stack_push;yaxis.x
+	gsu_stack_push;yaxis.y
+	gsu_stack_push;yaxis.z
 
-	iwt r2, #$9
-	gsu_stack_push (r2)
 
-	iwt r2, #$A
-	gsu_stack_push (r2)
-
+	;restor stack pointer
+	move stackPointer, stackbackup
 	stop
 	nop
 	stop
 	nop
+
+
+
 .endproc
