@@ -4,11 +4,11 @@
 ; Sqrt816GS1
 
 .include "libSFX.i"
+.include "../common/stack.sgs"
 
-.segment "GSUCODE"
 
-gsu_sqrt:
-.PROC square_root
+gsu_sqrt: ; input on r1 returns int-root on r3 and int remainder on r5
+.scope square_root
 	;square_root (n):
 	;  dividend = n
 	;  root = 0
@@ -32,7 +32,7 @@ gsu_sqrt:
 	.define divisor r0
 	.define remainder r5
 
-	iwt dividend, #$DD93 ; 56723   () 
+	
 	iwt partial_dividend, #$0 ; 
 	iwt r12, #$8 ; loop 8 times 
 	iwt root, #0 ; r3 =  ()  [should end up 238/EE]
@@ -84,8 +84,7 @@ gsu_sqrt:
 	move remainder,partial_dividend
 	loop
 	nop
-	stop
-	nop
-	stop
-	nop
-.endproc
+.endscope
+
+gsu_stack_pop r15
+nop
