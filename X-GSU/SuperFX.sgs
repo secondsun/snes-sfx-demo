@@ -117,7 +117,6 @@ camera_demo:
 	;Now we can normalize the vector at r10 - #6 (a vector is 6 bytes, and we pushed those bytes to the stack; r10 is pointing at the end of the stack so we look back)
  	;call #vector_length
 	link	#4
-	gsu_stack_push r11
 	iwt	  r15, #vector_length
 	nop
  stop
@@ -133,8 +132,11 @@ camera_demo:
 vector_length:
 .scope VectorLenght
 
+	gsu_stack_push r11 ; push return address to stack
+
 	.define vec r1 ; Pointer to the vector to get the length of
 	;r0 = (vec.x)
+	gsu_stack_push r11
 	ldw (r1)
 	;square vec.x/r0
 	move r6, r0
