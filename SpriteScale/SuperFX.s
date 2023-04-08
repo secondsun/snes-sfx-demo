@@ -1,7 +1,7 @@
 .include "libSFX.i"
 .include "pointers.s"
 .include "CpuMacros.s"
-.include "edgeEntry.i"
+.include "edgeEntry.sgs"
 
 Main:
 
@@ -39,7 +39,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$4;three sprite
+        lda #$5;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
@@ -66,7 +66,7 @@ Main:
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::texture
         ldx #$40
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::xLoc
-        ldx #$60
+        ldx #$20
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::yLoc
         ldx #$0100
         stx a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r
@@ -289,7 +289,7 @@ drawScreen1:
                 sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale
                 sta a:spritelist::sprites + 4 * .sizeof(sprite) + sprite::scale
                 lda f:Scale+2, X
-               sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
+                sta a:spritelist::sprites + 0 * .sizeof(sprite) + sprite::scale_r
                 sta a:spritelist::sprites + 1 * .sizeof(sprite) + sprite::scale_r
                 sta a:spritelist::sprites + 2 * .sizeof(sprite) + sprite::scale_r
                 sta a:spritelist::sprites + 3 * .sizeof(sprite) + sprite::scale_r

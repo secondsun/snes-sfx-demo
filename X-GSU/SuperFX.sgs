@@ -2,25 +2,9 @@
 ; Summers Pittman <secondsun@gmail.com>
 ; 16-bit 0.16-fixed point reciprocol
 ; reciprocol
-
+.include "var.sgs"
 .include "libSFX.i"
 .include "structs/structs.sgs"
-
-.segment "GSURAM"
-;Temp variables for return vectors
-vector_1:
-  .res .sizeof(vector3)
-vector_2:
-  .res .sizeof(vector3)
-vector_3:
-  .res .sizeof(vector3)  
-;Global Camera   
-camera_mem:
-  .res .sizeof(camera)
-; Global Matrix Transform  
-world_matrix_mem:
-  .res .sizeof(matrix4)
-
 .include "common/stack.sgs"
 
 
@@ -77,7 +61,7 @@ GSU_Code:
 
 camera_demo:
 	init_stack
-	init_camera ; I've hardcoded eye 0,0,0 lookAt -37.8,0,-1.5, up 0,1,0 
+	init_camera ; I've hardcoded eye 0,0,0 lookAt -37.8,24.7,20, up 0,1,0 
 	
 	;This code demonstrates a GLU lookAt
 	;First we get the vectors of our three axises based on the camera's situation
@@ -136,7 +120,6 @@ vector_length:
 
 	.define vec r1 ; Pointer to the vector to get the length of
 	;r0 = (vec.x)
-	gsu_stack_push r11
 	ldw (r1)
 	;square vec.x/r0
 	move r6, r0

@@ -42,7 +42,7 @@ gsu_sqrt: ; input on r1 returns int-root on r3 and int remainder on r5
 	iwt	r13, #square_root_loop
 
 	square_root_loop:
-
+cache
 	;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
 		with dividend
 		add dividend

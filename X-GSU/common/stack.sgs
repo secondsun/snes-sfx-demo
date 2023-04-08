@@ -1,14 +1,10 @@
 ;The GSU stack is 16 bit values
-.ifndef gsu_stack_ram
-	.struct gsu_stack
-	entries  .res $200 ; 512 Bytes of stack
-	.endstruct
+.ifndef ::__STACK_DEFINED__
+::__STACK_DEFINED__ = 1    
+	.include "../var.sgs"
 
 	.define stackPointer r10
 
-	gsu_stack_ram:
-	.res .sizeof(gsu_stack)
-	
 	; Pushes the value stored in R to the stack
 	; assumes r10 is stack pointer
 	;Example :

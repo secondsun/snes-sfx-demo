@@ -1,5 +1,5 @@
 .include "libSFX.i"
-.include "edgeEntry.i"
+.include "edgeEntry.sgs"
 
 ;This draws tree.bin
 ; Tree.bin is 0x1f columns 
