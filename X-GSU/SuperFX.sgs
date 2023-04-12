@@ -2,9 +2,10 @@
 ; Summers Pittman <secondsun@gmail.com>
 ; 16-bit 0.16-fixed point reciprocol
 ; reciprocol
-.include "var.sgs"
+.include "common/var.sgs"
+.include "common/function.sgs"
 .include "libSFX.i"
-.include "structs/structs.sgs"
+.include "common/structs.sgs"
 .include "common/stack.sgs"
 
 
@@ -100,9 +101,7 @@ camera_demo:
 
 	;Now we can normalize the vector at r10 - #6 (a vector is 6 bytes, and we pushed those bytes to the stack; r10 is pointing at the end of the stack so we look back)
  	;call #vector_length
-	link	#4
-	iwt	  r15, #vector_length
-	nop
+	call vector_length
  stop
 	nop
 	stop
@@ -113,11 +112,8 @@ camera_demo:
 ;problem for "long vectors" but is a problem for short ones.
 ;Right now this is used for camera functions
 
-vector_length:
-.scope VectorLenght
-
-	gsu_stack_push r11 ; push return address to stack
-
+; push return address to stack
+function vector_length
 	.define vec r1 ; Pointer to the vector to get the length of
 	;r0 = (vec.x)
 	ldw (r1)
@@ -150,15 +146,13 @@ vector_length:
 	move r1, r0 ; prepare for calling gsu_sqrt with input = r1
 
 
-	link	#4
-	iwt	  r15, #gsu_sqrt
-	nop
-	gsu_stack_pop r15 ; jump to return address on stack
-	nop
+	call gsu_sqrt
+	return
 
 	;load 
 
 
-.endscope
+endfunction
+
 .include "gsu_maths/gsu_sqrt.sgs"
 

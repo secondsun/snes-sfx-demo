@@ -5,10 +5,10 @@
 
 .include "libSFX.i"
 .include "../common/stack.sgs"
+.include "../common/function.sgs"
 
 
-gsu_sqrt: ; input on r1 returns int-root on r3 and int remainder on r5
-.scope square_root
+function gsu_sqrt
 	;square_root (n):
 	;  dividend = n
 	;  root = 0
@@ -84,7 +84,6 @@ cache
 	move remainder,partial_dividend
 	loop
 	nop
-.endscope
+	return
+endfunction
 
-gsu_stack_pop r15
-nop

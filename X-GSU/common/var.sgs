@@ -1,7 +1,7 @@
 
 .ifndef ::__VARS_DEFINED__
 ::__VARS_DEFINED__ = 1
-.include "structs/structs.sgs"
+.include "structs.sgs"
 
 .segment "GSURAM"
 ;Temp variables for return vectors
