@@ -1,0 +1,68 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; Vector utility functions
+;
+.ifndef ::__GSU_VECTOR_DEFINED__
+::__GSU_VECTOR_DEFINED__ = 1   
+
+.include "libSFX.i"
+.include "../common/stack.sgs"
+.include "../common/function.sgs"
+.include "./gsu_sqrt.sgs"
+
+;Returns the Address to a normalize vector of the input vector
+; Input : R1 address to vector
+; Output : R3 address to vector (normalized)
+; Clobbers All
+function vector_normalize
+  return 
+endfunction
+
+;Vector.length function put in r1 the memory address of the vector to get the length of
+;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
+;problem for "long vectors" but is a problem for short ones.
+; Clobbers All
+; Input : Address of vector to get length of at r1
+; Output : length of vector on r3
+
+function vector_length
+	.define vec r1 ; Pointer to the vector to get the length of
+	;r0 = (vec.x)
+	ldw (r1)
+	;square vec.x/r0
+	move r6, r0
+	fmult 
+	move r3, r0 ; save x^2 to r3
+	
+	with r1
+	add #2 ;r1 = vec.y
+	
+	;r0 = (vec.y)
+	ldw (r1)
+	;square vec.y/r0
+	move r6, r0
+	fmult 
+	move r2, r0 ; save y^2 to r2
+	with r1
+	add #2 ;r1 = vec.z
+	
+	;r0 = (vec.z)
+	ldw (r1)
+	;square vec.z/r0
+	move r6, r0
+	fmult  ; r0 = z^2
+	
+	add r2 ; r0 = z^2 + y^2 
+	add r3 ; r0 = z^2 + y^2 + x^2
+
+	move r1, r0 ; prepare for calling gsu_sqrt with input = r1
+
+
+	call gsu_sqrt
+	return
+
+	;load 
+
+
+endfunction
+.endif

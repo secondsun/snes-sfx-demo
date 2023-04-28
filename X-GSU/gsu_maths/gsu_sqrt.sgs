@@ -1,89 +1,94 @@
+
+
 ; SuperFX
 ; Summers Pittman <secondsun@gmail.com>
-; 16-bit square root algorithm ported from http://6502org.wikidot.com/software-math-sqrt
+; 16-bit square root0 algorithm ported from http://6502org.wikidot.com/software-math-sqrt
 ; Sqrt816GS1
+.ifndef ::__GSU_SQRT_DEFINED__
+::__GSU_SQRT_DEFINED__ = 1   
 
 .include "libSFX.i"
 .include "../common/stack.sgs"
 .include "../common/function.sgs"
 
-
+; In variable on r1 of type fixed88
 function gsu_sqrt
-	;square_root (n):
-	;  dividend = n
-	;  root = 0
+	;square_root0 (n):
+	;  dividend0 = n
+	;  root0 = 0
 	;  LOOP 8 TIMES
-	;    dividend <<= 2
-	;    NOTE: discard the lower 16 bits to produce the partial dividend
-	;    partial_dividend = dividend >> 16
-	;    divisor = (4 * root + 1) * 1
-	;    IF partial_dividend >= divisor 
-	;      partial_dividend -= divisor
-	;      root = root * 2 + 1
+	;    dividend0 <<= 2
+	;    NOTE: discard the lower 16 bits to produce the partial dividend0
+	;    partial_dividend0 = dividend0 >> 16
+	;    divisor0 = (4 * root0 + 1) * 1
+	;    IF partial_dividend0 >= divisor0 
+	;      partial_dividend0 -= divisor0
+	;      root0 = root0 * 2 + 1
 	;    ELSE
-	;      root = root * 2
+	;      root0 = root0 * 2
 
-	;  remainder = partial_dividend
-	;  RETURN (root, remainder)
+	;  remainder0 = partial_dividend0
+	;  RETURN (root0, remainder0)
 
-	.define dividend r1
-	.define partial_dividend r2
-	.define root r3
-	.define divisor r0
-	.define remainder r5
+	.define dividend0 r1
+	.define partial_dividend0 r2
+	.define root0 r3
+	.define divisor0 r0
+	.define remainder0 r5
 
 	
-	iwt partial_dividend, #$0 ; 
+	iwt partial_dividend0, #$0 ; 
 	iwt r12, #$8 ; loop 8 times 
-	iwt root, #0 ; r3 =  ()  [should end up 238/EE]
-	iwt divisor, #0 ; r0 =  () 
-	iwt remainder, #0 ; () 	[should end up 79/4F]
+	iwt root0, #0 ; r3 =  ()  [should end up 238/EE]
+	iwt divisor0, #0 ; r0 =  () 
+	iwt remainder0, #0 ; () 	[should end up 79/4F]
 
-	iwt	r13, #square_root_loop
+	iwt	r13, #square_root0_loop
 
-	square_root_loop:
+	square_root0_loop:
 cache
-	;shift dividend(r1) right 2 and put overflow into partial_dividend(r2)
-		with dividend
-		add dividend
-		with partial_dividend 
+	;shift dividend0(r1) right 2 and put overflow into partial_dividend0(r2)
+		with dividend0
+		add dividend0
+		with partial_dividend0 
 		rol
 
-		with dividend
-		add dividend
-		with partial_dividend
+		with dividend0
+		add dividend0
+		with partial_dividend0
 		rol
 
-	;divisor = 4*root+1
-		from root
-		add root ; r0 = 2*root
-		add divisor; r0 = 4*root
-		add #$1 ; divisor = $*root+1
-	; cmp divisor < partial_dividend
-		cmp partial_dividend; r0-r2
+	;divisor0 = 4*root0+1
+		from root0
+		add root0 ; r0 = 2*root0
+		add divisor0; r0 = 4*root0
+		add #$1 ; divisor0 = $*root0+1
+	; cmp divisor0 < partial_dividend0
+		cmp partial_dividend0; r0-r2
 		bmi sqrtElse;
 		nop
 		beq sqrtElse;
 		nop
-	;      root = root * 2
-		with root
-		add root ; root = 2*root
+	;      root0 = root0 * 2
+		with root0
+		add root0 ; root0 = 2*root0
 		bra lp
 		nop
 	sqrtElse:
-	;      partial_dividend -= divisor
-	;      root = root * 2 + 1
-		with partial_dividend
-		sub divisor
-		with root
-		add root
-		with root
+	;      partial_dividend0 -= divisor0
+	;      root0 = root0 * 2 + 1
+		with partial_dividend0
+		sub divisor0
+		with root0
+		add root0
+		with root0
 		add #$1 	
 		
 	lp:
-	move remainder,partial_dividend
+	move remainder0,partial_dividend0
 	loop
 	nop
 	return
 endfunction
 
+.endif

@@ -8,7 +8,6 @@
 .include "common/structs.sgs"
 .include "common/stack.sgs"
 
-
 .macro init_camera
 iwt r1, #(camera_mem + camera::eye + vector3::xPos)
 	iwt r0, #$0
@@ -53,10 +52,11 @@ iwt r1, #(camera_mem + camera::eye + vector3::xPos)
 
 .segment "GSUCODE"
 GSU_Code:
-.define zaxis r1
-.define xaxis r2
-.define yaxis r3
-.define stackbackup r4
+
+iwt r0, #$0300
+call reciprocol
+stop
+nop
 
 
 
@@ -99,60 +99,15 @@ camera_demo:
 		sm (vector_1 + vector3::zPos), r0
 		iwt r1, #vector_1
 
-	;Now we can normalize the vector at r10 - #6 (a vector is 6 bytes, and we pushed those bytes to the stack; r10 is pointing at the end of the stack so we look back)
- 	;call #vector_length
+	;Now we can normalize the vector at r1
 	call vector_length
  stop
 	nop
 	stop
 	nop
 
-;Vector.length function put in r1 the memory address of the vector to get the length of
-;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
-;problem for "long vectors" but is a problem for short ones.
-;Right now this is used for camera functions
-
-; push return address to stack
-function vector_length
-	.define vec r1 ; Pointer to the vector to get the length of
-	;r0 = (vec.x)
-	ldw (r1)
-	;square vec.x/r0
-	move r6, r0
-	fmult 
-	move r3, r0 ; save x^2 to r3
-	
-	with r1
-	add #2 ;r1 = vec.y
-	
-	;r0 = (vec.y)
-	ldw (r1)
-	;square vec.y/r0
-	move r6, r0
-	fmult 
-	move r2, r0 ; save y^2 to r2
-	with r1
-	add #2 ;r1 = vec.z
-	
-	;r0 = (vec.z)
-	ldw (r1)
-	;square vec.z/r0
-	move r6, r0
-	fmult  ; r0 = z^2
-	
-	add r2 ; r0 = z^2 + y^2 
-	add r3 ; r0 = z^2 + y^2 + x^2
-
-	move r1, r0 ; prepare for calling gsu_sqrt with input = r1
-
-
-	call gsu_sqrt
-	return
-
-	;load 
-
-
-endfunction
 
 .include "gsu_maths/gsu_sqrt.sgs"
+.include "gsu_maths/gsu_vector.sgs"
+.include "gsu_maths/gsu_recip.sgs"
 

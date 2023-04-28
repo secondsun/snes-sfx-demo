@@ -25,6 +25,7 @@
 	gsu_stack_push r11 
 .endmacro
 
+; Useful to return midfunction
 .macro return
     gsu_stack_pop r15 ; jump to return address on stack
 	nop
