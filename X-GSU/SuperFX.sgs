@@ -53,55 +53,16 @@ iwt r1, #(camera_mem + camera::eye + vector3::xPos)
 .segment "GSUCODE"
 GSU_Code:
 
-iwt r0, #$0300
-call reciprocol
+init_stack
+
+iwt r0, #$48cf
+call gsu_sqrt
 stop
 nop
 
-
-
-camera_demo:
-	init_stack
-	init_camera ; I've hardcoded eye 0,0,0 lookAt -37.8,24.7,20, up 0,1,0 
 	
-	;This code demonstrates a GLU lookAt
-	;First we get the vectors of our three axises based on the camera's situation
-	; |x| indicated the normalized vector of x
 	
-	;First Xaxis = |lookAt-eye| 
-	
-		;load camera.lookAt.x to x1
-		lm r0, (camera_mem + camera::lookAt + vector3::xPos)
-		;load camera.eye.x to x0
-		lm r1,  (camera_mem + camera::eye + vector3::xPos)
-		;subtract to r0
-		sub r1
-		;push to stack
-		sm (vector_1), r0
-
-		;load camera.lookAt.v to x1
-		
-		lm r0, (camera_mem + camera::lookAt + vector3::yPos)
-		;load camera.eye.y to x0
-		lm r1, (camera_mem + camera::eye + vector3::yPos)
-		;subtract to r0
-		sub r1
-		;push to stack
-		sm (vector_1 + vector3::yPos), r0
-	
-	;load camera.lookAt.v to x1
-		lm r0, (camera_mem + camera::lookAt + vector3::zPos)
-		;load camera.eye.y to x0
-		lm r1, (camera_mem + camera::eye + vector3::zPos)
-		;subtract to r0
-		sub r1
-		;push to stack
-		sm (vector_1 + vector3::zPos), r0
-		iwt r1, #vector_1
-
-	;Now we can normalize the vector at r1
-	call vector_length
- stop
+ 	stop
 	nop
 	stop
 	nop

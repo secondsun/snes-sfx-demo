@@ -37,7 +37,7 @@ function reciprocol
 
 	iwt dividend, #$1
 	move divisor, r0
-	iwt r12, #$10; loop 8 times 
+	iwt r12, #$10; loop 16 times 
 	move remainder, dividend; 
 	iwt quotient, #0 ; r0 =  () 
 	

@@ -16,6 +16,7 @@
 	nop
 .endmacro 
 
+
 .macro function name
     .if (.blank ({name}))
 		.error "Name must not be blank"

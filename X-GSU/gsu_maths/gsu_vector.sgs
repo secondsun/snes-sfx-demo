@@ -15,6 +15,7 @@
 ; Output : R3 address to vector (normalized)
 ; Clobbers All
 function vector_normalize
+  
   return 
 endfunction
 

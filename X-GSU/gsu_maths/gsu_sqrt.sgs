@@ -11,7 +11,8 @@
 .include "../common/stack.sgs"
 .include "../common/function.sgs"
 
-; In variable on r1 of type fixed88
+; In variable on r0 of type fixed88
+; Out : Sqrt on R3 of Input in fixed88
 function gsu_sqrt
 	;square_root0 (n):
 	;  dividend0 = n
@@ -29,7 +30,7 @@ function gsu_sqrt
 
 	;  remainder0 = partial_dividend0
 	;  RETURN (root0, remainder0)
-
+	move r1, r0
 	.define dividend0 r1
 	.define partial_dividend0 r2
 	.define root0 r3
@@ -38,7 +39,7 @@ function gsu_sqrt
 
 	
 	iwt partial_dividend0, #$0 ; 
-	iwt r12, #$8 ; loop 8 times 
+	iwt r12, #$C ; loop 12 times 
 	iwt root0, #0 ; r3 =  ()  [should end up 238/EE]
 	iwt divisor0, #0 ; r0 =  () 
 	iwt remainder0, #0 ; () 	[should end up 79/4F]
