@@ -12,7 +12,7 @@
 			.error "Label must not be blank"
 		.endif
     link	#4
-	iwt	  r15, #label
+	iwt	  r15, #.ident(.concat( .string(label), "_function"))
 	nop
 .endmacro 
 
@@ -21,7 +21,7 @@
     .if (.blank ({name}))
 		.error "Name must not be blank"
 	.endif
-        name:
+        .ident(.concat(.string(name), "_function")):
     .scope name
 	gsu_stack_push r11 
 .endmacro

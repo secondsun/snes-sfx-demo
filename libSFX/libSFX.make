@@ -62,11 +62,11 @@ asflags		:= -D __STACKSIZE__=\$$$(stack_size) -D __ZPADSIZE__=\$$$(zpad_size) -D
 ldflags       	:=
 
 ifeq ($(debug),1)
-asflags 	+= -D __DEBUG__=1
-ldflags 	+= -Ln $(name).$(debug_sym_ext)
+asflags 	+= -D __DEBUG__=1 
+ldflags 	+= -Ln $(name).$(debug_sym_ext) --dbgfile $(name).$(debug_nfo_ext)
 endif
 ifeq ($(debug),2)
-asflags 	+= -D __DEBUG__=1
+asflags 	+= -D __DEBUG__=1 
 ldflags 	+= -Ln $(name).$(debug_sym_ext) -m $(name).$(debug_map_ext) -vm --dbgfile $(name).$(debug_nfo_ext)
 endif
 

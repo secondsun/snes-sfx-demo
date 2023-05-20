@@ -7,15 +7,66 @@
 
 .include "libSFX.i"
 .include "../common/stack.sgs"
+.include "../common/var.sgs"
 .include "../common/function.sgs"
 .include "./gsu_sqrt.sgs"
+.include "./gsu_recip.sgs"
 
 ;Returns the Address to a normalize vector of the input vector
-; Input : R1 address to vector
+; Input : R0 address to vector to normalize
 ; Output : R3 address to vector (normalized)
 ; Clobbers All
 function vector_normalize
+  ;store referece to in to stack
+  gsu_stack_push
+  ;get length
+  call vector_length ;R3 = length
+  move r0, r3
+  call reciprocol ;R3 = 1/length
+  ;retrieve referece to in from stack
+  move r6, r3 ; Beging preparations for multiplies
+  ; Get in from stack
+  gsu_stack_pop r1 ; R1 = addr of vector to get value of
+  iwt r2, #vector_normalize_out
+
+  ;(vector_normalize_out.x) = (R1.x * R6)
+  ldw (r1) ;R0 = in.x
+  lmult ; r4 = decimal bits
+  move r7,r0
+  move r8,r4
+  merge ; r0 = fixed88 normalized length
+  stw (r2)
+  with r1
+  add #$2 ; R1 = R1.y
+  with r2
+  add #$2 ; R2 = memory address to write to
+
+  ldw (r1) ;R0 = in.x
+  lmult ; r4 = decimal bits
+  from r4
+  move r7,r0
+  move r8,r4
+  merge ; r0 = fixed88 normalized length
+  stw (r2)
+  with r1
+  add #$2 ; R1 = R1z
+  with r2
+  add #$2 ; R2 = memory address to write to
+
+  ldw (r1) ; ;R0 = in.z
+  lmult ; r4 = decimal bits
+  from r4
+  move r7,r0
+  move r8,r4
+  merge ; r0 = fixed88 normalized length
+  stw (r2)
   
+  iwt r3, #vector_normalize_out
+
+  ;MOVE #(vector_normalize_out +2), (R1.y * R6)
+  ;MOVE #(vector_normalize_out +4), (R1.z * R6)
+
+
   return 
 endfunction
 
@@ -23,12 +74,12 @@ endfunction
 ;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
 ;problem for "long vectors" but is a problem for short ones.
 ; Clobbers All
-; Input : Address of vector to get length of at r1
+; Input : Address of vector to get length of at r0
 ; Output : length of vector on r3
 
 function vector_length
-	.define vec r1 ; Pointer to the vector to get the length of
 	;r0 = (vec.x)
+  move r1,r0
 	ldw (r1)
 	;square vec.x/r0
 	move r6, r0
@@ -55,9 +106,6 @@ function vector_length
 	
 	add r2 ; r0 = z^2 + y^2 
 	add r3 ; r0 = z^2 + y^2 + x^2
-
-	move r1, r0 ; prepare for calling gsu_sqrt with input = r1
-
 
 	call gsu_sqrt
 	return

@@ -2,11 +2,12 @@
 ; Summers Pittman <secondsun@gmail.com>
 ; 16-bit 0.16-fixed point reciprocol
 ; reciprocol
-.include "common/var.sgs"
-.include "common/function.sgs"
-.include "libSFX.i"
-.include "common/structs.sgs"
+
 .include "common/stack.sgs"
+.include "common/function.sgs"
+.include "common/structs.sgs"
+.include "common/var.sgs"
+.include "libSFX.i"
 
 .macro init_camera
 iwt r1, #(camera_mem + camera::eye + vector3::xPos)
@@ -31,7 +32,7 @@ iwt r1, #(camera_mem + camera::eye + vector3::xPos)
 	stw (r1)
 	
 	iwt r1, #(camera_mem + camera::lookAt + vector3::zPos)
-	iwt r0, #$1400 ; 20.0 in 8.8 twos compliment fixed point
+	iwt r0, #$1400 ; 20 in 8.8 twos compliment fixed point
 	stw (r1)
 	
 	;Create up
@@ -51,24 +52,23 @@ iwt r1, #(camera_mem + camera::eye + vector3::xPos)
 
 
 .segment "GSUCODE"
+
+
 GSU_Code:
 
 init_stack
+init_camera
 
-iwt r0, #$48cf
-call gsu_sqrt
-stop
-nop
-
-	
-	
+	iwt R0, #(camera_mem + camera::lookAt ) 
+	call vector_normalize	
  	stop
 	nop
 	stop
 	nop
 
 
+
+;Code goes in code segment
 .include "gsu_maths/gsu_sqrt.sgs"
 .include "gsu_maths/gsu_vector.sgs"
 .include "gsu_maths/gsu_recip.sgs"
-

@@ -3,19 +3,7 @@
 ; 16-bit 0.16-fixed point reciprocol
 ; reciprocol
 
-.ifndef ::__GSU_RECIP_DEFINED__
-::__GSU_RECIP_DEFINED__ = 1   
-
-
-.include "libSFX.i"
-.include "../common/stack.sgs"
-.include "../common/function.sgs"
-
-
-;In : R0 fixed88 the value to return the reciprocol of
-; Out : R3 a fixe88 reciprocol
-function reciprocol
-
+	; pseudocode
 	;   int dividend = 1;
     ;    int quotient = 0;
     ;    int remainder = dividend;
@@ -30,6 +18,18 @@ function reciprocol
     ;        }
     ;    }
 
+.ifndef ::__GSU_RECIP_DEFINED__
+::__GSU_RECIP_DEFINED__ = 1   
+
+
+.include "libSFX.i"
+.include "../common/stack.sgs"
+.include "../common/function.sgs"
+
+
+; In : R0 fixed88 the value to return the reciprocol of
+; Out : R3 a fixe88 reciprocol
+function reciprocol
     .define dividend r1
 	.define divisor r2
 	.define remainder r3
