@@ -13,6 +13,48 @@
 .include "./gsu_recip.sgs"
 
 ;Returns the Address to a normalize vector of the input vector
+; Input : R0 address to vector to subtract from
+; Input : VECTOR_SUBTRACT_IN address of vector to subtract
+; Output : R3,VECTOR_SUBTRACT_OUT  address to vector (normalized)
+; Clobbers All
+function vector_subtract
+  to r1 
+  ldw (r0)
+  add #2 ;bump up r0 = in.y
+  lm r3, (VECTOR_SUBTRACT_IN)
+  to r2
+  ldw (r3)
+  with r3
+  add #2
+  with r1 
+  sub r2
+  sm (VECTOR_SUBTRACT_OUT), r1
+
+  to r1 
+  ldw (r0)
+  add #2 ;bump up r0 = in.z
+  to r2
+  ldw (r3)
+  with r3
+  add #2
+  with r1 
+  sub r2
+  sm (VECTOR_SUBTRACT_OUT+2), r1
+
+  to r1 
+  ldw (r0)
+  to r2
+  ldw (r3)
+  with r1 
+  sub r2
+  sm (VECTOR_SUBTRACT_OUT + 4), r1
+
+  iwt r3, #VECTOR_SUBTRACT_OUT
+
+  return
+endfunction
+
+;Returns the Address to a normalize vector of the input vector
 ; Input : R0 address to vector to normalize
 ; Output : R3 address to vector (normalized)
 ; Clobbers All

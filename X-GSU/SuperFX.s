@@ -18,7 +18,7 @@ Main:
         sta     GSU_SCMR
         lda     #%10000000
         sta     GSU_CFGR
-        lda     #$00
+        lda     #$01
         sta     GSU_CLSR
 
         ;Start GSU

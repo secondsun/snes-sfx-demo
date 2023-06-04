@@ -15,7 +15,10 @@ vector_3:
   .res .sizeof(vector3)  
 vector_normalize_out:
   .res .sizeof(vector3)
-
+VECTOR_SUBTRACT_IN:
+  .res .sizeof(vector3)
+VECTOR_SUBTRACT_OUT:
+  .res .sizeof(vector3)
 
 ;Global Camera   
 camera_mem:

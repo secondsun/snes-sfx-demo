@@ -47,7 +47,6 @@ function gsu_sqrt
 	iwt	r13, #square_root0_loop
 
 	square_root0_loop:
-cache
 	;shift dividend0(r1) right 2 and put overflow into partial_dividend0(r2)
 		with dividend0
 		add dividend0
