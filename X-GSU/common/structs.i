@@ -1,5 +1,7 @@
 .ifndef ::__STRUCTS_DEFINED__
 ::__STRUCTS_DEFINED__ = 1   
+  .out "struct again \n"
+
 .struct vector3
       xPos  .word
       yPos  .word

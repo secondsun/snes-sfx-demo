@@ -8,8 +8,8 @@
 ::__GSU_SQRT_DEFINED__ = 1   
 
 .include "libSFX.i"
-.include "../common/stack.sgs"
-.include "../common/function.sgs"
+.include "../common/stack.i"
+.include "../common/function.i"
 
 ; In : 16bit int on r0
 ; Out : Sqrt on R3 of Input in fixed88

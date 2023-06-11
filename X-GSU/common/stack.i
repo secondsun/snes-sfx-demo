@@ -1,7 +1,7 @@
 ;The GSU stack is 16 bit values
 .ifndef ::__STACK_DEFINED__
 ::__STACK_DEFINED__ = 1    
-	.include "var.sgs"
+	.include "var.i"
 
 	.define stackPointer r10
 

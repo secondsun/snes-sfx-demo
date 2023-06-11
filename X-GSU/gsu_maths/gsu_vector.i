@@ -6,16 +6,58 @@
 ::__GSU_VECTOR_DEFINED__ = 1   
 
 .include "libSFX.i"
-.include "../common/stack.sgs"
-.include "../common/var.sgs"
-.include "../common/function.sgs"
-.include "./gsu_sqrt.sgs"
-.include "./gsu_recip.sgs"
+.include "../common/stack.i"
+.include "../common/var.i"
+.include "../common/function.i"
+.include "./gsu_sqrt.i"
+.include "./gsu_recip.i"
+
+;Returns the Address to a sum vector of the input vectors
+; Input : R0 address to vector to add from
+; Input : VECTOR_ADD_IN address of second vector to add
+; Output : R3,VECTOR_ADD_OUT  address to vector 
+; Clobbers All
+function vector_add
+  to r1 
+  ldw (r0)
+  add #2 ;bump up r0 = in.y
+  lm r3, (VECTOR_ADD_IN)
+  to r2
+  ldw (r3)
+  with r3
+  add #2
+  with r1 
+  add r2
+  sm (VECTOR_ADD_OUT), r1
+
+  to r1 
+  ldw (r0)
+  add #2 ;bump up r0 = in.z
+  to r2
+  ldw (r3)
+  with r3
+  add #2
+  with r1 
+  add r2
+  sm (VECTOR_ADD_OUT+2), r1
+
+  to r1 
+  ldw (r0)
+  to r2
+  ldw (r3)
+  with r1 
+  add r2
+  sm (VECTOR_ADD_OUT + 4), r1
+
+  iwt r3, #VECTOR_ADD_OUT
+
+  return
+endfunction
 
 ;Returns the Address to a normalize vector of the input vector
 ; Input : R0 address to vector to subtract from
 ; Input : VECTOR_SUBTRACT_IN address of vector to subtract
-; Output : R3,VECTOR_SUBTRACT_OUT  address to vector (normalized)
+; Output : R3,VECTOR_SUBTRACT_OUT  address to vector 
 ; Clobbers All
 function vector_subtract
   to r1 

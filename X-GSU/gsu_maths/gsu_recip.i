@@ -23,8 +23,8 @@
 
 
 .include "libSFX.i"
-.include "../common/stack.sgs"
-.include "../common/function.sgs"
+.include "../common/stack.i"
+.include "../common/function.i"
 
 
 ; In : R0 fixed88 the value to return the reciprocol of
