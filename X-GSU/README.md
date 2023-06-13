@@ -10,6 +10,11 @@ There are several registers that have special meaning in this Project. `R10` is 
 
 The [function](./common/function.sgs) macros provide convenient ways to call functions. They setup and tear down frames and update the stack as appropriate. This is why the register `R10` should not be used in general operations. Functions receive one input on `R0` and return their value (if any) on `R3`. `R0` and all other registers may be modified during function calls, and functions are expected to provide documentation if they do anything clever or considerate such as avoiding or using certain registers.
 
+Additional Operands should be written to static variables in the form ${FUNCTION_NAME}_IN. 
+
+When writing functions where the operand order matters (ie subtraction), the left hand side should be placed in `R0` by convention. 
+
+
 ### Example Function Definition
 
 Function names must be globally unique.

@@ -16,13 +16,16 @@ vector_3:
 vector_normalize_out:
   .res .sizeof(vector3)
 VECTOR_SUBTRACT_IN:
-  .res .sizeof(vector3)
+  .res 2
 VECTOR_SUBTRACT_OUT:
   .res .sizeof(vector3)
 VECTOR_ADD_IN:
-  .res .sizeof(vector3)
-  .out "def again \n"
+  .res 2
 VECTOR_ADD_OUT:
+  .res .sizeof(vector3)
+VECTOR_CROSS_IN:
+  .res 2
+VECTOR_CROSS_OUT:
   .res .sizeof(vector3)
 
 ;Global Camera   

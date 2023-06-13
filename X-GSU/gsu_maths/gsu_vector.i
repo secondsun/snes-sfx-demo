@@ -12,6 +12,170 @@
 .include "./gsu_sqrt.i"
 .include "./gsu_recip.i"
 
+;Returns the Address to a cross vector of the input vectors
+; Input : R0 address to vector to cross from
+; Input : VECTOR_CROSS_IN address of second vector to cross
+; Output : R3,VECTOR_CROSS_OUT  address to vector  result
+; Clobbers All
+function vector_cross
+  
+;Vector3.of(
+  ;(r0+2)*(VECTOR_CROSS_IN+4)-(r0+4*(VECTOR_CROSS_IN+2)),
+  ;(r0+4)*(VECTOR_CROSS_IN)-(r0*(VECTOR_CROSS_IN+4)),
+  ;(r0)*(VECTOR_CROSS_IN+2)-(r0+2*(VECTOR_CROSS_IN))
+;)
+  ;Initialize
+  lm r1, (VECTOR_CROSS_IN)
+
+  ;Adjust  R0, VECTOR_CROSS_IN to (r0+2),(VECTOR_CROSS_IN+4)
+  add #2
+  with r1
+  add #4
+
+  ;Begin (r0+2)*(VECTOR_CROSS_IN+4)
+  to r5
+  ldw (r0) ; r5 = r0.y
+  to r6
+  ldw (r1) ; r6 = IN.z
+  from r5
+  to r7
+  lmult; r5.r4 = r5*r6 = this.y*other.z
+  move r8,r4
+  with r7
+  swap
+  to r3
+  merge ; r3  = this.y*other.z at fixed 8.8
+  ; End (r0+2)*(VECTOR_CROSS_IN+4)
+
+  ;Adjust  (r0+2),(VECTOR_CROSS_IN+4) to (r0+4),(VECTOR_CROSS_IN+2)
+  add #2
+  with r1
+  sub #2
+
+
+  ;Begin (r0+4*(VECTOR_CROSS_IN+2))
+  to r5
+  ldw (r0) ; r5 = r0.z
+  to r6
+  ldw (r1) ; r6 = IN.y
+  from r5
+  to r7
+  lmult; r5.r4 = r5*r6 = this.z*other.y
+  move r8,r4
+  with r7
+  swap
+  to r4
+  merge ; r4  = this.z*other.y at fixed 8.8
+  ;End (r0+4*(VECTOR_CROSS_IN+2))
+  
+  ;Begin subtract this.y*other.z - this.z*other.y
+  with r3
+  sub r4
+  ;End subtract this.y*other.z - this.z*other.y
+  ;Write out.x
+  sm (VECTOR_CROSS_OUT), r3
+
+
+
+  ;Adjust  (r0+4),(VECTOR_CROSS_IN+2) to (r0+4),(VECTOR_CROSS_IN)
+  with r1
+  sub #2
+
+  ;Begin (r0+4)*(VECTOR_CROSS_IN)
+  to r5
+  ldw (r0) ; r5 = this.z
+  to r6
+  ldw (r1) ; r6 = other.x
+  from r5
+  to r7
+  lmult; r5.r4 = r5*r6 = this.z*other.x
+  with r7
+  swap
+  move r8,r4
+  to r3
+  merge ; r3  = this.z*other.x at fixed 8.8
+  ; End (r0+4)*(VECTOR_CROSS_IN)
+
+  ;Adjust  (r0+4),(VECTOR_CROSS_IN) to (r0), (VECTOR_CROSS_IN+4)
+  sub #4
+  with r1
+  add #4
+
+
+  ;Begin ((r0)*(VECTOR_CROSS_IN+4))
+  to r5
+  ldw (r0) ; r5 =this.x
+  to r6
+  ldw (r1) ; r6 = other.z
+  from r5
+  to r7
+  lmult; r5.r4 = r5*r6 = this.x*other.z
+  with r7
+  swap
+  move r8,r4
+  to r4
+  merge ; r4  = this.x*other.z at fixed 8.8
+  ;End ((r0)*(VECTOR_CROSS_IN+4))
+
+  ;Begin subtract this.z*other.x - this.x * other.z, 
+  with r3
+  sub r4
+  ;End subtract this.y*other.z - this.z*other.y
+  ;Write out.y
+  sm (VECTOR_CROSS_OUT+2), r3
+
+
+
+  ;Adjust (r0), (VECTOR_CROSS_IN+4) to (r0)*(VECTOR_CROSS_IN+2)
+  with r1
+  sub #2
+
+  ;Begin (r0)*(VECTOR_CROSS_IN+2)
+  to r5
+  ldw (r0) ; r5 = this.x
+  to r6
+  ldw (r1) ; r6 = other.y
+  from r5
+  to r7
+  lmult; r5.r4 = r5*r6 = this.x*other.y
+  with r7
+  swap
+  move r8,r4
+  to r3
+  merge ; r3  = this.x*other.y at fixed 8.8
+  ; End (r0)*(VECTOR_CROSS_IN+2)
+
+  ;Adjust (r0)*(VECTOR_CROSS_IN+2) to (r0+2),(VECTOR_CROSS_IN)
+  add #2
+  with r1
+  sub #2
+
+  ;Begin (r0+2)*(VECTOR_CROSS_IN)
+  to r5
+  ldw (r0) ; r5 = this.y
+  to r6
+  ldw (r1) ; r6 = other.x
+  from r5
+  to r7
+  lmult; r5.r4 = r5*r6 = this.y*other.x
+  with r7
+  swap
+  move r8,r4
+  to r4
+  merge ;r4  = this.y*other.x at fixed 8.8
+  ; End (r0+2)*(VECTOR_CROSS_IN)
+
+  ;Begin subtract this.x*other.y - this.y * other.x,
+  with r3
+  sub r4
+  ;End subtract this.x*other.y - this.y*other.x
+  ;Write out.y
+  sm (VECTOR_CROSS_OUT+4), r3
+
+  iwt r3, #VECTOR_CROSS_OUT
+  return
+endfunction
+
 ;Returns the Address to a sum vector of the input vectors
 ; Input : R0 address to vector to add from
 ; Input : VECTOR_ADD_IN address of second vector to add
