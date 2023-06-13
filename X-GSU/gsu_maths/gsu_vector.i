@@ -281,6 +281,8 @@ function vector_normalize
   ldw (r1) ;R0 = in.x
   lmult ; r4 = decimal bits
   move r7,r0
+  with r7
+  swap
   move r8,r4
   merge ; r0 = fixed88 normalized length
   stw (r2)
@@ -293,6 +295,8 @@ function vector_normalize
   lmult ; r4 = decimal bits
   from r4
   move r7,r0
+  with r7
+  swap
   move r8,r4
   merge ; r0 = fixed88 normalized length
   stw (r2)
@@ -305,6 +309,8 @@ function vector_normalize
   lmult ; r4 = decimal bits
   from r4
   move r7,r0
+  with r7
+  swap
   move r8,r4
   merge ; r0 = fixed88 normalized length
   stw (r2)
