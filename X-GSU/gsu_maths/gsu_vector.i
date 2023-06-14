@@ -279,8 +279,8 @@ function vector_normalize
 
   ;(vector_normalize_out.x) = (R1.x * R6)
   ldw (r1) ;R0 = in.x
+  to r7
   lmult ; r4 = decimal bits
-  move r7,r0
   with r7
   swap
   move r8,r4
@@ -292,9 +292,8 @@ function vector_normalize
   add #$2 ; R2 = memory address to write to
 
   ldw (r1) ;R0 = in.x
+  to r7
   lmult ; r4 = decimal bits
-  from r4
-  move r7,r0
   with r7
   swap
   move r8,r4
@@ -306,9 +305,8 @@ function vector_normalize
   add #$2 ; R2 = memory address to write to
 
   ldw (r1) ; ;R0 = in.z
+  to r7
   lmult ; r4 = decimal bits
-  from r4
-  move r7,r0
   with r7
   swap
   move r8,r4

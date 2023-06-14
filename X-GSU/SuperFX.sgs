@@ -64,9 +64,9 @@ cache
 	sm (VECTOR_CROSS_IN), r0
 	;iwt R0, #(camera_mem + camera::lookAt )
 	;call vector_subtract	
-	iwt R0, #(camera_mem + camera::lookAt )
+	iwt R0, #(camera_mem + camera::up )
 	; lookAt (x) up
-	call vector_cross
+	call vector_normalize
  	stop
 	nop
 	stop
