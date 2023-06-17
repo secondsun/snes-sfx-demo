@@ -5,7 +5,6 @@ __VARS_DEFINED__ = 1
 
 .segment "GSURAM"
 
-.res 1
 ;Temp variables for return vectors
 vector_1:
   .res .sizeof(vector3)
@@ -22,6 +21,8 @@ VECTOR_SUBTRACT_OUT:
 VECTOR_ADD_IN:
   .res 2
 VECTOR_ADD_OUT:
+  .res .sizeof(vector3)
+VECTOR_NEGATE_OUT:
   .res .sizeof(vector3)
 VECTOR_CROSS_IN:
   .res 2

@@ -231,9 +231,25 @@ function vector_negate
   with r1 
   add #2 ; r1 = &vector.y
   not
-  add #1
+  add #1 ; r0 = negated.x
+  
+  sm (VECTOR_NEGATE_OUT), R0 ; Write negate.x
+
+  ldw (r1) ; r0 = vector.y
+  with r1 
+  add #2 ; r1 = &vector.z
+  not
+  add #1 ; r0 = negated.y
+  
+  sm (VECTOR_NEGATE_OUT + 2), R0 ; Write negate.y
 
 
+  ldw (r1) ; r0 = vector.z
+  not
+  add #1 ; r0 = negated.z
+  
+  sm (VECTOR_NEGATE_OUT + 4), R0 ; Write negate.z
+  iwt R3, #VECTOR_NEGATE_OUT
 
   return
 
