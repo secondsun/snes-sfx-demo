@@ -218,6 +218,27 @@ function vector_add
   return
 endfunction
 
+
+;Returns the Address to a negated vector of the input vector
+; Input : R0 address to vector to negate
+; Output : R3,VECTOR_NEGATE_OUT  address to negated vector 
+; Clobbers All
+function vector_negate
+  
+  ;r1 = address of vector.x
+  move r1,r0
+  ldw (r1) ; r0 = vector.x
+  with r1 
+  add #2 ; r1 = &vector.y
+  not
+  add #1
+
+
+
+  return
+
+endfunction
+
 ;Returns the Address to a normalize vector of the input vector
 ; Input : R0 address to vector to subtract from
 ; Input : VECTOR_SUBTRACT_IN address of vector to subtract
