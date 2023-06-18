@@ -20,6 +20,8 @@ VECTOR_SUBTRACT_OUT:
   .res .sizeof(vector3)
 VECTOR_ADD_IN:
   .res 2
+VECTOR_DOT_IN:
+  .res 2  
 VECTOR_ADD_OUT:
   .res .sizeof(vector3)
 VECTOR_NEGATE_OUT:

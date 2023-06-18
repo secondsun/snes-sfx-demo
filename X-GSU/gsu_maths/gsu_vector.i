@@ -176,6 +176,85 @@ function vector_cross
   return
 endfunction
 
+;Returns the dot product of two input vectors
+; Input : R0 left vector of dot
+; Input : VECTOR_CROSS_IN right vector of dot
+; Output : fixed 8.8 dot product 
+; Clobbers All
+function vector_dot
+  
+  ;r0 = &a.x
+  ;r1 = &b.x
+  lm r1, (VECTOR_DOT_IN)
+
+  ;r6 = a.x
+  ;r5 = b.x
+  ; r2 = a.x *b.x
+  ; clobber r6,r7,r4,r8
+  to r6
+  ldw (r0)
+  to r7 
+  ldw (r1)
+  with r7
+  lmult
+  with r7
+  swap
+  move r8,r4
+  to r2
+  merge
+
+  ;r0 = &a.y
+  ;r1 = &b.y
+  add #2
+  with r1
+  add #2
+  
+  ;r6 = a.y
+  ;r5 = b.y
+  ; r3 = a.y *by
+  ; clobber r6,r7,r4,r8
+  to r6
+  ldw (r0)
+  to r7 
+  ldw (r1)
+  with r7
+  lmult
+  with r7
+  swap
+  move r8,r4
+  to r3
+  merge
+
+  ;r0 = &a.z
+  ;r1 = &b.z
+  add #2
+  with r1
+  add #2
+  
+  ;r6 = a.z
+  ;r5 = b.z
+  ; r4 = a.z *b.z
+  ; clobber r6,r7,r4,r8
+  to r6
+  ldw (r0)
+  to r7 
+  ldw (r1)
+  with r7
+  lmult
+  with r7
+  swap
+  move r8,r4
+  to r4
+  merge
+
+  from r2
+  add r4 ; r0 = a.x*b.x+a.z*b.z
+  with r3 ; 
+  add r0 ; r3 = a.y*b.y + r0
+
+return
+endfunction
+
 ;Returns the Address to a sum vector of the input vectors
 ; Input : R0 address to vector to add from
 ; Input : VECTOR_ADD_IN address of second vector to add
