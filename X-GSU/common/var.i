@@ -6,12 +6,12 @@ __VARS_DEFINED__ = 1
 .segment "GSURAM"
 
 ;Temp variables for return vectors
-vector_1:
+LOOKAT_ZAXIS:
   .res .sizeof(vector3)
-vector_2:
+LOOKAT_XAXIS:
   .res .sizeof(vector3)
-vector_3:
-  .res .sizeof(vector3)  
+LOOKAT_YAXIS:
+  .res .sizeof(vector3)
 vector_normalize_out:
   .res .sizeof(vector3)
 VECTOR_SUBTRACT_IN:
@@ -30,12 +30,14 @@ VECTOR_CROSS_IN:
   .res 2
 VECTOR_CROSS_OUT:
   .res .sizeof(vector3)
+VECTOR_COPY_IN:
+  .res 2
 
 ;Global Camera   
-camera_mem:
+CAMERA:
   .res .sizeof(camera)
 ; Global Matrix Transform  
-world_matrix_mem:
+LOOKAT_MATRIX:
   .res .sizeof(matrix4)
 gsu_stack_ram:
 	.res .sizeof(gsu_stack)

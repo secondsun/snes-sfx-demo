@@ -36,4 +36,13 @@
    .endscope
 .endmacro
 
+.macro for count
+	iwt r12, #count ; loop count times 
+	move r13,r15
+.endmacro
+
+.macro endfor
+	loop
+	nop
+.endmacro
 .endif

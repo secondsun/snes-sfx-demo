@@ -12,12 +12,35 @@
 .include "./gsu_sqrt.i"
 .include "./gsu_recip.i"
 
+
+;Returns the Address to a copy vector of the input vector
+; Input : R0 address of vector to copy
+; Input : VECTOR_COPY_IN address of vector to copy to
+; Output : R3 address to vector (copied)
+
+ function vector3_copy  
+   move r1, r0
+   lm r2, (VECTOR_COPY_IN)
+   
+  for 3
+    ldw (r1)
+    stw (r2)
+
+    with r2
+    add #2
+    with r1
+    add #2
+  endfor
+
+   return
+endfunction
+
 ;Returns the Address to a cross vector of the input vectors
 ; Input : R0 address to vector to cross from
 ; Input : VECTOR_CROSS_IN address of second vector to cross
 ; Output : R3,VECTOR_CROSS_OUT  address to vector  result
 ; Clobbers All
-function vector_cross
+function vector3_cross
   
 ;Vector3.of(
   ;(r0+2)*(VECTOR_CROSS_IN+4)-(r0+4*(VECTOR_CROSS_IN+2)),
@@ -181,7 +204,7 @@ endfunction
 ; Input : VECTOR_CROSS_IN right vector of dot
 ; Output : fixed 8.8 dot product 
 ; Clobbers All
-function vector_dot
+function vector3_dot
   
   ;r0 = &a.x
   ;r1 = &b.x
@@ -260,7 +283,7 @@ endfunction
 ; Input : VECTOR_ADD_IN address of second vector to add
 ; Output : R3,VECTOR_ADD_OUT  address to vector 
 ; Clobbers All
-function vector_add
+function vector3_add
   to r1 
   ldw (r0)
   add #2 ;bump up r0 = in.y
@@ -302,7 +325,7 @@ endfunction
 ; Input : R0 address to vector to negate
 ; Output : R3,VECTOR_NEGATE_OUT  address to negated vector 
 ; Clobbers All
-function vector_negate
+function vector3_negate
   
   ;r1 = address of vector.x
   move r1,r0
@@ -339,7 +362,7 @@ endfunction
 ; Input : VECTOR_SUBTRACT_IN address of vector to subtract
 ; Output : R3,VECTOR_SUBTRACT_OUT  address to vector 
 ; Clobbers All
-function vector_subtract
+function vector3_subtract
   to r1 
   ldw (r0)
   add #2 ;bump up r0 = in.y
@@ -376,15 +399,16 @@ function vector_subtract
   return
 endfunction
 
+
 ;Returns the Address to a normalize vector of the input vector
 ; Input : R0 address to vector to normalize
 ; Output : R3 address to vector (normalized)
 ; Clobbers All
-function vector_normalize
+function vector3_normalize
   ;store referece to in to stack
   gsu_stack_push
   ;get length
-  call vector_length ;R3 = length
+  call vector3_length ;R3 = length
   move r0, r3
   call reciprocol ;R3 = 1/length
   ;retrieve referece to in from stack
@@ -445,7 +469,7 @@ endfunction
 ; Input : Address of vector to get length of at r0
 ; Output : length of vector on r3
 
-function vector_length
+function vector3_length
 	;r0 = (vec.x)
   move r1,r0
 	ldw (r1)
