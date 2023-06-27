@@ -21,7 +21,7 @@
  function vector3_copy  
    move r1, r0
    lm r2, (VECTOR_COPY_IN)
-   
+   move r3, r2
   for 3
     ldw (r1)
     stw (r2)
@@ -31,7 +31,7 @@
     with r1
     add #2
   endfor
-
+   
    return
 endfunction
 

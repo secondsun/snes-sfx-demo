@@ -60,15 +60,19 @@ GSU_Code:
 
 init_stack
 init_camera
+;init w_axis
+iwt r0, #0
+
+sm (__LOOKAT_WAXIS__), r0
+sm (__LOOKAT_WAXIS__ + 2), r0
+sm (__LOOKAT_WAXIS__ + 4), r0
+add #1
+sm (__LOOKAT_WAXIS__ + 6), r0
+
+
 cache
-	iwt r0, #(CAMERA + camera::up )
-	sm (VECTOR_SUBTRACT_IN), r0
-	sm (VECTOR_COPY_IN), r0
-	;iwt R0, #(CAMERA + camera::lookAt )
-	;call vector3_subtract	
-	iwt R0, #(CAMERA + camera::lookAt )
 	; lookAt (x) up
-	call vector3_copy
+	call camera_lookAt
  	stop
 	nop
 	stop
@@ -80,3 +84,4 @@ cache
 .include "gsu_maths/gsu_sqrt.i"
 .include "gsu_maths/gsu_vector.i"
 .include "gsu_maths/gsu_recip.i"
+.include "gsu_maths/gsu_camera.i"
