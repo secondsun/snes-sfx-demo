@@ -9,7 +9,7 @@ fail = 0
 
 function setupFirstTest(address, value) 
 	emu.log(string.format("%x",input[index]))
-	emu.writeWord(0x5B4,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(0x5B0,input[index],emu.memType.gsuWorkRam)
 end
 
 emu.addMemoryCallback(setupFirstTest, 
@@ -20,18 +20,21 @@ emu.addMemoryCallback(setupFirstTest,
 					  emu.memType.gsuWorkRam)
 
 function setNextInput() 
-	emu.writeWord(0x5B4,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(0x5B0,input[index],emu.memType.gsuWorkRam)
 end
 
 function compareAndLogOutput(address, value)
-	local read = emu.readWord(0x5B6,emu.memType.gsuWorkRam,false)
+	local read = emu.readWord(0x5B2,emu.memType.gsuWorkRam,false)
+	
+	emu.log("Checking")
+	
 	if read ~= expected[index] then  
 		fail = 1
 		emu.log(input[index])
 		emu.log(read)
 		emu.log(expected[index])
 		emu.log(string.format("Error sqrt(%x) was %x expected %x", input[index],read,expected[index]))
-	end
+	end	
 	index=index+1
 	loopOrExit()
 end

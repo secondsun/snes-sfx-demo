@@ -88,10 +88,10 @@ function gsu_sqrt
 	move remainder0,partial_dividend0
 	loop
 	nop
-	div2 	
-	div2 	
-	div2 	
-	div2 	
+	lsr 	
+	lsr 	
+	lsr 	
+	lsr 	
 	move r3,r0
 	return
 endfunction
