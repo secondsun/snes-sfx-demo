@@ -11,7 +11,7 @@
 .include "../common/stack.i"
 .include "../common/function.i"
 
-; In : 16bit int on r0
+; In : fixed88 int on r0
 ; Out : Sqrt on R3 of Input in fixed88
 function gsu_sqrt
 	;square_root0 (n):
@@ -39,7 +39,7 @@ function gsu_sqrt
 
 	
 	iwt partial_dividend0, #$0 ; 
-	iwt r12, #$F ; loop 12 times 
+	iwt r12, #$F ; loop 16 times 
 	iwt root0, #0 ; r3 =  ()  [should end up 238/EE]
 	iwt divisor0, #0 ; r0 =  () 
 	iwt remainder0, #0 ; () 	[should end up 79/4F]
@@ -88,6 +88,10 @@ function gsu_sqrt
 	move remainder0,partial_dividend0
 	loop
 	nop
+	div2 	
+	div2 	
+	div2 	
+	div2 	
 	move r3,r0
 	return
 endfunction

@@ -475,7 +475,12 @@ function vector3_length
 	ldw (r1)
 	;square vec.x/r0
 	move r6, r0
-	fmult 
+	to r7
+  lmult ; r4 = decimal bits
+  with r7
+  swap
+  move r8,r4
+  merge 
 	move r3, r0 ; save x^2 to r3
 	
 	with r1
@@ -485,7 +490,12 @@ function vector3_length
 	ldw (r1)
 	;square vec.y/r0
 	move r6, r0
-	fmult 
+	to r7
+  lmult ; r4 = decimal bits
+  with r7
+  swap
+  move r8,r4
+  merge 
 	move r2, r0 ; save y^2 to r2
 	with r1
 	add #2 ;r1 = vec.z
@@ -494,7 +504,12 @@ function vector3_length
 	ldw (r1)
 	;square vec.z/r0
 	move r6, r0
-	fmult  ; r0 = z^2
+	to r7
+  lmult ; r4 = decimal bits
+  with r7
+  swap
+  move r8,r4
+  merge  ; r0 = z^2
 	
 	add r2 ; r0 = z^2 + y^2 
 	add r3 ; r0 = z^2 + y^2 + x^2
