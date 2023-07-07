@@ -3,10 +3,10 @@
 ; 16-bit 0.16-fixed point reciprocol
 ; reciprocol
 
-.include "../common/stack.i"
-.include "../common/function.i"
-.include "../common/structs.i"
-.include "../common/var.i"
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
 .include "libSFX.i"
 
 .segment "GSURAM"
@@ -58,7 +58,7 @@ test_stop:
 
 
 ;Code goes in code segment
-.include "../gsu_maths/gsu_sqrt.i"
-.include "../gsu_maths/gsu_vector.i"
-.include "../gsu_maths/gsu_recip.i"
-.include "../gsu_maths/gsu_camera.i"
+.include "../../gsu_maths/gsu_sqrt.i"
+.include "../../gsu_maths/gsu_vector.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_camera.i"
