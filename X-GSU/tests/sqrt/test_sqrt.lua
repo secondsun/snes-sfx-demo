@@ -9,25 +9,27 @@ fail = 0
 
 function setupFirstTest(address, value) 
 	emu.log(string.format("%x",input[index]))
-	emu.writeWord(0x5B0,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(emu.getLabelAddress("INPUT")['address'],input[index],emu.memType.gsuWorkRam)
 end
 
-emu.log(("gsu_pop_stack address"))
-emu.log(emu.getLabelAddress("gsu_pop_stack")) 
+
+emu.log(tostring(
+		emu.getLabelAddress("test_setup")['memType']
+	))
 
 emu.addMemoryCallback(setupFirstTest, 
 					  emu.callbackType.exec, 
-					  0x003,
-					  0x003, 
+					  emu.getLabelAddress("test_setup")['address'],
+					  emu.getLabelAddress("test_setup")['address'], 
 					  4,
 					  emu.memType.gsuWorkRam)
 
 function setNextInput() 
-	emu.writeWord(0x5B0,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(emu.getLabelAddress("INPUT")['address'],input[index],emu.memType.gsuWorkRam)
 end
 
 function compareAndLogOutput(address, value)
-	local read = emu.readWord(0x5B2,emu.memType.gsuWorkRam,false)
+	local read = emu.readWord(emu.getLabelAddress("OUTPUT")['address'],emu.memType.gsuWorkRam,false)
 	
 	emu.log("Checking")
 	
@@ -55,7 +57,7 @@ end
 
 emu.addMemoryCallback(compareAndLogOutput, 
 					  emu.callbackType.exec, 
-					  0x0030,
-					  0x0030, 
+					  emu.getLabelAddress("test_stop")['address'],
+					  emu.getLabelAddress("test_stop")['address'], 
 					  4,
 					  emu.memType.gsuWorkRam)
