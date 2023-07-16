@@ -465,6 +465,7 @@ endfunction
 ;Vector.length function put in r1 the memory address of the vector to get the length of
 ;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
 ;problem for "long vectors" but is a problem for short ones.
+;
 ; Clobbers All
 ; Input : Address of vector to get length of at r0
 ; Output : length of vector on r3
@@ -475,13 +476,8 @@ function vector3_length
 	ldw (r1)
 	;square vec.x/r0
 	move r6, r0
-	to r7
-  lmult ; r4 = decimal bits
-  with r7
-  swap
-  move r8,r4
-  merge 
-	move r3, r0 ; save x^2 to r3
+	fmult ; r7 = int bits
+  move r3, r0 ; save x^2 to r3
 	
 	with r1
 	add #2 ;r1 = vec.y
@@ -490,13 +486,8 @@ function vector3_length
 	ldw (r1)
 	;square vec.y/r0
 	move r6, r0
-	to r7
-  lmult ; r4 = decimal bits
-  with r7
-  swap
-  move r8,r4
-  merge 
-	move r2, r0 ; save y^2 to r2
+	lmult ; r4 = decimal bits
+  move r2, r0 ; save y^2 to r2
 	with r1
 	add #2 ;r1 = vec.z
 	
@@ -504,17 +495,22 @@ function vector3_length
 	ldw (r1)
 	;square vec.z/r0
 	move r6, r0
-	to r7
-  lmult ; r4 = decimal bits
-  with r7
-  swap
-  move r8,r4
-  merge  ; r0 = z^2
-	
+  
+	lmult ; r4 = decimal bits
+  
 	add r2 ; r0 = z^2 + y^2 
 	add r3 ; r0 = z^2 + y^2 + x^2
 
 	call gsu_sqrt
+  move r0, r3 
+  
+  rol
+  rol
+  rol
+  rol
+
+  move r3,r0
+
 	return
 
 	;load 
