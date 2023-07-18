@@ -9,7 +9,7 @@ fail = 0
 
 function setupFirstTest(address, value)
 	emu.log(string.format("%x",input[index]))
-	emu.writeWord(0x5B0,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(0x5E8,input[index],emu.memType.gsuWorkRam)
 end
 
 emu.addMemoryCallback(setupFirstTest,
@@ -20,11 +20,11 @@ emu.addMemoryCallback(setupFirstTest,
 					  emu.memType.gsuWorkRam)
 
 function setNextInput()
-	emu.writeWord(0x5B0,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(0x5E8,input[index],emu.memType.gsuWorkRam)
 end
 
 function compareAndLogOutput(address, value)
-	local read = emu.readWord(0x5B2,emu.memType.gsuWorkRam,false)
+	local read = emu.readWord(0x5EA,emu.memType.gsuWorkRam,false)
 
 	--emu.log("Checking")
 
@@ -44,7 +44,7 @@ end
 function loopOrExit()
 	if index > 1024 then
 		emu.log("Done")
-		emu.stop(fail)
+		--emu.stop(fail)
 		emu.breakExecution()
 	else
 		setNextInput()

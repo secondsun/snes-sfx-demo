@@ -462,7 +462,7 @@ function vector3_normalize
   return 
 endfunction
 
-;Vector.length function put in r1 the memory address of the vector to get the length of
+;Vector.length  puts in r1 the memory address of the vector to get the length of
 ;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
 ;problem for "long vectors" but is a problem for short ones.
 ;
@@ -501,20 +501,13 @@ function vector3_length
 	add r2 ; r0 = z^2 + y^2 
 	add r3 ; r0 = z^2 + y^2 + x^2
 
-	call gsu_sqrt
+	call gsu_sqrt_int_in
   move r0, r3 
   
-  rol
-  rol
-  rol
-  rol
 
   move r3,r0
 
 	return
-
-	;load 
-
-
 endfunction
+
 .endif
