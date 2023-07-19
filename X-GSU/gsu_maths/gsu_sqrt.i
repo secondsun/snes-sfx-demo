@@ -124,10 +124,10 @@ function gsu_sqrt_int_in
 
 	
 	iwt partial_dividend2, #$0 ; 
-	iwt r12, #$13 ; loop 16 times 
-	iwt root2, #0 ; r3 =  ()  [should end up 238/EE]
+	iwt r12, #$F ; loop $13 times
+	iwt root2, #0 ; r3 =  () 
 	iwt divisor2, #0 ; r0 =  () 
-	iwt remainder2, #0 ; () 	[should end up 79/4F]
+	iwt remainder2, #0 ; () 
 
 	iwt	r13, #square_root2_loop
 
@@ -173,10 +173,6 @@ function gsu_sqrt_int_in
 	move remainder2,partial_dividend2
 	loop
 	nop
-	lsr 	
-	lsr 	
-	lsr 	
-	lsr 	
 	move r3,r0
 	return
 endfunction

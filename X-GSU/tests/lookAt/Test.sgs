@@ -1,7 +1,7 @@
 ; SuperFX
 ; Summers Pittman <secondsun@gmail.com>
-; 16-bit 0.16-fixed point reciprocol
-; reciprocol
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
 
 .include "../../common/stack.i"
 .include "../../common/function.i"

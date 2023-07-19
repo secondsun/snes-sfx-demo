@@ -2,7 +2,7 @@
 --emu.log("input")
 --emu.log(emu.getLabelAddress("input"))
 
-expected = {0xff1b, 0x0, 0x71, 0x0 , 0xffa5, 0x99, 0xff49, 0x0 , 0xffbc, 0xff33, 0xff77, 0x0 , 0x0, 0x0, 0x0, 0x100}
+expected = {0x0044, 0x00cd, 0x0089}
 index = 1
 output = 0x0
 fail = 0
@@ -13,9 +13,9 @@ function compareAndLogOutput(address, value)
 	--local read = emu.readWord(0x36A + 2*(index -1),emu.memType.gsuWorkRam,false)
 
 	emu.log("Checking")
-	while (index <= 16)
+	while (index <= 3)
 	do 
-		local read = emu.readWord(0x3F6 + 2*(index -1),emu.memType.gsuWorkRam,false)
+		local read = emu.readWord(0x3BD + 2*(index -1),emu.memType.gsuWorkRam,false)
 		if read ~= expected[index] then
 			fail = 1
 			emu.log(expected[index])

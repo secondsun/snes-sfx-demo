@@ -410,7 +410,7 @@ function vector3_normalize
   ;get length
   call vector3_length ;R3 = length
   move r0, r3
-  call reciprocol ;R3 = 1/length
+  call reciprocal016 ;R3 = 1/length
   ;retrieve referece to in from stack
   move r6, r3 ; Beging preparations for multiplies
   ; Get in from stack
@@ -419,12 +419,7 @@ function vector3_normalize
 
   ;(vector_normalize_out.x) = (R1.x * R6)
   ldw (r1) ;R0 = in.x
-  to r7
   lmult ; r4 = decimal bits
-  with r7
-  swap
-  move r8,r4
-  merge ; r0 = fixed88 normalized length
   stw (r2)
   with r1
   add #$2 ; R1 = R1.y
@@ -432,12 +427,7 @@ function vector3_normalize
   add #$2 ; R2 = memory address to write to
 
   ldw (r1) ;R0 = in.x
-  to r7
   lmult ; r4 = decimal bits
-  with r7
-  swap
-  move r8,r4
-  merge ; r0 = fixed88 normalized length
   stw (r2)
   with r1
   add #$2 ; R1 = R1z
@@ -445,12 +435,7 @@ function vector3_normalize
   add #$2 ; R2 = memory address to write to
 
   ldw (r1) ; ;R0 = in.z
-  to r7
   lmult ; r4 = decimal bits
-  with r7
-  swap
-  move r8,r4
-  merge ; r0 = fixed88 normalized length
   stw (r2)
   
   iwt r3, #vector_normalize_out
@@ -502,10 +487,6 @@ function vector3_length
 	add r3 ; r0 = z^2 + y^2 + x^2
 
 	call gsu_sqrt_int_in
-  move r0, r3 
-  
-
-  move r3,r0
 
 	return
 endfunction

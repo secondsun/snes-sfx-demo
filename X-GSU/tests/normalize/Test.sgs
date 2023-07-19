@@ -9,15 +9,52 @@
 .include "../../common/var.i"
 .include "libSFX.i"
 
-.macro init_vectors
+.macro init_camera
+	iwt r1, #(CAMERA + camera::eye + vector3::xPos)
+	iwt r0, #$0
+	stw (r1)
+
+	iwt r1, #(CAMERA + camera::eye + vector3::yPos)
+	iwt r0, #$0
+	stw (r1)
 	
+	iwt r1, #(CAMERA + camera::eye + vector3::zPos)
+	iwt r0, #$0
+	stw (r1)
+	
+	;Create lookAt
+	iwt r1, #(CAMERA + camera::lookAt + vector3::xPos)
+	iwt r0, #$1833 ; 24.20 in 8.8 twos compliment fixed point
+	stw (r1)
+
+	iwt r1, #(CAMERA + camera::lookAt + vector3::yPos)
+	iwt r0, #$48e6 ; 72.9 in 8.8 twos compliment fixed point
+	stw (r1)
+	
+	iwt r1, #(CAMERA + camera::lookAt + vector3::zPos)
+	iwt r0, #$30cd ; 48.8 in 8.8 twos compliment fixed point
+	stw (r1)
+	
+	;Create up
+	iwt r1, #(CAMERA + camera::up + vector3::xPos)
+	iwt r0, #$000 ;0
+	stw (r1)
+
+	iwt r1, #(CAMERA + camera::up + vector3::yPos)
+	iwt r0, #$0100; 1 in 8.8 twos compliment fixed point
+	stw (r1)
+	
+	iwt r1, #(CAMERA + camera::up + vector3::zPos)
+	iwt r0, #$0000 ; 0
+	stw (r1)
 
 .endmacro
 
 
 .segment "GSURAM"
+.res 1
 INPUT:
-.res .sizeof(vector3)
+.res 2
 OUTPUT:
 .res 2
 .segment "GSUCODE"
@@ -25,21 +62,17 @@ GSU_Code:
 
 ;Setup stack
 init_stack
-init_vectors
+init_camera
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
 test_setup:
-iwt r12, #$D
-iwt r13, #test_call
+iwt  r0, #(CAMERA + camera::lookAt)
+
 
 ;This label represents the memory address that begins test execution
 test_call:
-	gsu_stack_push r12
-	gsu_stack_push r13
-	iwt r0, #INPUT
-	call vector3_length
-	sm (OUTPUT), r3
+	call vector3_normalize
 	;LET MEMORY SETTLE
  	nop
 	nop
@@ -53,10 +86,6 @@ test_call:
 ; The lua script will check values here and prepare for the next loop
 test_stop:    
 	nop
-	nop
-	gsu_stack_pop r13
-	gsu_stack_pop r12
-	loop
 	nop
 	stop
 	nop
