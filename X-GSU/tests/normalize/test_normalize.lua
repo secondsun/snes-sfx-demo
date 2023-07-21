@@ -16,7 +16,7 @@ function compareAndLogOutput(address, value)
 	emu.log("Checking")
 	while (index <= 3)
 	do 
-		local read = emu.readWord(0x3BC + 2*(index -1),emu.memType.gsuWorkRam,false)
+		local read = emu.readWord(0x3E0 + 2*(index -1),emu.memType.gsuWorkRam,false)
 		if read ~= expected[index] then
 			fail = 1
 			emu.log(expected[index])

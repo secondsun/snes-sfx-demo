@@ -461,9 +461,10 @@ function vector3_length
 	ldw (r1)
 	;square vec.x/r0
 	move r6, r0
-	fmult ; r7 = int bits
-  move r3, r0 ; save x^2 to r3
-	
+	lmult ; r7 = int bits
+  move r3, r0 ; save x^2 int to r3
+	move r7, r4 ; save x^2 decimal to r7
+
 	with r1
 	add #2 ;r1 = vec.y
 	
@@ -472,7 +473,9 @@ function vector3_length
 	;square vec.y/r0
 	move r6, r0
 	lmult ; r4 = decimal bits
-  move r2, r0 ; save y^2 to r2
+  move r2, r0 ; save y^2 integer to r2
+  move r8, r4 ; save y^2 decimal to r8
+
 	with r1
 	add #2 ;r1 = vec.z
 	
@@ -486,6 +489,32 @@ function vector3_length
 	add r2 ; r0 = z^2 + y^2 
 	add r3 ; r0 = z^2 + y^2 + x^2
 
+
+  
+  ; TODO : if sum of ints (at this point r0, r2, and r3 is > 256 use gsu_sqrt_int_in
+  ;        otherwise use gsu_sqrt
+  iwt r2, #$00F0
+  cmp r2; r0-240
+  ; if r0 > 240, s =0 & o = 0
+  bpl intSqrt
+  nop
+  with r4
+  add r8
+  adc #0; 
+  with r4;
+  add r7;
+  adc #0;
+  move r8, r4
+  to r7
+  swap 
+  merge
+  call gsu_sqrt
+  return
+  ; r4 = decimal bits
+  ; r0 = int bits
+
+
+intSqrt:  
 	call gsu_sqrt_int_in
 
 	return

@@ -16,6 +16,7 @@
 
 
 .segment "GSURAM"
+.res 1 ; hack to byte align
 INPUT:
 .res .sizeof(vector3)
 OUTPUT:
