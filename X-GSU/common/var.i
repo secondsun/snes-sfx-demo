@@ -4,7 +4,7 @@ __VARS_DEFINED__ = 1
 .include "structs.i"
 
 .segment "GSURAM"
-
+.res 1
 ;Temp variables for return vectors
 LOOKAT_ZAXIS:
   .res .sizeof(vector3)
@@ -14,6 +14,8 @@ LOOKAT_YAXIS:
   .res .sizeof(vector3)
 vector_normalize_out:
   .res .sizeof(vector3)
+_normalize_small_big_reciprocal_temp:
+  .res 2
 VECTOR_SUBTRACT_IN:
   .res 2
 VECTOR_SUBTRACT_OUT:

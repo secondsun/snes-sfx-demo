@@ -406,15 +406,37 @@ endfunction
 ; Clobbers All
 function vector3_normalize
   ;store referece to in to stack
-  gsu_stack_push
+  sm (_normalize_small_big_reciprocal_temp), r0
   ;get length
   call vector3_length ;R3 = length
+  
+  ;Check the length and determine if we will 
+  ;use a reciprocal that returns 8 or 16 fractional bits
   move r0, r3
+  iwt r5, #1 ;r5 = 1 using 8 frac bits
+  hib
+  cmp r5 ;if r0 > 1 (z=0 and s=0)
+  move r0, r3
+  beq small
+  nop
+  bmi small
+  nop
+big:  ;calculate using 16 fractional bits and no int bit
+  call _normalize_big
+  return 
+small:  ;calculate using 8 fractional bits and 8 int bits
+  call _normalize_small
+  return  
+endfunction
+
+;Private
+;calculate using 16 fractional bits and no int bit
+function _normalize_big
   call reciprocal016 ;R3 = 1/length
   ;retrieve referece to in from stack
   move r6, r3 ; Beging preparations for multiplies
   ; Get in from stack
-  gsu_stack_pop r1 ; R1 = addr of vector to get value of
+  lm r1, (_normalize_small_big_reciprocal_temp) ; R1 = addr of vector to get value of
   iwt r2, #vector_normalize_out
 
   ;(vector_normalize_out.x) = (R1.x * R6)
@@ -439,13 +461,62 @@ function vector3_normalize
   stw (r2)
   
   iwt r3, #vector_normalize_out
-
-  ;MOVE #(vector_normalize_out +2), (R1.y * R6)
-  ;MOVE #(vector_normalize_out +4), (R1.z * R6)
-
-
-  return 
+return
 endfunction
+
+;calculate using 8 fractional bits and 8 int bit
+function _normalize_small
+  call reciprocal ;R3 = 1/length
+  ;retrieve referece to in from stack
+  move r6, r3 ; Beging preparations for multiplies
+  ; Get in from stack
+  lm r1, (_normalize_small_big_reciprocal_temp) ; R1 = addr of vector to get value of
+  iwt r2, #vector_normalize_out
+
+  ;(vector_normalize_out.x) = (R1.x * R6)
+  ldw (r1) ;R0 = in.x
+  to r7
+  lmult ; r4 = decimal bits
+  move r8,r4
+  with r7
+  swap
+  merge ; fixed 88 of this.x*1/len
+  
+  stw (r2)
+  with r1
+  add #$2 ; R1 = R1.y
+  with r2
+  add #$2 ; R2 = memory address to write to
+  ldw (r1) ;R0 = in.x
+  
+  to r7
+  lmult ; r4 = decimal bits
+  move r8,r4
+  with r7
+  swap
+  merge ; r0  = fixed 88 of this.y*1/len
+
+  stw (r2)
+  with r1
+  add #$2 ; R1 = R1z
+  with r2
+  add #$2 ; R2 = memory address to write to
+
+  ldw (r1) ; ;R0 = in.z
+  to r7
+  lmult ; r4 = decimal bits
+  move r8,r4
+  with r7
+  swap
+  merge ; r0  = fixed 88 of this.z*1/len
+
+  stw (r2)
+  
+  iwt r3, #vector_normalize_out
+
+  return
+endfunction
+
 
 ;Vector.length  puts in r1 the memory address of the vector to get the length of
 ;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
