@@ -583,12 +583,105 @@ function vector3_length
   return
   ; r4 = decimal bits
   ; r0 = int bits
-
-
 intSqrt:  
 	call gsu_sqrt_int_in
-
 	return
+endfunction
+
+; Transforms a vector by multiplying it with a 4x4 matrix.
+; This replaces the vector with the transformed vector.
+; IN : r0 = address of vector to transform
+; IN : r1 = address of matrix to transform by
+function vector3_transform
+  
+ for 3
+    to r6
+    ldw (r0) ; r6 = vector.x
+    to r3
+    ldw (r1) ; r3 = matrix[0][0]
+
+    to r7
+    from r3
+    lmult ; r4 = decimal bits
+    move r8,r4
+    with r7
+    swap
+    to r9 ; r9 = v.x * m[0][0]
+    merge 
+
+    ; setup y* m[0][1]
+    add #2
+    with r1
+    add #2
+
+    to r6
+    ldw (r0) ; r6 = vector.x
+    to r3
+    ldw (r1) ; r3 = matrix[0][0]
+
+    to r7
+    from r3
+    lmult ; r4 = decimal bits
+    move r8,r4
+    with r7
+    swap
+    to r5 ; r5 = v.y * m[0][1]
+    merge 
+
+    ; setup z* m[0][2]
+    add #2
+    with r1
+    add #2
+
+    to r6
+    ldw (r0) ; r6 = vector.z
+    to r3
+    ldw (r1) ; r3 = matrix[0][2]
+
+    to r7
+    from r3
+    lmult ; r4 = decimal bits
+    move r8,r4
+    with r7
+    swap
+    to r11 ; r10 = v.z * m[0][2]
+    merge 
+
+
+    ;quick sum of x*m00,y*m01,z*m02 to r9
+    with r9
+    add r5
+    with r9
+    add r11
+
+    with r1
+    add #2
+    to r5
+    ldw(r1) ; 5 = m[0][3]
+    with r9 
+    add r5
+
+    ; Save x*matrix[0][0] +y*matrix[0][1] +z*matrix[0][2] + matrix[0][3];
+    gsu_stack_push r9
+
+    ;reset variables
+    with r1
+    add #2 ; r1 = @matrix[1]
+    sub #4 ; r0 = @vector
+  endfor
+
+  to r1
+  from r10
+  sub #6
+  sm (VECTOR_COPY_IN), r1
+
+  call vector3_copy
+
+  ;cleanup temp stack values
+  with r10
+  sub #6
+  
+return
 endfunction
 
 .endif

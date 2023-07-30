@@ -13,6 +13,21 @@
 .include "./gsu_vector.i"
 .include "./gsu_recip.i"
 
+.macro fixed88_negate reg
+    .if .not(.blank ({reg}))
+		with reg
+	.endif
+    
+    not
+    
+    .if (.blank ({reg}))
+		inc r0
+    .else    
+        inc reg
+	.endif
+    
+.endmacro    
+
 ;Calculates LOOKAT_MATRIX from CAMERA
 ; This operates on Static values and has no input/output
 ; Clobbers : All
@@ -68,7 +83,36 @@ function camera_lookAt
     ;copy the normalized vector to ZAXIS @r0 = @VECTOR_COPY_IN
     call vector3_copy
 
+    iwt r0, #(CAMERA + camera::eye)
+    sm (VECTOR_DOT_IN),r0
+    iwt r0, #(__LOOKAT_XAXIS__)
+    call vector3_dot
 
+    fixed88_negate r3
+    sm (LOOKAT_MATRIX + 6),r3
+
+
+    iwt r0, #(__LOOKAT_YAXIS__)
+    call vector3_dot
+
+    fixed88_negate r3
+    sm (LOOKAT_MATRIX + 14),r3
+
+    iwt r0, #(__LOOKAT_ZAXIS__)
+    call vector3_dot
+
+    
+    fixed88_negate r3
+    sm (LOOKAT_MATRIX + 22),r3
+
+    iwt r3, #0
+    sm (LOOKAT_MATRIX + 24),r3
+    sm (LOOKAT_MATRIX + 26),r3
+    sm (LOOKAT_MATRIX + 28),r3
+    iwt r3, #$100
+    sm (LOOKAT_MATRIX + 30),r3
+
+    iwt r3, #LOOKAT_MATRIX
 
     return
 endfunction

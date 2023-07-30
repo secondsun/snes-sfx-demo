@@ -21,6 +21,12 @@
       dVector .tag vector4
    .endstruct   
 
+   .struct polygon
+      v1 .tag vector3
+      v2 .tag vector3
+      v3 .tag vector3
+   .endstruct
+
    .struct camera
       eye .tag vector3
       lookAt .tag vector3
