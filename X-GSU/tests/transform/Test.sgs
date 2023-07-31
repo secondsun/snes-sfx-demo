@@ -59,6 +59,7 @@ POLYGON_LIST:
 
 
 .macro init_cube
+	
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::xPos)
 	iwt r0, #$fc00;-4
 	stw (r1)
@@ -88,7 +89,7 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v3 + vector3::yPos)
-	iwt r0, #$fc00 ;=4
+	iwt r0, #$fc00 ;-4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v3 + vector3::zPos)
@@ -103,7 +104,7 @@ GSU_Code:
 ;Setup stack
 init_stack
 init_camera
-init_cube
+;init_cube handled by test_transform.lua
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
@@ -113,9 +114,18 @@ call camera_lookAt
 
 ;This label represents the memory address that begins test execution
 test_call:
-	iwt r0, #polygon
+	iwt r0, #POLYGON_LIST
 	iwt r1, #LOOKAT_MATRIX
-	call vector3_transform ;we're testing the camera's lookAt matrix against test polygons
+	for 36
+		gsu_stack_push r0
+		gsu_stack_push r1
+		backuploop
+		call vector3_transform ;we're testing the camera's lookAt matrix against test polygons
+		restoreloop
+		gsu_stack_pop r1
+		gsu_stack_pop r0
+		add #.sizeof(vector3)
+	endfor
 	;LET MEMORY SETTLE
  	nop
 	nop

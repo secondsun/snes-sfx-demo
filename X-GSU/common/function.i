@@ -45,4 +45,15 @@
 	loop
 	nop
 .endmacro
+
+.macro backuploop
+	gsu_stack_push r12
+	gsu_stack_push r13
+.endmacro
+
+.macro restoreloop
+	gsu_stack_pop r13
+	gsu_stack_pop r12
+.endmacro
+
 .endif

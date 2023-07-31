@@ -670,13 +670,15 @@ function vector3_transform
     sub #4 ; r0 = @vector
   endfor
 
-  to r1
+
+  move r1, r0
+  
+  to r0
   from r10
   sub #6
   sm (VECTOR_COPY_IN), r1
-
   call vector3_copy
-
+  
   ;cleanup temp stack values
   with r10
   sub #6
