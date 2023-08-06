@@ -47,17 +47,17 @@ function test_setup(address, value)
 	
 	for index=1,12 do
 		--V1
-		emu.writeWord(POLYGON_LIST+16*(index-1),verticies[faces[index][1]][1],emu.memType.gsuWorkRam)
-		emu.writeWord(POLYGON_LIST+16*(index-1)+2,verticies[faces[index][1]][2],emu.memType.gsuWorkRam)
-		emu.writeWord(POLYGON_LIST+16*(index-1)+4,verticies[faces[index][1]][3],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1),verticies[faces[index][1]][1],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+2,verticies[faces[index][1]][2],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+4,verticies[faces[index][1]][3],emu.memType.gsuWorkRam)
 		--V2
-		emu.writeWord(POLYGON_LIST+16*(index-1)+6,verticies[faces[index][2]][1],emu.memType.gsuWorkRam)
-		emu.writeWord(POLYGON_LIST+16*(index-1)+8,verticies[faces[index][2]][2],emu.memType.gsuWorkRam)
-		emu.writeWord(POLYGON_LIST+16*(index-1)+10,verticies[faces[index][2]][3],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+6,verticies[faces[index][2]][1],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+8,verticies[faces[index][2]][2],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+10,verticies[faces[index][2]][3],emu.memType.gsuWorkRam)
 		--V3
-		emu.writeWord(POLYGON_LIST+16*(index-1)+12,verticies[faces[index][3]][1],emu.memType.gsuWorkRam)
-		emu.writeWord(POLYGON_LIST+16*(index-1)+14,verticies[faces[index][3]][2],emu.memType.gsuWorkRam)
-		emu.writeWord(POLYGON_LIST+16*(index-1)+16,verticies[faces[index][3]][3],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+12,verticies[faces[index][3]][1],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+14,verticies[faces[index][3]][2],emu.memType.gsuWorkRam)
+		emu.writeWord(POLYGON_LIST+18*(index-1)+16,verticies[faces[index][3]][3],emu.memType.gsuWorkRam)
 		
 	end
 
