@@ -21,11 +21,11 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(CAMERA + camera::eye + vector3::yPos)
-	iwt r0, #$000;0
+	iwt r0, #$2000;32
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::eye + vector3::zPos)
-	iwt r0, #$e000;-32
+	iwt r0, #$0000;0
 	stw (r1)
 	
 	;Create lookAt
@@ -47,11 +47,11 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(CAMERA + camera::up + vector3::yPos)
-	iwt r0, #$0100; 1 in 8.8 twos compliment fixed point
+	iwt r0, #$0000; 1 in 8.8 twos compliment fixed point
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::up + vector3::zPos)
-	iwt r0, #$0000 ; 0
+	iwt r0, #$0100 ; 0
 	stw (r1)
 
 .endmacro
@@ -61,23 +61,23 @@ POLYGON_LIST:
 .macro init_cube
 	
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::xPos)
-	iwt r0, #$fc00;-4
+	iwt r0, #$ff00;-4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::yPos)
-	iwt r0, #$fc00-4
+	iwt r0, #$ff00-4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::zPos)
-	iwt r0, #$0000;0
+	iwt r0, #$FF00;0
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v2 + vector3::xPos)
-	iwt r0, #$fc00;-4
+	iwt r0, #$ff00;-4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v2 + vector3::yPos)
-	iwt r0, #$0400 ;4
+	iwt r0, #$0100 ;4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v2 + vector3::zPos)
@@ -85,11 +85,11 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v3 + vector3::xPos)
-	iwt r0, #$0400;4
+	iwt r0, #$0100;4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v3 + vector3::yPos)
-	iwt r0, #$fc00 ;-4
+	iwt r0, #$ff00 ;-4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v3 + vector3::zPos)
