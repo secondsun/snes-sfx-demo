@@ -25,7 +25,7 @@ POLYGON_LIST:
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::eye + vector3::zPos)
-	iwt r0, #$0000;0
+	iwt r0, #$1400;20
 	stw (r1)
 	
 	;Create lookAt
@@ -38,7 +38,7 @@ POLYGON_LIST:
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::lookAt + vector3::zPos)
-	iwt r0, #$000 ; 0.0
+	iwt r0, #$00; 0.0
 	stw (r1)
 	
 	;Create up
@@ -47,11 +47,11 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(CAMERA + camera::up + vector3::yPos)
-	iwt r0, #$0000; 1 in 8.8 twos compliment fixed point
+	iwt r0, #$009a; .6 in 8.8 twos compliment fixed point
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::up + vector3::zPos)
-	iwt r0, #$0100 ; 0
+	iwt r0, #$0048; .28
 	stw (r1)
 
 .endmacro
@@ -65,7 +65,7 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::yPos)
-	iwt r0, #$ff00-4
+	iwt r0, #$ff00;-4
 	stw (r1)
 
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::zPos)
@@ -116,6 +116,7 @@ call camera_lookAt
 test_call:
 	iwt r0, #POLYGON_LIST
 	iwt r1, #LOOKAT_MATRIX
+	cache
 	for 36
 		gsu_stack_push r0
 		gsu_stack_push r1
@@ -128,6 +129,7 @@ test_call:
 	endfor
 	;LET MEMORY SETTLE
  	nop
+	nop
 	nop
 	nop
 	nop
