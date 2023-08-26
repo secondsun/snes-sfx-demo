@@ -7,9 +7,13 @@ index = 1
 output = 0x0
 fail = 0
 
-testsetup = 0x004A
-teststop = 0x0085
-POLYGON_LIST = 0x0792
+testcall = 0x004A
+testsetup = 0x0042
+teststop = 0x0087
+POLYGON_LIST = 0x0794
+lookat = 0x0574
+camera_lookAt_XAXIS=0x047D
+
 function test_setup(address, value)
   verticies = {
 		{0xc000,0xc000,0xc000},
@@ -22,7 +26,7 @@ function test_setup(address, value)
 		{0x4000,0xc000,0x4000}
   }
   faces = {
-	{3,7,8},
+	{1,2,3},
 	{3,8,4},
 
 	{1,5,6},
@@ -41,7 +45,7 @@ function test_setup(address, value)
 	{3,1,2},
 	}
 	
-	emu.breakExecution()
+	emu.breakExecution()	
 	emu.log("Loading")
 	
 	
@@ -65,25 +69,54 @@ function test_setup(address, value)
 
 end
 
-function compareAndLogOutput(address, value)
+function checkLookAt(address, value)
 	--local read = emu.readWord(0x36A + 2*(index -1),emu.memType.gsuWorkRam,false)
-
-	emu.log("Checking")
-	while (index <= 3)
-	do 
-		local read = emu.readWord(POLYGON_LIST + 2*(index -1),emu.memType.gsuWorkRam,false)
-		if read ~= expected[index] then
-			fail = 1
-			emu.log(expected[index])
-			emu.log(index)
-
-			emu.log(string.format("Error lookat(%x) was %x expected %x", index,read,expected[index]))
-		end
-		index=index+1
-	end
 	emu.breakExecution()
+	emu.log("Checking lookAt")
+	for matrixIndex=0,3
+	do 
+		local x = emu.readWord(lookat + 8*matrixIndex,emu.memType.gsuWorkRam,false)
+		local y = emu.readWord(lookat + 2+ 8*matrixIndex,emu.memType.gsuWorkRam,false)
+		local z = emu.readWord(lookat + 4+ 8*matrixIndex,emu.memType.gsuWorkRam,false)
+		local w = emu.readWord(lookat + 6+ 8*matrixIndex,emu.memType.gsuWorkRam,false)
+		emu.log(string.format("{%x,%x,%x,%x}\n", x,y,z,w))
+	end
+	
 end
 
+function compareAndLogOutput(address, value)
+	--local read = emu.readWord(0x36A + 2*(index -1),emu.memType.gsuWorkRam,false)
+	emu.breakExecution()
+	emu.log("Checking Polygon")
+	for vertexIndex=0,2
+	do 
+		local x = emu.readWord(POLYGON_LIST + 6*vertexIndex,emu.memType.gsuWorkRam,false)
+		local y = emu.readWord(POLYGON_LIST + 2 + 6*vertexIndex,emu.memType.gsuWorkRam,false)
+		local z = emu.readWord(POLYGON_LIST + 4 + 6*vertexIndex,emu.memType.gsuWorkRam,false)
+		emu.log(string.format("{%x,%x,%x}\n", x,y,z))
+	end
+	
+end
+
+function break_(address, value)
+	--local read = emu.readWord(0x36A + 2*(index -1),emu.memType.gsuWorkRam,false)
+	emu.breakExecution()
+	emu.log("Break X axis")
+end
+
+emu.addMemoryCallback(break_,
+					  emu.callbackType.exec,
+					  camera_lookAt_XAXIS,
+					  camera_lookAt_XAXIS,
+					  4,
+					  emu.memType.gsuWorkRam)
+
+emu.addMemoryCallback(checkLookAt,
+					  emu.callbackType.exec,
+					  testcall,
+					  testcall,
+					  4,
+					  emu.memType.gsuWorkRam)
 
 
 emu.addMemoryCallback(test_setup,

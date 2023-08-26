@@ -45,7 +45,7 @@ function camera_lookAt
     move r0,r3
     ;copy the normalized vector to ZAXIS @r0 = @VECTOR_COPY_IN
     call vector3_copy
-
+camera_lookAt_XAXIS:
     ;xaxis = Math.normalize(zaxis.cross(up));
     iwt r0, #(CAMERA + camera::up)
     sm (VECTOR_CROSS_IN), r0

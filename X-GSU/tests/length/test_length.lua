@@ -5,7 +5,7 @@
 -- Vectors
 local input = {
 	{0xbeb3, 0x2f20, 0x55e6},    -- Vector v13
-	{0x0100, 0x0000, 0x0000},   -- Vector v1
+	{0x0014, 0x0000, 0x0000},   -- Vector v1
 	{0x0000, 0x0100, 0x0000},   -- Vector v2
 	{0x0000, 0x0000, 0x0100},   -- Vector v3
 	{0xfe00, 0x0300, 0x0500},   -- Vector v4
@@ -23,7 +23,7 @@ local input = {
   -- Lengths
   local expected = {
     0x75bd,     -- Length of v13
-	0x0100,    -- Length of v1
+	0x0014,    -- Length of v1
 	0x0100,    -- Length of v2
 	0x0100,    -- Length of v3
 	0x062a,    -- Length of v4
@@ -41,8 +41,8 @@ index = 1
 output = 0x0
 fail = 0
 
-inputAddress = 0x618
-outputAddress = 0x61E
+inputAddress = 0x73C
+outputAddress = 0x742
 
 emu.writeWord(inputAddress + 0, input[index][1], emu.memType.gsuWorkRam)
 emu.writeWord(inputAddress + 2, input[index][2], emu.memType.gsuWorkRam)

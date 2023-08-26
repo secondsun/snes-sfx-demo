@@ -114,9 +114,11 @@ call camera_lookAt
 
 ;This label represents the memory address that begins test execution
 test_call:
+	cache
 	iwt r0, #POLYGON_LIST
 	iwt r1, #LOOKAT_MATRIX
-	cache
+	
+
 	for 36
 		gsu_stack_push r0
 		gsu_stack_push r1
