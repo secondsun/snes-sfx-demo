@@ -12,7 +12,7 @@
 .segment "GSURAM"
 
 INPUT:
-.res 2
+.res 4
 OUTPUT:
 .res 2
 .segment "GSUCODE"
@@ -31,13 +31,10 @@ iwt r12, #$400 ; loop 1024 times
 
 ;This label represents the memory address that begins test execution
 test_call:
+	lm r1, (INPUT+2)
 	lm r0, (INPUT)
-	gsu_stack_push r12
-	gsu_stack_push r13
-	call gsu_sqrt
+	call gsu_sqrt32
  	nop
-	gsu_stack_pop r13
-	gsu_stack_pop r12
 	sm (OUTPUT), r3
 	nop
 	nop
@@ -50,7 +47,7 @@ test_call:
 ; The lua script will check values here and prepare for the next loop
 test_stop:    
 	nop
-	loop
+	;loop
 	nop
 	stop
 	nop

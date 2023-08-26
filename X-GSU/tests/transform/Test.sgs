@@ -21,7 +21,7 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(CAMERA + camera::eye + vector3::yPos)
-	iwt r0, #$2000;32
+	iwt r0, #$0000;32
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::eye + vector3::zPos)
@@ -47,11 +47,11 @@ POLYGON_LIST:
 	stw (r1)
 
 	iwt r1, #(CAMERA + camera::up + vector3::yPos)
-	iwt r0, #$009a; .6 in 8.8 twos compliment fixed point
+	iwt r0, #$0100; .6 in 8.8 twos compliment fixed point
 	stw (r1)
 	
 	iwt r1, #(CAMERA + camera::up + vector3::zPos)
-	iwt r0, #$0048; .28
+	iwt r0, #$0000; .28
 	stw (r1)
 
 .endmacro

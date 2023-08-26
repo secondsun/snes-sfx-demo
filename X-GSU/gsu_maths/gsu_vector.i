@@ -560,32 +560,16 @@ function vector3_length
 	add r2 ; r0 = z^2 + y^2 
 	add r3 ; r0 = z^2 + y^2 + x^2
 
-
-  
-  ; TODO : if sum of ints (at this point r0, r2, and r3 is > 256 use gsu_sqrt_int_in
-  ;        otherwise use gsu_sqrt
-  iwt r2, #$00F0
-  cmp r2; r0-240
-  ; if r0 > 240, s =0 & o = 0
-  bpl intSqrt
-  nop
   with r4
   add r8
-  adc #0; 
-  with r4;
-  add r7;
-  adc #0;
-  move r8, r4
-  to r7
-  swap 
-  merge
-  call gsu_sqrt
+  adc #0 
+  with r4
+  add r7
+  adc #0
+  
+  move r1,r4
+  call gsu_sqrt32
   return
-  ; r4 = decimal bits
-  ; r0 = int bits
-intSqrt:  
-	call gsu_sqrt_int_in
-	return
 endfunction
 
 ; Transforms a vector by multiplying it with a 4x4 matrix.
