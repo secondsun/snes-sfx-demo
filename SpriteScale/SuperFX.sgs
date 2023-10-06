@@ -160,7 +160,7 @@ from r11
 add r4
 from r12
 cmp r10
-bge :+
+blt :+
   to r11
   from r12
   sub r4 
@@ -624,7 +624,7 @@ drawLine2:
 		inc r1
 	  from r1
 	  cmp r11
-	  bge adjustFornext3
+	  blt adjustFornext3
 	  dec r7
 	  bmi adjustFornext3
 	  nop
