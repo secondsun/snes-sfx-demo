@@ -39,7 +39,7 @@ Main:
         lda #$70
         pha
         plb
-        lda #$5;three sprite
+        lda #$3;three sprite
         sta a:spritelist::count
 
 ;texture .word ; address
