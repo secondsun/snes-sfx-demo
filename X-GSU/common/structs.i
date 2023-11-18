@@ -36,4 +36,16 @@
 	entries  .res $200 ; 512 Bytes of stack
 	.endstruct
 
+.struct rnc_header
+   uncompressed_size .res 4
+   compressed_size   .res 4
+   pack_chunks       .res 2
+.endstruct
+
+.struct rombuffer
+   bank .res 2
+   address .res 2
+   index .res 2
+.endstruct
+
 .endif   

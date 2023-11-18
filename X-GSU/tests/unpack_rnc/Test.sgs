@@ -1,0 +1,75 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+.macro init_rnc
+	;decompress(bytesIn, *bytesOut, breakAfterBytes)
+	;bytesIn is the romlocation of the compressed data
+	;bytesOut is the ramlocation of the decompressed data
+	;breakAfterBytes is the number of bytes to decompress before returning
+
+.endmacro
+
+
+.segment "GSURAM"
+.res 1 ; hack to byte align
+INPUT:
+.res .sizeof(vector3)
+OUTPUT:
+.res 2
+.segment "GSUCODE"
+GSU_Code:
+
+;Setup stack
+init_stack
+init_rnc
+
+;This label represents the memory address that begins test setup
+; The lua script will execute setup here
+test_setup:
+iwt r12, #$D
+iwt r13, #test_call
+
+;This label represents the memory address that begins test execution
+test_call:
+	gsu_stack_push r12
+	gsu_stack_push r13
+	iwt r0, #INPUT
+	call vector3_length
+	sm (OUTPUT), r3
+	;LET MEMORY SETTLE
+ 	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+;This label represents the memory address that ends test execution.
+;The test will loop back to test_call after reaching this label.  
+; The lua script will check values here and prepare for the next loop
+test_stop:    
+	nop
+	nop
+	gsu_stack_pop r13
+	gsu_stack_pop r12
+	loop
+	nop
+	stop
+	nop
+
+
+.res 1
+;Code goes in code segment
+.include "../../gsu_maths/gsu_sqrt.i"
+.include "../../gsu_maths/gsu_vector.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_camera.i"
+.include "../../rnc/gsu_decompress.i"
