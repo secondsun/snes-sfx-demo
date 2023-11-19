@@ -40,7 +40,7 @@
    uncompressed_size .res 4
    compressed_size   .res 4
    pack_chunks       .res 2
-.endstruct
+.endstruct  
 
 .struct rombuffer
    bank .res 2
