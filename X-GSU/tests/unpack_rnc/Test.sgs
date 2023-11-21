@@ -34,15 +34,14 @@ init_rnc
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
 test_setup:
-iwt r12, #$D
-iwt r13, #test_call
+
 
 ;This label represents the memory address that begins test execution
 test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
 	iwt r0, #INPUT
-	call vector3_length
+	call parseHeader
 	sm (OUTPUT), r3
 	;LET MEMORY SETTLE
  	nop
@@ -60,7 +59,6 @@ test_stop:
 	nop
 	gsu_stack_pop r13
 	gsu_stack_pop r12
-	loop
 	nop
 	stop
 	nop

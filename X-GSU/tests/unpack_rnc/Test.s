@@ -8,7 +8,12 @@
 Main:
         ;Copy GSU code
         memcpy GSU_SRAM, __GSUCODE_LOAD__, __GSUCODE_SIZE__
+        ;Copy SNES code
+        memcpy  __MAIN_LOOP_RUN__, __MAIN_LOOP_LOAD__, __MAIN_LOOP_SIZE__
+        memcpy  __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__
+        jml __MAIN_LOOP_RUN__
 
+.SEGMENT "MAIN_LOOP"
         ;Configure GSU
         lda     #$70
         sta     GSU_PBR
@@ -35,3 +40,9 @@ Main:
 loops:
 :       wai
         bra :-
+
+.segment "ROM2"
+
+badapple:
+.export badapple
+  incbin Badapple, "badapple.bin"
