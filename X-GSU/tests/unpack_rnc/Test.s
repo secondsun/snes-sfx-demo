@@ -19,7 +19,7 @@ Main:
         sta     GSU_PBR
         lda     #$10
         sta     GSU_SCBR
-        lda     #%00001000
+        lda     #%00111101 ;4bpp_obj SuperFX controls ram and rom
         sta     GSU_SCMR
         lda     #%10000000
         sta     GSU_CFGR
@@ -41,7 +41,7 @@ loops:
 :       wai
         bra :-
 
-.segment "ROM2"
+.segment "GSUDATA"
 
 badapple:
 .export badapple

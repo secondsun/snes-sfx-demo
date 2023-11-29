@@ -48,4 +48,10 @@
    index .res 2
 .endstruct
 
+.struct hufftree
+    l1 .res 4; ; +0
+    l2 .res 2; ; +4
+    l3 .res 4; ; +6
+    bit_depth .res 2; ; +A
+.endstruct
 .endif   

@@ -23,7 +23,7 @@
 INPUT:
 .res .sizeof(vector3)
 OUTPUT:
-.res 2
+.res 156
 .segment "GSUCODE"
 GSU_Code:
 
@@ -40,9 +40,15 @@ test_setup:
 test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
-	iwt r0, #INPUT
+	iwt r0, #(.hiword( badapple))
+	romb
+	iwt r0, #badapple
+
 	call parseHeader
-	sm (OUTPUT), r3
+	iwt r0, #(.hiword( badapple))
+	iwt r1, #OUTPUT
+	iwt r2, #$156
+	call decompress
 	;LET MEMORY SETTLE
  	nop
 	nop

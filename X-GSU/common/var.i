@@ -34,7 +34,8 @@ VECTOR_CROSS_OUT:
   .res .sizeof(vector3)
 VECTOR_COPY_IN:
   .res 2
-
+RNC_HEADER:
+  .res .sizeof(rnc_header)
 ;Global Camera   
 CAMERA:
   .res .sizeof(camera)

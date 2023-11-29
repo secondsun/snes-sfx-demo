@@ -36,6 +36,43 @@
 
 	.endmacro
 
+	; Allocates a struct on the stack
+	; assumes r10 is stack pointer
+	; Returns the address of the struct in R
+	.macro gsu_stack_alloc struct, R
+		.if .blank({R})
+				.error "gsu_stack_alloc: R is blank"
+		.endif
+
+		.if .blank({struct})
+				.error "gsu_stack_alloc: struct is blank"
+		.endif
+
+		iwt R, #.sizeof({struct})
+		with r10
+		add R
+		from r10
+		to R
+		sub R
+	.endmacro
+
+	; Frees a struct on the stack
+	; assumes r10 is stack pointer
+	; R is used as a temp register to store the size of the struct
+	.macro gsu_stack_free struct, R
+		.if .blank({R})
+				.error "gsu_stack_alloc: R is blank"
+		.endif
+
+		.if .blank({struct})
+				.error "gsu_stack_alloc: struct is blank"
+		.endif
+
+		iwt R, #.sizeof({struct})
+		with r10
+		sub R
+	.endmacro
+
 	; Pops the value stored in R to the stack
 	; assumes r10 is stack pointer
 	;Example :

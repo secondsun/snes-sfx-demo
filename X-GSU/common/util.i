@@ -15,16 +15,17 @@
 	inc	r14
 .endmacro
 
+;BIG ENDIAN
 .macro _romreadword  R
     .if .not( .blank({R}))
         to	R
     .endif
-    getb
+    getbh
 	inc	r14
     .if .not( .blank({R}))
-        to	R
+        with R
     .endif
-    getbh
+    getbl
 	inc	r14
 .endmacro
 
