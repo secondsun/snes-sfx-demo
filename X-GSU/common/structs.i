@@ -42,10 +42,13 @@
    pack_chunks       .res 2
 .endstruct  
 
-.struct rombuffer
-   bank .res 2
-   address .res 2
-   index .res 2
+.struct rncbuffer
+   bank .res 2 ; bank of data
+   address .res 2 ; next address to read
+   index .res 4 ; index within larger bytestream
+   size .res 4 ; size of bytestream
+   word  .res 2 ; current bits in the buffer. 
+   count .res 2 ; number of biuts remaining in buffer
 .endstruct
 
 .struct hufftree

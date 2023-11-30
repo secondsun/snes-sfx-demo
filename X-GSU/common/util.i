@@ -15,6 +15,16 @@
 	inc	r14
 .endmacro
 
+;resets carry flag
+;logical shift left
+.macro shl R
+    add #0
+    .if .not( .blank({R}))
+        with R
+    .endif
+    rol
+.endmacro
+
 ;BIG ENDIAN
 .macro _romreadword  R
     .if .not( .blank({R}))

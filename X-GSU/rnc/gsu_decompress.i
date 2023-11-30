@@ -12,10 +12,6 @@
 .include "../common/util.i"
 
 
-    .struct two_word_buffer
-        hi .word 
-        lo .word 
-    .endstruct
 
     .segment "GSUCODE"
 
@@ -73,6 +69,95 @@
         ;read from buffer
         ;create buffer handler 
         ;create decompression function
+        
+    return
+    endfunction
+
+    ;This sets up a two byte RNC buffer. The buffer is read using the
+    ; read and peek functions defined in this file. 
+    ; 
+    ;
+    ;
+    ; r0 = start of compressed rnc file
+    ; r1 = bank of compressed rnc file
+    ; r2 = hiword size of compressed rnc file
+    ; r3 = loword size of compressed rnc file
+    function initialize_buffer
+        ;RNC_WORD_BUFFER
+        ;from r1
+        ;romb
+        add #$12 ;move to start of compressed data
+        ;move r14,r0
+        sm (RNC_WORD_BUFFER + bank), r1
+        sm (RNC_WORD_BUFFER + address), r0
+        sm (RNC_WORD_BUFFER + size), r2
+        sm (RNC_WORD_BUFFER + size +2), r3
+        iwt r3, #$12
+        sm (RNC_WORD_BUFFER + index),r3
+        sm (RNC_WORD_BUFFER + index + 2),r3
+        return
+    endfunction
+
+    ; reads r0 bits from the rnc bitstream
+    ; r0 = number of bits to read
+    ; clobbers r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14
+    ; returns r3 = bits read
+    function readBits
+    
+        lm r5, (RNC_WORD_BUFFER + bank); bank
+        from r5
+        romb
+        lm r14, (RNC_WORD_BUFFER + address); bank
+
+        iwt r3, #0 ; out
+        iwt r1, #1 ; bitflag
+        lm r4, (RNC_WORD_BUFFER + word); word
+        lm r2, (RNC_WORD_BUFFER + count); count
+        
+        forR r0
+            from r2
+            cmp r2
+            bne countFine
+            nop
+                ;val lower = inputBytes[index].toInt()
+                ;val upper = inputBytes[index + 1].toInt()
+                ;word = ((upper and 0x0FF) shl (8)) or ((lower) and 0x0FF) and 0x0FFFF
+                _romreadword r4
+                ;index += 2
+                with r14
+                add #2
+                bcc noBankChange
+                    nop 
+                    inc r5
+                    sm (RNC_WORD_BUFFER + bank), r5; bank
+                    from r5
+                    romb
+                noBankChange:
+                
+                sm (RNC_WORD_BUFFER + address), r14, ; address
+                ;count = 16
+                iwt r2, #16
+            countFine:            
+            from r4
+            and #1
+            beq afterWrite
+            nop
+                ;out = out or bitflag
+                with r3
+                or r1
+            afterWrite:
+
+            ;word = word shr 1
+            with r4
+            lsr
+            ;bitflag = bitflag shl 1
+            with r1
+            shl
+            ;count -= 1
+            dec r2
+
+
+        endfor
         
     return
     endfunction

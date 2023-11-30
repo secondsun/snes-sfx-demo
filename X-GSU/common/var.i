@@ -50,6 +50,10 @@ __LOOKAT_XAXIS__ = LOOKAT_MATRIX
 __LOOKAT_ZAXIS_W__ = LOOKAT_MATRIX + 2 * .sizeof(vector4) + .sizeof(vector3) 
 __LOOKAT_YAXIS_W__ = LOOKAT_MATRIX + .sizeof(vector4) + .sizeof(vector3) 
 __LOOKAT_XAXIS_W__ = LOOKAT_MATRIX + .sizeof(vector3) 
+
+RNC_WORD_BUFFER:
+  .res .sizeof(rncbuffer)
+
 gsu_stack_ram:
 	.res .sizeof(gsu_stack)
 	

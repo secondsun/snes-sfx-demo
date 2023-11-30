@@ -41,6 +41,12 @@
 	move r13,r15
 .endmacro
 
+.macro forR countRegister
+	move r12, countRegister ; loop number of times in countRegister
+	move r13,r15
+.endmacro
+
+
 .macro endfor
 	loop
 	nop
