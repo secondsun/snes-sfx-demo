@@ -42,7 +42,6 @@ loops:
         bra :-
 
 .segment "GSUDATA"
-
 badapple:
 .export badapple
   incbin Badapple, "badapple.bin"

@@ -16,8 +16,8 @@
     .segment "GSUCODE"
 
     ; reads a rnc header from the cart
-    ; r0 = start of header data
-    ; r3 = address of header
+    ; In : r0 = start of header data
+    ; Out : r3 = address of header
     ;
     ; ROMB should be set to the bank of compressed data before calling this function
     ; clobbers r1,r14,r3
@@ -86,15 +86,18 @@
         ;RNC_WORD_BUFFER
         ;from r1
         ;romb
-        add #$12 ;move to start of compressed data
+        
+        add #9;move to start of compressed data
+        add #9;move to start of compressed data
+
         ;move r14,r0
-        sm (RNC_WORD_BUFFER + bank), r1
-        sm (RNC_WORD_BUFFER + address), r0
-        sm (RNC_WORD_BUFFER + size), r2
-        sm (RNC_WORD_BUFFER + size +2), r3
+        sm (RNC_WORD_BUFFER + rncbuffer::bank), r1
+        sm (RNC_WORD_BUFFER + rncbuffer::address), r0
+        sm (RNC_WORD_BUFFER + rncbuffer::size), r2
+        sm (RNC_WORD_BUFFER + rncbuffer::size +2), r3
         iwt r3, #$12
-        sm (RNC_WORD_BUFFER + index),r3
-        sm (RNC_WORD_BUFFER + index + 2),r3
+        sm (RNC_WORD_BUFFER + rncbuffer::index),r3
+        sm (RNC_WORD_BUFFER + rncbuffer::index + 2),r3
         return
     endfunction
 
@@ -102,17 +105,17 @@
     ; r0 = number of bits to read
     ; clobbers r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14
     ; returns r3 = bits read
-    function readBits
+    function read_buffer
     
-        lm r5, (RNC_WORD_BUFFER + bank); bank
+        lm r5, (RNC_WORD_BUFFER + rncbuffer::bank); bank
         from r5
         romb
-        lm r14, (RNC_WORD_BUFFER + address); bank
+        lm r14, (RNC_WORD_BUFFER + rncbuffer::address); bank
 
         iwt r3, #0 ; out
         iwt r1, #1 ; bitflag
-        lm r4, (RNC_WORD_BUFFER + word); word
-        lm r2, (RNC_WORD_BUFFER + count); count
+        lm r4, (RNC_WORD_BUFFER + rncbuffer::word); word
+        lm r2, (RNC_WORD_BUFFER + rncbuffer::count); count
         
         forR r0
             from r2
@@ -129,12 +132,12 @@
                 bcc noBankChange
                     nop 
                     inc r5
-                    sm (RNC_WORD_BUFFER + bank), r5; bank
+                    sm (RNC_WORD_BUFFER + rncbuffer::bank), r5; bank
                     from r5
                     romb
                 noBankChange:
                 
-                sm (RNC_WORD_BUFFER + address), r14, ; address
+                sm (RNC_WORD_BUFFER + rncbuffer::address), r14 ; address
                 ;count = 16
                 iwt r2, #16
             countFine:            

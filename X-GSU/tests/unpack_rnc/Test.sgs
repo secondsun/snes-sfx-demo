@@ -19,11 +19,11 @@
 
 
 .segment "GSURAM"
-.res 1 ; hack to byte align
+;.res 1 ; hack to byte align
 INPUT:
-.res .sizeof(vector3)
+.res 2
 OUTPUT:
-.res 156
+.res 2
 .segment "GSUCODE"
 GSU_Code:
 
@@ -45,10 +45,10 @@ test_call:
 	iwt r0, #badapple
 
 	call parseHeader
-	iwt r0, #(.hiword( badapple))
-	iwt r1, #OUTPUT
-	iwt r2, #$156
-	call decompress
+	;iwt r0, #(.hiword( badapple))
+	;iwt r1, #OUTPUT
+	;iwt r2, #$156
+	;call decompress
 	;LET MEMORY SETTLE
  	nop
 	nop
@@ -60,9 +60,36 @@ test_call:
 ;This label represents the memory address that ends test execution.
 ;The test will loop back to test_call after reaching this label.  
 ; The lua script will check values here and prepare for the next loop
-test_stop:    
+test_stop_parse:    
 	nop
 	nop
+
+	iwt r1, #(.hiword( badapple))
+	iwt r0, #badapple
+	iwt r2, #0
+	iwt r3, #$7b
+	call initialize_buffer
+
+	for 96
+		gsu_stack_push r12
+		gsu_stack_push r13
+		test_prepare_buffer_read:    ;in lua script write input to #INPUT
+
+		lm r0, (INPUT)
+		call read_buffer
+		sm (OUTPUT),r3
+		nop
+		nop
+		nop
+		nop
+		test_validate_buffer_read:    
+		nop
+		gsu_stack_pop r13
+		gsu_stack_pop r12
+
+	endfor
+
+
 	gsu_stack_pop r13
 	gsu_stack_pop r12
 	nop
@@ -70,7 +97,6 @@ test_stop:
 	nop
 
 
-.res 1
 ;Code goes in code segment
 .include "../../gsu_maths/gsu_sqrt.i"
 .include "../../gsu_maths/gsu_vector.i"
