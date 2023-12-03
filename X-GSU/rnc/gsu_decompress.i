@@ -161,7 +161,10 @@
 
 
         endfor
-        
+        sm (RNC_WORD_BUFFER + rncbuffer::bank),r5 ; bank
+        sm  (RNC_WORD_BUFFER + rncbuffer::address),r14; bank
+        sm  (RNC_WORD_BUFFER + rncbuffer::word),r4; word
+        sm (RNC_WORD_BUFFER + rncbuffer::count), r2 ; count
     return
     endfunction
 

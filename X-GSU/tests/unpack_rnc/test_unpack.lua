@@ -1,5 +1,22 @@
-﻿
-UNCOMPRESSED = 0x600
+﻿--create lookup table for octal to binary
+oct2bin = {
+    ['0'] = '000',
+    ['1'] = '001',
+    ['2'] = '010',
+    ['3'] = '011',
+    ['4'] = '100',
+    ['5'] = '101',
+    ['6'] = '110',
+    ['7'] = '111'
+}
+function getOct2bin(a) return oct2bin[a] end
+function convertBin(n)
+    local s = string.format('%o', n)
+    s = s:gsub('.', getOct2bin)
+    return s
+end
+
+UNCOMPRESSED = 0x61A
 COMPRESSED = UNCOMPRESSED  + 4
 PACK_CHUNKS = UNCOMPRESSED  + 8
 
@@ -37,10 +54,12 @@ function checkHeader(address, value)
 	
 end
 
-expected = {96,0,1,25,0,0,3,2,0,4,2,0,24,0,0,48,2,0,64,4,0,18,3,0,1,0,0,0,0,0,12,4,0,0,0,0,61,5,1,123,0,1,10,2,1,21,3,0,16,1,0,87,6,1,82,5,1,88,5,0,3,2,0,115,0,1,45,6,1,1,1,0,51,7,1,6,7,1,64,0,1,90,2,1,107,6,0,112,2,1,12,1,1,1,1,1,55}
-input = {96,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7}
-OUTPUT = 0
-INPUT = 0
+
+expected = {0,1,25,0,0,3,2,0,4,2,0,24,0,0,48,2,0,64,4,0,18,3,0,1,0,0,0,0,0,12,4,0,0,0,0,61,5,1,123,0,1,10,2,1,21,3,0,16,1,0,87,6,1,82,5,1,88,5,0,3,2,0,115,0,1,45,6,1,1,1,0,51,7,1,6,7,1,64,0,1,90,2,1,107,6,0,112,2,1,12,1,1,1,1,1,55}
+input = {3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7}
+
+OUTPUT = 0x868
+INPUT = 0x866
 index = 1
 
 function setupBufferRead(ignore, ignore2) 
@@ -53,28 +72,32 @@ end
 function checkBufferRead(ignore, ignore2) 
 	emu.breakExecution()
 	emu.log("check buffer read")
-	data = emu.readWord(OUTPUT, emu.memType.gsuWorkRam)
+	word = emu.readWord(0x662, emu.memType.gsuWorkRam)
+	emu.log(string.format("word is (%x, %o, %s)",word,word, convertBin(word)))
 	
+	data = emu.readWord(OUTPUT, emu.memType.gsuWorkRam)
+	emu.log(index)
+	emu.log(expected[index])
 	if data ~= expected[index] then
 		emu.log(string.format("Error byte readbuffer(%d) was %x expected %x", input[index], data, expected[index]))
 	end
 
 	index = index + 1
-	emu.resume()
+	--emu.resume()
 end
 
 
 emu.addMemoryCallback(checkBufferRead,
 					  emu.callbackType.exec,
-					  0x0050,
-					  0x0050,
+					  0x005A,
+					  0x005A,
 					  4,
 					  emu.memType.gsuWorkRam)
 
 emu.addMemoryCallback(setupBufferRead,
 					  emu.callbackType.exec,
-					  0x003F,
-					  0x003F,
+					  0x0040,
+					  0x0040,
 					  4,
 					  emu.memType.gsuWorkRam)					  
 
