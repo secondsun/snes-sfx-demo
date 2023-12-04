@@ -16,7 +16,7 @@ function convertBin(n)
     return s
 end
 
-UNCOMPRESSED = 0x61A
+UNCOMPRESSED = 0x622
 COMPRESSED = UNCOMPRESSED  + 4
 PACK_CHUNKS = UNCOMPRESSED  + 8
 
@@ -58,8 +58,9 @@ end
 expected = {0,1,25,0,0,3,2,0,4,2,0,24,0,0,48,2,0,64,4,0,18,3,0,1,0,0,0,0,0,12,4,0,0,0,0,61,5,1,123,0,1,10,2,1,21,3,0,16,1,0,87,6,1,82,5,1,88,5,0,3,2,0,115,0,1,45,6,1,1,1,0,51,7,1,6,7,1,64,0,1,90,2,1,107,6,0,112,2,1,12,1,1,1,1,1,55}
 input = {3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7,3,1,7}
 
-OUTPUT = 0x868
-INPUT = 0x866
+OUTPUT = 0x870
+INPUT = 0x86E
+WORD = 0x65E + 12
 index = 1
 
 function setupBufferRead(ignore, ignore2) 
@@ -69,11 +70,16 @@ function setupBufferRead(ignore, ignore2)
 	emu.resume()
 end
 
+function logWord(ignore, ignore2) 
+	emu.breakExecution()
+	word = emu.readWord(WORD, emu.memType.gsuWorkRam)
+	emu.log(string.format("word is (%x, %o, %s)",word,word, convertBin(word)))
+	--emu.resume()
+end
+
 function checkBufferRead(ignore, ignore2) 
 	emu.breakExecution()
 	emu.log("check buffer read")
-	word = emu.readWord(0x662, emu.memType.gsuWorkRam)
-	emu.log(string.format("word is (%x, %o, %s)",word,word, convertBin(word)))
 	
 	data = emu.readWord(OUTPUT, emu.memType.gsuWorkRam)
 	emu.log(index)
@@ -107,3 +113,19 @@ emu.addMemoryCallback(checkHeader,
 					  0x001F,
 					  4,
 					  emu.memType.gsuWorkRam)
+
+					  
+emu.addMemoryCallback(logWord,
+	emu.callbackType.exec,
+	0x05E4,
+	0x05E4,
+	4,
+	emu.memType.gsuWorkRam)
+
+
+emu.addMemoryCallback(logWord,
+	emu.callbackType.exec,
+	0x059C,
+	0x059C,
+	4,
+	emu.memType.gsuWorkRam)

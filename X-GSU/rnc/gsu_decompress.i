@@ -96,8 +96,13 @@
         sm (RNC_WORD_BUFFER + rncbuffer::size), r2
         sm (RNC_WORD_BUFFER + rncbuffer::size +2), r3
         iwt r3, #$12
-        sm (RNC_WORD_BUFFER + rncbuffer::index),r3
         sm (RNC_WORD_BUFFER + rncbuffer::index + 2),r3
+
+        iwt r3, #$0
+        sm (RNC_WORD_BUFFER + rncbuffer::index),r3
+        sm  (RNC_WORD_BUFFER + rncbuffer::word), r3; word
+        sm  (RNC_WORD_BUFFER + rncbuffer::count), r3; count
+
         return
     endfunction
 
@@ -116,7 +121,7 @@
         iwt r1, #1 ; bitflag
         lm r4, (RNC_WORD_BUFFER + rncbuffer::word); word
         lm r2, (RNC_WORD_BUFFER + rncbuffer::count); count
-        
+        break_for_word1:
         forR r0
             from r2
             cmp r2
@@ -127,8 +132,7 @@
                 ;word = ((upper and 0x0FF) shl (8)) or ((lower) and 0x0FF) and 0x0FFFF
                 _romreadword r4
                 ;index += 2
-                with r14
-                add #2
+                
                 bcc noBankChange
                     nop 
                     inc r5
@@ -161,10 +165,13 @@
 
 
         endfor
+        
+        
         sm (RNC_WORD_BUFFER + rncbuffer::bank),r5 ; bank
         sm  (RNC_WORD_BUFFER + rncbuffer::address),r14; bank
         sm  (RNC_WORD_BUFFER + rncbuffer::word),r4; word
         sm (RNC_WORD_BUFFER + rncbuffer::count), r2 ; count
+        break_for_word2:
     return
     endfunction
 
