@@ -123,17 +123,17 @@
         lm r2, (RNC_WORD_BUFFER + rncbuffer::count); count
         break_for_word1:
         forR r0
-            from r2
-            cmp r2
+            with r2
+            add #0
             bne countFine
             nop
                 ;val lower = inputBytes[index].toInt()
                 ;val upper = inputBytes[index + 1].toInt()
                 ;word = ((upper and 0x0FF) shl (8)) or ((lower) and 0x0FF) and 0x0FFFF
-                _romreadword r4
+                _romreadwordLE r4
                 ;index += 2
-                
-                bcc noBankChange
+                ;
+                bne noBankChange
                     nop 
                     inc r5
                     sm (RNC_WORD_BUFFER + rncbuffer::bank), r5; bank
@@ -158,8 +158,8 @@
             with r4
             lsr
             ;bitflag = bitflag shl 1
-            with r1
-            shl
+            
+            shl r1
             ;count -= 1
             dec r2
 

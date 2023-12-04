@@ -117,8 +117,8 @@ emu.addMemoryCallback(checkHeader,
 					  
 emu.addMemoryCallback(logWord,
 	emu.callbackType.exec,
-	0x05E4,
-	0x05E4,
+	0x05E1,
+	0x05E1,
 	4,
 	emu.memType.gsuWorkRam)
 

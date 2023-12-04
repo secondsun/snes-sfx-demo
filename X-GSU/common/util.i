@@ -26,6 +26,7 @@
 .endmacro
 
 ;BIG ENDIAN
+;Z is set on overflow
 .macro _romreadword  R
     .if .not( .blank({R}))
         to	R
@@ -39,4 +40,21 @@
 	inc	r14
 .endmacro
 
+;LITTLE ENDIAN
+;Z is set on overflow of address
+.macro _romreadwordLE  R
+    .if .not( .blank({R}))
+        to	R
+    .endif
+    getbl
+	inc	r14
+    .if .not( .blank({R}))
+        with R
+    .endif
+    getbh
+	inc	r14
+.endmacro
+
 .endif
+
+
