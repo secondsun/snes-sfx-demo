@@ -37,11 +37,13 @@
 .endmacro
 
 .macro for count
+	backuploop
 	iwt r12, #count ; loop count times 
 	move r13,r15
 .endmacro
 
 .macro forR countRegister
+	backuploop
 	move r12, countRegister ; loop number of times in countRegister
 	move r13,r15
 .endmacro
@@ -50,6 +52,7 @@
 .macro endfor
 	loop
 	nop
+	restoreloop
 .endmacro
 
 .macro backuploop

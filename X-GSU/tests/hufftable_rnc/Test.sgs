@@ -1,0 +1,98 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+
+
+.segment "GSURAM"
+;.res 1 ; hack to byte align
+INPUT:
+.res 2
+OUTPUT:
+.res 2
+;val literalTable = HuffTree();
+literalTable:
+	.res .sizeof(hufftree)
+
+;val lengthTable = HuffTree();
+lengthTable:
+	.res .sizeof(hufftree)
+
+;val positionTable = HuffTree();
+positionTable:
+	.res .sizeof(hufftree)
+
+.segment "GSUCODE"
+GSU_Code:
+
+;Setup stack
+init_stack
+
+;This label represents the memory address that begins test setup
+; The lua script will execute setup here
+;This label represents the memory address that begins test execution
+	iwt r0, #(.hiword( badapple))
+	romb
+	iwt r0, #badapple
+
+	call parseHeader
+	;iwt r0, #(.hiword( badapple))
+	;iwt r1, #OUTPUT
+	;iwt r2, #$156
+	;call decompress
+	;LET MEMORY SETTLE
+ 	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+;This label represents the memory address that ends test execution.
+;The test will loop back to test_call after reaching this label.  
+; The lua script will check values here and prepare for the next loop
+	nop
+	nop
+
+	iwt r1, #(.hiword( badapple))
+	iwt r0, #badapple
+	iwt r2, #0
+	iwt r3, #$7b
+	;twoWordBuffer.inputBytes = bytes
+	;also hard coding values from test header
+	call initialize_buffer
+
+	;twoWordBuffer.read(2)
+	iwt r0, #2
+	call read_buffer
+	
+	startTable:
+	iwt r0, #(literalTable)
+	call init_hufftree
+	iwt r0, #(lengthTable)
+	call init_hufftree
+	iwt r0, #(positionTable)
+	call init_hufftree
+	nop
+	nop
+	nop
+	nop
+	test_stop:
+	nop
+	stop
+	nop
+
+
+;Code goes in code segment
+.include "../../gsu_maths/gsu_sqrt.i"
+.include "../../gsu_maths/gsu_vector.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_camera.i"
+.include "../../rnc/gsu_decompress.i"

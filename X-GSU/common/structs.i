@@ -51,10 +51,15 @@
    count .res 2 ; number of biuts remaining in buffer
 .endstruct
 
-.struct hufftree
-    l1 .res 4; ; +0
-    l2 .res 2; ; +4
-    l3 .res 4; ; +6
-    bit_depth .res 2; ; +A
+.struct node
+   depth .res 2
+   encoding .res 2
 .endstruct
+
+.struct hufftree
+    nodeCount .res 2; ; +0
+    nodes .res 32* .sizeof(node); ; +4
+.endstruct
+
+
 .endif   
