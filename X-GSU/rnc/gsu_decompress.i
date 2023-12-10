@@ -189,9 +189,9 @@
         stw (r1) ; store node count
         
         ;set r2 to start of nodes for hufftree (at r1)
-            move r2, r1 ; r2 = address of hufftree
-            with r2
-            add hufftree::nodes ; r2 = address of nodes
+            from  r1 ; r2 = address of hufftree
+            to r2
+            add #hufftree::nodes ; r2 = address of nodes
 
         forR r3 ; for each node in hufftree 
             ;read node
@@ -202,9 +202,9 @@
             gsu_stack_pop r2
             gsu_stack_pop r1
             from r3 ;save bitdepth to node
-            stw (r2)
+            stw (r2)    
             with r2
-            add .sizeof(node) ;point r2 at next node
+            add #.sizeof(node) ;point r2 at next node
         endfor
 
         ;var div = 0x8000u
@@ -243,7 +243,7 @@
                 ;nodes[i].bitdepth
                 ;set r2 to start of nodes for hufftree (at r1)
                 move r0, r1 ; r0 = address of hufftree
-                add hufftree::nodes ; r0 = address of nodes[0]
+                add #hufftree::nodes ; r0 = address of nodes[0]
 
                 iwt r2, #.sizeof(node) ; r2 = sizeof(node)
                 from r7 ; r7 = i
@@ -260,7 +260,7 @@
                 ;   nodes[i].encoding = inverse_bits(value / div, bits_count)
                 
                 with r2
-                add node::encoding ; r2 = address of nodes[i].encoding
+                add #node::encoding ; r2 = address of nodes[i].encoding
                 gsu_stack_push r2
                 gsu_stack_push r1
                 move r2, r4
@@ -278,6 +278,9 @@
                 ;
                 gsu_stack_pop r1
                 gsu_stack_pop r2
+                saveEncoding:
+                from r3
+                stw (r2)
 
                 ;   value += div
                 with r5
