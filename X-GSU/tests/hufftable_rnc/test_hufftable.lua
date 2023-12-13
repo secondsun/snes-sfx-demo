@@ -1,4 +1,4 @@
-﻿
+﻿	
 --create lookup table for octal to binary
 oct2bin = {
     ['0'] = '000',

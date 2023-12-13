@@ -179,9 +179,16 @@
     ;R0 = address of hufftree
     function init_hufftree
         move r1,r0 ; r1 = address of hufftree
-        iwt r0, #$5 ;r0 = bits to read
+        
         ;Read number of nodes
         gsu_stack_push r1
+        for .sizeof(hufftree)
+            iwt r0, #0
+            stw (r1)
+            inc r1
+            inc r1
+        endfor
+        iwt r0, #$5 ;r0 = bits to read
         call read_buffer
         gsu_stack_pop r1
 
