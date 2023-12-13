@@ -223,12 +223,12 @@
         nop
             ;var i = 0
             iwt r7, #0 ; r7 = i
-            ;while (true) {
             init_encoding_loop: 
+            ;while (true) {
                 ;if (i >= nodeCount) {
-                    from r1
+                    ldw (r1) ; r0 = nodeCount
                     cmp r7
-                    bmi set_encoding
+                    blt set_encoding
                     nop
                     ;bits_count++
                     inc r6
@@ -248,9 +248,9 @@
                 iwt r2, #.sizeof(node) ; r2 = sizeof(node)
                 from r7 ; r7 = i
                 to r2
-                mult r2 ;   r2 = offset of nodes[i]
+                mult #.sizeof(node) ;   r2 = offset of nodes[i]
                 to r2
-                add r2; r2 = address of nodes[i] 
+                add r2; r2 = r0 + r2 = address of nodes[i] 
 
                 ldw(r2) ; r0 = nodes[i].bitdepth
                 cmp r6 ; r6 = bits_count
@@ -274,11 +274,12 @@
                     nop
                 ; inverse_bits(value / div, bits_count)
                 move r1, r6 ; r1 = bits_count
-                call inverse_bits
+                call inverse_bits ; r3 = encoding
                 ;
                 gsu_stack_pop r1
                 gsu_stack_pop r2
                 saveEncoding:
+                
                 from r3
                 stw (r2)
 
@@ -331,6 +332,7 @@
             ;}
         dec r1
         bra inverse_bits_loop
+        nop
         end_inverse_bits_loop:
         ;return i
     return
