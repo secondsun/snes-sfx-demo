@@ -228,8 +228,11 @@
                 ;if (i >= nodeCount) {
                     ldw (r1) ; r0 = nodeCount
                     cmp r7
+                    beq :+
+                    nop
                     blt set_encoding
                     nop
+                    :
                     ;bits_count++
                     inc r6
                     ;div = div shr 1
@@ -263,15 +266,21 @@
                 add #node::encoding ; r2 = address of nodes[i].encoding
                 gsu_stack_push r2
                 gsu_stack_push r1
-                move r2, r4
+                move r2, r4 
                 move r0, r5 ; r0 = value
                 ;r0 = value / div (div is always a power of 2, so we can just shift right)
                 :
+                    to r9
+                    from r2
+                    sub #1
+                    beq :+
+                    nop
                     lsr
                     with r2
                     lsr
-                    bmi :-
+                    bra :-
                     nop
+                :    
                 ; inverse_bits(value / div, bits_count)
                 move r1, r6 ; r1 = bits_count
                 call inverse_bits ; r3 = encoding
