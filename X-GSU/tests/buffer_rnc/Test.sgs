@@ -69,10 +69,11 @@ test_stop_parse:
 	iwt r2, #0
 	iwt r3, #$7b
 	call initialize_buffer
-
+	loop1 = r12
+	loop2 = r13
 	for 95
-		gsu_stack_push r12
-		gsu_stack_push r13
+		gsu_stack_push loop1
+		gsu_stack_push loop2
 		nop
 		test_prepare_buffer_read:    ;in lua script write input to #INPUT
 		nop
@@ -93,8 +94,8 @@ test_stop_parse:
 		nop
 		test_validate_buffer_read:    
 		nop
-		gsu_stack_pop r13
-		gsu_stack_pop r12
+		gsu_stack_pop loop2
+		gsu_stack_pop loop1
 
 	endfor
 

@@ -35,9 +35,6 @@ GSU_Code:
 ;Setup stack
 init_stack
 
-;This label represents the memory address that begins test setup
-; The lua script will execute setup here
-;This label represents the memory address that begins test execution
 	iwt r0, #(.hiword( badapple))
 	romb
 	iwt r0, #badapple

@@ -51,8 +51,19 @@ __LOOKAT_ZAXIS_W__ = LOOKAT_MATRIX + 2 * .sizeof(vector4) + .sizeof(vector3)
 __LOOKAT_YAXIS_W__ = LOOKAT_MATRIX + .sizeof(vector4) + .sizeof(vector3) 
 __LOOKAT_XAXIS_W__ = LOOKAT_MATRIX + .sizeof(vector3) 
 
+;Decompress GLOBALS
 RNC_WORD_BUFFER:
   .res .sizeof(rncbuffer)
+
+RNC_LITERAL_TABLE:
+	.res .sizeof(hufftree)
+;val lengthTable = HuffTree();
+RNC_LENGTH_TABLE:
+	.res .sizeof(hufftree)
+;val positionTable = HuffTree();
+RNC_POSTION_TABLE:
+	.res .sizeof(hufftree)
+
 
 gsu_stack_ram:
 	.res .sizeof(gsu_stack)

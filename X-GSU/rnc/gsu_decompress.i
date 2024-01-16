@@ -15,7 +15,7 @@
 
     .segment "GSUCODE"
 
-    ; reads a rnc header from the cart
+    ; reads a rnc header from the cart and storees data in RNC_HEADER
     ; In : r0 = start of header data
     ; Out : r3 = address of header
     ;
@@ -53,23 +53,104 @@
     ; r0 = start of compressed data
     ; r1 = bank of compressed data
     ; r2 = start of uncompressed data; must be preallocated
-    ; r3 = bytes to decompress
+    ; r3 = number of bytes to decompress
+    ; decompress data. 
     function decompress
         from r1
         romb
-        ;todo push variables I will need to stack
+        move r6, r3
+        gsu_stack_push r2
         call parseHeader
-        ;todo setup initialize buffer registers
-        call initialize_buffer
+        move r7, r3
+        header = r7
+        outCounter = r6
 
+        with outCounter
+        sub #$2
 
+        iwt r0, #$2
+        call read_buffer
+        gsu_stack_pop r8
+        output = r8
 
-        ;todo write structure for hufftree
-        ;todo create hufftree
-        ;read from buffer
-        ;create buffer handler 
-        ;create decompression function
-        
+        ;// do {
+        outCounterLoop:
+            ;val literalTable = HuffTree();
+            ;val lengthTable = HuffTree();
+            ;val positionTable = HuffTree();
+            iwt r0, #(literalTable)
+            call init_hufftree
+            iwt r0, #(lengthTable)
+            call init_hufftree
+            iwt r0, #(positionTable)
+            call init_hufftree
+
+            iwt r0, #16
+            call read_buffer
+            move r9, r3
+            subchunks = r9
+            
+
+            subchunksLoop:    
+            ;while (subchunks-- > 0) {
+                with subchunks
+                sub #$0
+                beq endSubchunksLoop
+                nop
+                bmi endSubchunksLoop
+                dec subchunks
+            ;   var literalLength = decodeNext(literalTable)
+                iwt r0, #literalTable
+                ;TODO push/pop registers
+                ;todo create decode_next
+                
+                call decode_next
+                literalLength = r3
+        ;            while (literalLength-- > 0u) {
+                literalLengthLoop:
+                     with literalLength
+                     sub #$0
+                     beq endLiteralLengthLoop
+                     nop
+                     bmi endSubchunksLoop
+                     dec subchunks
+                         
+        ;                output[outIndex] = twoWordBuffer.readSourceByte().toByte()
+
+                         
+        ;                outIndex++
+        ;                outCounter--
+        ;            }
+                bra literalLengthLoop
+                nop
+                endLiteralLengthLoop
+            ;        if (subchunks > 0 ) {
+            ;            val offset = decodeNext(lengthTable) + 1u
+            ;            var count :Int = (decodeNext(positionTable) + 2u).toInt()
+            ;            while ((count--) !=0) {
+            ;                if (offset.toInt() >= 0x4000) {
+            ;                    System.out.println("offset ${offset} is too large ")
+            ;                }
+            ;                output[outIndex] = output[(outIndex - offset.toInt()) ]
+            ;                outIndex++
+            ;                outCounter--
+            ;            }
+            ;        }
+            ;    }
+            bra subchunksLoop
+            nop
+            endSubchunksLoop:
+
+        ; } while (outCounter > 0)
+            with outCounter
+            sub #$0
+            beq endOutCounterLoop
+            nop
+            bpl outCounterLoop
+            nop
+        endOutCounterLoop:
+    
+
     return
     endfunction
 
@@ -109,7 +190,7 @@
 
     ; reads r0 bits from the rnc bitstream
     ; r0 = number of bits to read
-    ; clobbers r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14
+    ; clobbers r0, r1,r2,r3,r4,r5,r10,r12,r13,r14
     ; returns r3 = bits read
     function read_buffer
     
@@ -178,8 +259,9 @@
 
     ;R0 = address of hufftree
     function init_hufftree
-        move r1,r0 ; r1 = address of hufftree
-        
+        address = r0
+        move r1,address ; r1 = address of hufftree
+        iwt r0, #$5 ;r0 = bits to read
         ;Read number of nodes
         gsu_stack_push r1
         for .sizeof(hufftree)

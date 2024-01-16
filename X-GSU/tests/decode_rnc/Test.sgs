@@ -1,0 +1,63 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+
+
+.segment "GSURAM"
+;.res 1 ; hack to byte align
+INPUT:
+.res 2
+OUTPUT:
+.res 342
+
+.segment "GSUCODE"
+GSU_Code:
+
+;Setup stack
+init_stack
+
+
+	; r0 = start of compressed rnc file
+    ; r1 = bank of compressed rnc file
+    ; r2 = hiword size of compressed rnc file
+    ; r3 = loword size of compressed rnc file
+	iwt r0, #(.loword(badapple))
+	iwt r1, #(.hiword(badapple))
+	iwt r2, #$0
+	iwt r3, #$7B
+	call initialize_buffer
+
+    ; r0 = start of compressed data
+    ; r1 = bank of compressed data
+    ; r2 = start of uncompressed data; must be preallocated
+    ; r3 = bytes to decompress
+	iwt r0, #(.loword(badapple))
+	iwt r1, #(.hiword(badapple))
+	iwt r2, #OUTPUT
+	iwt r3, #$7B
+	call decompress
+	
+	nop
+	nop
+	nop
+	nop
+	test_stop:
+	nop
+	stop
+	nop
+
+
+;Code goes in code segment
+.include "../../gsu_maths/gsu_sqrt.i"
+.include "../../gsu_maths/gsu_vector.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_camera.i"
+.include "../../rnc/gsu_decompress.i"
