@@ -15,6 +15,43 @@
 
     .segment "GSUCODE"
 
+
+
+    ;This sets up a two byte RNC buffer. The buffer is read using the
+    ; read and peek functions defined in this file. 
+    ; 
+    ;
+    ;
+    ; r0 = start of compressed rnc file
+    ; r1 = bank of compressed rnc file
+    ; r2 = hiword size of compressed rnc file
+    ; r3 = loword size of compressed rnc file
+    function initialize_buffer
+        ;RNC_WORD_BUFFER
+        ;from r1
+        ;romb
+        
+        add #9;move to start of compressed data
+        add #9;move to start of compressed data
+
+        ;move r14,r0
+        sm (RNC_WORD_BUFFER + rncbuffer::bank), r1
+        sm (RNC_WORD_BUFFER + rncbuffer::address), r0
+        sm (RNC_WORD_BUFFER + rncbuffer::size), r2
+        sm (RNC_WORD_BUFFER + rncbuffer::size +2), r3
+        iwt r3, #$12
+        sm (RNC_WORD_BUFFER + rncbuffer::index + 2),r3
+
+        ; initialize index, word, count to 0
+        iwt r3, #$0
+        sm (RNC_WORD_BUFFER + rncbuffer::index),r3
+        sm  (RNC_WORD_BUFFER + rncbuffer::word), r3; word
+        sm  (RNC_WORD_BUFFER + rncbuffer::count), r3; count
+
+        return
+    endfunction
+
+
     ; reads a rnc header from the cart and storees data in RNC_HEADER
     ; In : r0 = start of header data
     ; Out : r3 = address of header
@@ -55,7 +92,7 @@
     ; r2 = start of uncompressed data; must be preallocated
     ; r3 = number of bytes to decompress
     ; decompress data. 
-    function decompress
+        function decompress
         from r1
         romb
         move r6, r3
@@ -101,19 +138,17 @@
                 dec subchunks
             ;   var literalLength = decodeNext(literalTable)
                 iwt r0, #literalTable
-                ;TODO push/pop registers
-                ;todo create decode_next
-                
-                call decode_next
-                literalLength = r3
-        ;            while (literalLength-- > 0u) {
+                ; TODO call decode_next
+                literalLength = r3 ;;TODO push/pop registers, todo create decode_next
+        ;       while (literalLength-- > 0u) {
                 literalLengthLoop:
                      with literalLength
                      sub #$0
                      beq endLiteralLengthLoop
                      nop
                      bmi endSubchunksLoop
-                     dec subchunks
+                     nop
+                     dec literalLength
                          
         ;                output[outIndex] = twoWordBuffer.readSourceByte().toByte()
 
@@ -123,7 +158,7 @@
         ;            }
                 bra literalLengthLoop
                 nop
-                endLiteralLengthLoop
+                endLiteralLengthLoop:
             ;        if (subchunks > 0 ) {
             ;            val offset = decodeNext(lengthTable) + 1u
             ;            var count :Int = (decodeNext(positionTable) + 2u).toInt()
@@ -152,40 +187,6 @@
     
 
     return
-    endfunction
-
-    ;This sets up a two byte RNC buffer. The buffer is read using the
-    ; read and peek functions defined in this file. 
-    ; 
-    ;
-    ;
-    ; r0 = start of compressed rnc file
-    ; r1 = bank of compressed rnc file
-    ; r2 = hiword size of compressed rnc file
-    ; r3 = loword size of compressed rnc file
-    function initialize_buffer
-        ;RNC_WORD_BUFFER
-        ;from r1
-        ;romb
-        
-        add #9;move to start of compressed data
-        add #9;move to start of compressed data
-
-        ;move r14,r0
-        sm (RNC_WORD_BUFFER + rncbuffer::bank), r1
-        sm (RNC_WORD_BUFFER + rncbuffer::address), r0
-        sm (RNC_WORD_BUFFER + rncbuffer::size), r2
-        sm (RNC_WORD_BUFFER + rncbuffer::size +2), r3
-        iwt r3, #$12
-        sm (RNC_WORD_BUFFER + rncbuffer::index + 2),r3
-
-        ; initialize index, word, count to 0
-        iwt r3, #$0
-        sm (RNC_WORD_BUFFER + rncbuffer::index),r3
-        sm  (RNC_WORD_BUFFER + rncbuffer::word), r3; word
-        sm  (RNC_WORD_BUFFER + rncbuffer::count), r3; count
-
-        return
     endfunction
 
     ; reads r0 bits from the rnc bitstream

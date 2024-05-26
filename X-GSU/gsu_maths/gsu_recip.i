@@ -30,10 +30,10 @@
 ; In : R0 fixed88 the value to return the reciprocal of
 ; Out : R3 a fixed016 reciprocal
 function reciprocal016
-    .define dividend1 r1
-	.define divisor1 r2
-	.define remainder1 r3
-	.define quotient1 r0
+    register  dividend1 = r1
+	register  divisor1 = r2
+	register  remainder1 = r3
+	register  quotient1 = r0
 
 	iwt dividend1, #$1
 	move divisor1, r0
@@ -66,20 +66,30 @@ endfunction
 ; In : R0 fixed88 the value to return the reciprocal of
 ; Out : R3 a fixed88 reciprocal
 function reciprocal
-    .define dividend r1
-	.define divisor r2
-	.define remainder r3
-	.define quotient r0
+    register dividend = r1
+	register divisor  = r2
+	register remainder = r3
+	register quotient  = r0
 
+	
 	iwt dividend, #$1
 	move divisor, r0
-	iwt r12, #$10; loop 16 times 
 	move remainder, dividend; 
 	iwt quotient, #0 ; r0 =  () 
 	
-
+	iwt r12, #$10; loop 16 times 
 	iwt	r13, #divide_loop
 	
+	gsu_stack_push divisor
+	with divisor
+	add #$0
+	bpl divide_loop
+		nop
+		with divisor 
+		not
+		with divisor 
+		add #$1
+
 	divide_loop:
 		with remainder
 		add remainder
@@ -94,8 +104,18 @@ function reciprocal
 	lp: 	
 		loop
 		nop
-		move r3, r0
-	return 
+		gsu_stack_pop divisor
+		with divisor
+		add #0
+		bmi negate
+		    nop
+			move r3, r0
+			return
+		negate:
+			not
+			add #$1
+			move r3, r0
+			return 
 endfunction
 
 

@@ -32,67 +32,67 @@ function gsu_sqrt32
 	;  remainder0 = partial_dividend0
 	;  RETURN (root0, remainder0)
 	
-	.define dividend0 r1
-	.define dividendhi r5
-	.define partial_dividend0 r4
-	.define root0 r3
-	.define divisor0 r0
+	 dividend =r1
+	 dividendhi= r5
+	 partial_dividend =r4
+	 root =r3
+	 divisor =r0
 
 	move dividendhi, r0
 
-	iwt partial_dividend0, #$0 ; 
+	iwt partial_dividend, #$0 ; 
 	iwt r12, #$F ; loop 16 times 
-	iwt root0, #0 ; r3 =  ()  [should end up 238/EE]
-	iwt divisor0, #0 ; r0 =  () 
+	iwt root, #0 ; r3 =  ()  [should end up 238/EE]
+	iwt divisor, #0 ; r0 =  () 
 	
 
-	iwt	r13, #square_root0_loop
-	with dividend0
-	square_root0_loop:
+	iwt	r13, #square_root_loop
+	with dividend
+	square_root_loop:
 	;shift dividend0(r1) right 2 and put overflow into partial_dividend0(r2)
 		
-		add dividend0
+		add dividend
 		with	dividendhi
 		rol
-		with partial_dividend0 
+		with partial_dividend
 		rol
 
-		with dividend0
-		add dividend0
+		with dividend
+		add dividend
 		with	dividendhi
 		rol
-		with partial_dividend0
+		with partial_dividend
 		rol
 
 	;divisor0 = 4*root0+1
-		from root0
-		add root0 ; r0 = 2*root0
-		add divisor0; r0 = 4*root0
+		from root
+		add root ; r0 = 2*root0
+		add divisor; r0 = 4*root0
 		add #$1 ; divisor0 = $*root0+1
 	; cmp divisor0 < partial_dividend0
-		cmp partial_dividend0; r0-r2
+		cmp partial_dividend; r0-r2
 		bmi sqrtElse;
 		nop
 		beq sqrtElse;
 		nop
 	;      root0 = root0 * 2
-		with root0
-		add root0 ; root0 = 2*root0
+		with root
+		add root ; root0 = 2*root0
 		bra lp
 		nop
 	sqrtElse:
 	;      partial_dividend0 -= divisor0
 	;      root0 = root0 * 2 + 1
-		with partial_dividend0
-		sub divisor0
-		with root0
-		add root0
-		with root0
+		with partial_dividend
+		sub divisor
+		with root
+		add root
+		with root
 		add #$1 	
 		
 	lp:
 	loop
-	with dividend0
+	with dividend
 	from r0
 	to r3
 	sub #1
@@ -119,61 +119,61 @@ function gsu_sqrt_int_in
 	;  remainder0 = partial_dividend0
 	;  RETURN (root0, remainder0)
 	move r1, r0
-	.define dividend2 r1
-	.define partial_dividend2 r2
-	.define root2 r3
-	.define divisor2 r0
-	.define remainder2 r5
+	 dividend = r1
+	 partial_dividend = r2
+	 root = r3
+	 divisor = r0
+	 remainder = r5
 
 	
-	iwt partial_dividend2, #$0 ; 
+	iwt partial_dividend, #$0 ; 
 	iwt r12, #$F ; loop $13 times
-	iwt root2, #0 ; r3 =  () 
-	iwt divisor2, #0 ; r0 =  () 
-	iwt remainder2, #0 ; () 
+	iwt root, #0 ; r3 =  () 
+	iwt divisor, #0 ; r0 =  () 
+	iwt remainder, #0 ; () 
 
-	iwt	r13, #square_root2_loop
+	iwt	r13, #square_root_loop
 
-	square_root2_loop:
+	square_root_loop:
 	;shift dividend0(r1) right 2 and put overflow into partial_dividend0(r2)
-		with dividend2
-		add dividend2
-		with partial_dividend2
+		with dividend
+		add dividend
+		with partial_dividend
 		rol
 
-		with dividend2
-		add dividend2
-		with partial_dividend2
+		with dividend
+		add dividend
+		with partial_dividend
 		rol
 
 	;divisor0 = 4*root0+1
-		from root2
-		add root2 ; r0 = 2*root0
-		add divisor2; r0 = 4*root0
+		from root
+		add root ; r0 = 2*root0
+		add divisor; r0 = 4*root0
 		add #$1 ; divisor0 = $*root0+1
 	; cmp divisor0 < partial_dividend0
-		cmp partial_dividend2; r0-r2
+		cmp partial_dividend; r0-r2
 		bmi sqrtElse;
 		nop
 		beq sqrtElse;
 		nop
 	;      root0 = root0 * 2
-		with root2
-		add root2 ; root0 = 2*root0
+		with root
+		add root ; root0 = 2*root0
 		bra lp
 		nop
 	sqrtElse:
 	;      partial_dividend0 -= divisor0
 	;      root0 = root0 * 2 + 1
-		with partial_dividend2
-		sub divisor2
-		with root2
-		add root2
-		with root2
+		with partial_dividend
+		sub divisor
+		with root
+		add root
+		with root
 		add #$1 	
 		
 	lp:
-	move remainder2,partial_dividend2
+	move remainder,partial_dividend
 	loop
 	nop
 	move r3,r0

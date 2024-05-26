@@ -4,7 +4,9 @@ __VARS_DEFINED__ = 1
 .include "structs.i"
 
 .segment "GSURAM"
-
+gsu_stack_ram:
+	.res .sizeof(gsu_stack)
+	
 ;Temp variables for return vectors
 LOOKAT_ZAXIS:
   .res .sizeof(vector3)
@@ -64,9 +66,17 @@ RNC_LENGTH_TABLE:
 RNC_POSTION_TABLE:
 	.res .sizeof(hufftree)
 
+;val literalTable = HuffTree();
+literalTable:
+	.res .sizeof(hufftree)
 
-gsu_stack_ram:
-	.res .sizeof(gsu_stack)
-	
+;val lengthTable = HuffTree();
+lengthTable:
+	.res .sizeof(hufftree)
+
+;val positionTable = HuffTree();
+positionTable:
+	.res .sizeof(hufftree)
+
 
 .endif

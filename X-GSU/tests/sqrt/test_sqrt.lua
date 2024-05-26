@@ -8,10 +8,10 @@ index = 1
 output = 0x0
 fail = 0
 
-input_addr  = 0x0718
-output_addr  = 0x071C
+input_addr  = 0x0A5E
+output_addr  = 0x0A62
 test_setup = 0x0003
-test_stop = 0x0034
+test_stop = 0x0024
 function setupFirstTest(address, value)
 	emu.log("setup")
 	emu.log(string.format("0x%04x%04x",input_high[1],input_low[1]))

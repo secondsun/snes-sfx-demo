@@ -32,6 +32,11 @@
 	nop
 .endmacro
 
+;This register ignores the register keyword
+.macro register params
+  params	
+.endmacro
+
 .macro endfunction
    .endscope
 .endmacro

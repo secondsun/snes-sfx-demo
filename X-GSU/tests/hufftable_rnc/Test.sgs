@@ -17,17 +17,6 @@ INPUT:
 .res 2
 OUTPUT:
 .res 2
-;val literalTable = HuffTree();
-literalTable:
-	.res .sizeof(hufftree)
-
-;val lengthTable = HuffTree();
-lengthTable:
-	.res .sizeof(hufftree)
-
-;val positionTable = HuffTree();
-positionTable:
-	.res .sizeof(hufftree)
 
 .segment "GSUCODE"
 GSU_Code:

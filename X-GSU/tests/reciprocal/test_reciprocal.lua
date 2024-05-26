@@ -9,9 +9,11 @@ index = 1
 output = 0x0
 fail = 0
 
+INPUT_ADDRESS = 0xA8E
+OUTPUT_ADDRESS = 0xA90
 function setupFirstTest(address, value)
 	--emu.log(string.format("%x",input[index]))
-	emu.writeWord(0x5E0,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(INPUT_ADDRESS,input[index],emu.memType.gsuWorkRam)
 end
 
 emu.addMemoryCallback(setupFirstTest,
@@ -22,11 +24,11 @@ emu.addMemoryCallback(setupFirstTest,
 					  emu.memType.gsuWorkRam)
 
 function setNextInput()
-	emu.writeWord(0x5E0,input[index],emu.memType.gsuWorkRam)
+	emu.writeWord(INPUT_ADDRESS,input[index],emu.memType.gsuWorkRam)
 end
 
 function compareAndLogOutput(address, value)
-	local read = emu.readWord(0x5E2,emu.memType.gsuWorkRam,false)
+	local read = emu.readWord(OUTPUT_ADDRESS,emu.memType.gsuWorkRam,false)
 
 	emu.log("Checking")
 
@@ -38,6 +40,9 @@ function compareAndLogOutput(address, value)
 		emu.log(index)
 
 		emu.log(string.format("Error reciprocal(%x) was %x expected %x", input[index],read,expected[index]))
+		emu.breakExecution()
+    else 
+    	emu.log("good")	   
 	end
 	index=index+1
 	loopOrExit()
@@ -52,7 +57,8 @@ function loopOrExit()
 		setNextInput()
 	end
 end
-
+ 
+ 
 
 emu.addMemoryCallback(compareAndLogOutput,
 					  emu.callbackType.exec,
