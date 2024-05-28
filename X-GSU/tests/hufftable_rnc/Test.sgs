@@ -77,8 +77,4 @@ init_stack
 
 
 ;Code goes in code segment
-.include "../../gsu_maths/gsu_sqrt.i"
-.include "../../gsu_maths/gsu_vector.i"
-.include "../../gsu_maths/gsu_recip.i"
-.include "../../gsu_maths/gsu_camera.i"
 .include "../../rnc/gsu_decompress.i"
