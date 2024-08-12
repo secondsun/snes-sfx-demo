@@ -395,10 +395,7 @@
         bra init_encoding
         nop            
         end_init_encoding:
-        
-
-
-
+    
     return
     endfunction
 

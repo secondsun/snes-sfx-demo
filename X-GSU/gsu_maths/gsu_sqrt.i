@@ -32,11 +32,11 @@ function gsu_sqrt32
 	;  remainder0 = partial_dividend0
 	;  RETURN (root0, remainder0)
 	
-	 dividend =r1
-	 dividendhi= r5
-	 partial_dividend =r4
-	 root =r3
-	 divisor =r0
+	 register dividend =r1
+	 register dividendhi= r5
+	 register partial_dividend =r4
+	 register root =r3
+	 register divisor =r0
 
 	move dividendhi, r0
 
