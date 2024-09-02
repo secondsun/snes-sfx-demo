@@ -22,29 +22,37 @@ test_setup:
 nop
 nop
 nop
+iwt r12, #$D
+iwt r13, #test_call
 
 
 ;This label represents the memory address that begins test execution
 test_call:
+	gsu_stack_push r12
+	gsu_stack_push r13
 	call camera_lookAt
 	;LET MEMORY SETTLE
  	nop
 	nop
 	nop
 	nop
+	gsu_stack_pop r13
+	gsu_stack_pop r12
 	nop
 	nop
 	nop
+	
 ;This label represents the memory address that ends test execution.
 ;The test will loop back to test_call after reaching this label.  
 ; The lua script will check values here and prepare for the next loop
 test_stop:    
+	loop
 	nop
 	nop
 	stop
 	nop
 
-
+.res 0
 	;Code goes in code segment
 .include "../../gsu_maths/gsu_sqrt.i"
 .include "../../gsu_maths/gsu_vector.i"

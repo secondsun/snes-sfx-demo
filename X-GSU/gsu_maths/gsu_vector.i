@@ -422,10 +422,10 @@ function vector3_normalize
   bmi small
   nop
 big:  ;calculate using 16 fractional bits and no int bit
-  call _normalize_big
+  call _normalize_big ;todo change back
   return 
 small:  ;calculate using 8 fractional bits and 8 int bits
-  call _normalize_small
+  call _normalize_big
   return  
 endfunction
 

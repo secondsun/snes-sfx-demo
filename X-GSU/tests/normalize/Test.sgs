@@ -52,7 +52,6 @@ test_stop:
 	stop
 	nop
 
-
 .res 1
 ;Code goes in code segment
 .include "../../gsu_maths/gsu_sqrt.i"

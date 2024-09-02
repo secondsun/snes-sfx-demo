@@ -10,6 +10,7 @@
 .include "libSFX.i"
 
 .segment "GSURAM"
+.res 1
 INPUT:
 .res 2
 OUTPUT:
