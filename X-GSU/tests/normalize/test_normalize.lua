@@ -3,8 +3,12 @@
 --emu.log(emu.getLabelAddress("input"))
 --input = {0x1833, 0x48e6,0x30cd, 0xFF77,0x0000,0x0044}
 --expected = {0x0044, 0x00cd, 0x0089,0xff1b,0x0,0x0072}
-expected = {0x0044, 0x00cd, 0x0089}
+input = {0x0000,0x7f00,0x7f00}
+expected =  {0x0, 0x181, 0x181}
+CAMERA = 0x724
+NORMAL_OUT = 0x6F0
 index = 1
+in_index = 1
 output = 0x0
 fail = 0
 
@@ -16,7 +20,7 @@ function compareAndLogOutput(address, value)
 	emu.log("Checking")
 	while (index <= 3)
 	do 
-		local read = emu.readWord(0x44C + 2*(index -1),emu.memType.gsuWorkRam,false)
+		local read = emu.readWord(NORMAL_OUT + 2*(index -1),emu.memType.gsuWorkRam,false)
 		if read ~= expected[index] then
 			fail = 1
 			emu.log(expected[index])
@@ -29,10 +33,28 @@ function compareAndLogOutput(address, value)
 	emu.breakExecution()
 end
 
+function setupInput(address, value)
+	--local read = emu.readWord(0x36A + 2*(index -1),emu.memType.gsuWorkRam,false)
+
+	emu.log("Updating")
+	while (in_index <= 3)
+	do 
+		emu.writeWord(CAMERA + 2*(in_index -1), input[in_index], emu.memType.gsuWorkRam)
+		in_index=in_index+1
+	end
+	
+end
+
+emu.addMemoryCallback(setupInput,
+					  emu.callbackType.exec,
+					  0x0004,
+					  0x0004,
+					  4,
+					  emu.memType.gsuWorkRam)
 
 emu.addMemoryCallback(compareAndLogOutput,
 					  emu.callbackType.exec,
-					  0x0051,
-					  0x0051,
+					  0x0013,
+					  0x0013,
 					  4,
 					  emu.memType.gsuWorkRam)

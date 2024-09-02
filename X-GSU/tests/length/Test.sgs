@@ -9,10 +9,6 @@
 .include "../../common/var.i"
 .include "libSFX.i"
 
-.macro init_vectors
-	
-
-.endmacro
 
 
 .segment "GSURAM"
@@ -26,7 +22,6 @@ GSU_Code:
 
 ;Setup stack
 init_stack
-init_vectors
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
