@@ -15,20 +15,18 @@
 
 ;Returns the Address to a copy vector of the input vector
 ; Input : R0 address of vector to copy
-; Input : VECTOR_COPY_IN address of vector to copy to
+; Input : R2 address of vector to copy to
 ; Output : R3 address to vector (copied)
 
  function vector3_copy  
-   move r1, r0
-   lm r2, (VECTOR_COPY_IN)
+
    move r3, r2
   for 3
-    ldw (r1)
+    ldw (r0)
     stw (r2)
 
     with r2
     add #2
-    with r1
     add #2
   endfor
    
@@ -37,7 +35,7 @@ endfunction
 
 ;Returns the Address to a cross vector of the input vectors
 ; Input : R0 address to vector to cross from
-; Input : VECTOR_CROSS_IN address of second vector to cross
+; Input : R1 address of second vector to cross
 ; Output : R3,VECTOR_CROSS_OUT  address to vector  result
 ; Clobbers All
 function vector3_cross
@@ -48,7 +46,7 @@ function vector3_cross
   ;(r0)*(VECTOR_CROSS_IN+2)-(r0+2*(VECTOR_CROSS_IN))
 ;)
   ;Initialize
-  lm r1, (VECTOR_CROSS_IN)
+  
 
   ;Adjust  R0, VECTOR_CROSS_IN to (r0+2),(VECTOR_CROSS_IN+4)
   add #2
@@ -201,14 +199,14 @@ endfunction
 
 ;Returns the dot product of two input vectors
 ; Input : R0 left vector of dot
-; Input : VECTOR_CROSS_IN right vector of dot
+; Input : R1 right vector of dot
 ; Output : fixed 8.8 dot product 
 ; Clobbers All
 function vector3_dot
   
   ;r0 = &a.x
   ;r1 = &b.x
-  lm r1, (VECTOR_DOT_IN)
+  
 
   ;r6 = a.x
   ;r5 = b.x
@@ -359,14 +357,13 @@ endfunction
 
 ;Returns the Address to a normalize vector of the input vector
 ; Input : R0 address to vector to subtract from
-; Input : VECTOR_SUBTRACT_IN address of vector to subtract
+; Input : R3 address of vector to subtract
 ; Output : R3,VECTOR_SUBTRACT_OUT  address to vector 
 ; Clobbers All
-function vector3_subtract
+function vector3_subtract;camera.from = r0/r1 ;camera.to = r3/r2 
   to r1 
   ldw (r0)
   add #2 ;bump up r0 = in.y
-  lm r3, (VECTOR_SUBTRACT_IN)
   to r2
   ldw (r3)
   with r3
@@ -413,7 +410,25 @@ function vector3_normalize
   ;Check the length and determine if we will 
   ;use a reciprocal that returns 8 or 16 fractional bits
   move r0, r3
+  iwt r5, #1 ;r5 = 1 using 8 frac bits
+  hib
+  cmp r5 ;if r0 > 1 (z=0 and s=0)
+  move r0, r3
+  beq small
+  nop
+  bmi small
+  nop
+big:  ;calculate using 16 fractional bits and no int bit
+  call _normalize_big
+  return 
+small:  ;calculate using 8 fractional bits and 8 int bits
+  call _normalize_small
+  return  
+endfunction
 
+;Private
+;calculate using 16 fractional bits and no int bit
+function _normalize_big
   call reciprocal016 ;R3 = 1/length
   ;retrieve referece to in from stack
   move r6, r3 ; Beging preparations for multiplies
@@ -444,7 +459,59 @@ function vector3_normalize
   
   iwt r3, #vector_normalize_out
   return
+endfunction
 
+;calculate using 8 fractional bits and 8 int bit
+function _normalize_small
+  call reciprocal ;R3 = 1/length
+  ;retrieve referece to in from stack
+  move r6, r3 ; Beging preparations for multiplies
+  ; Get in from stack
+  lm r1, (_normalize_small_big_reciprocal_temp) ; R1 = addr of vector to get value of
+  iwt r2, #vector_normalize_out
+
+  ;(vector_normalize_out.x) = (R1.x * R6)
+  ldw (r1) ;R0 = in.x
+  to r7
+  lmult ; r4 = decimal bits
+  move r8,r4
+  with r7
+  swap
+  merge ; fixed 88 of this.x*1/len
+  
+  stw (r2)
+  with r1
+  add #$2 ; R1 = R1.y
+  with r2
+  add #$2 ; R2 = memory address to write to
+  ldw (r1) ;R0 = in.x
+  
+  to r7
+  lmult ; r4 = decimal bits
+  move r8,r4
+  with r7
+  swap
+  merge ; r0  = fixed 88 of this.y*1/len
+
+  stw (r2)
+  with r1
+  add #$2 ; R1 = R1z
+  with r2
+  add #$2 ; R2 = memory address to write to
+
+  ldw (r1) ; ;R0 = in.z
+  to r7
+  lmult ; r4 = decimal bits
+  move r8,r4
+  with r7
+  swap
+  merge ; r0  = fixed 88 of this.z*1/len
+
+  stw (r2)
+  
+  iwt r3, #vector_normalize_out
+
+  return
 endfunction
 
 ;Vector.length  puts in r1 the memory address of the vector to get the length of
@@ -584,12 +651,11 @@ function vector3_transform
   endfor
 
 
-  move r1, r0
+  move r2, r0
   
   to r0
   from r10
   sub #6
-  sm (VECTOR_COPY_IN), r1
   call vector3_copy
   
   ;cleanup temp stack values
