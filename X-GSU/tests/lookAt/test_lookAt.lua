@@ -62,7 +62,7 @@ function setupInput(address, value)
 	emu.log("Updating")
 	while (in_index <= 12)
 	do 
-		emu.writeWord(CAMERA + 2*(in_index -1), input[case_index*12 + in_index], emu.memType.gsuWorkRam)
+		emu.writeWord(CAMERA + 2*(in_index -1), input[(case_index*9) + in_index], emu.memType.gsuWorkRam)
 		in_index=in_index+1
 	end
 	
