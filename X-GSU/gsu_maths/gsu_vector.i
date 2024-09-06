@@ -19,16 +19,33 @@
 ; Output : R3 address to vector (copied)
 
  function vector3_copy  
-
+   move r1,r0
    move r3, r2
-  for 3
-    ldw (r0)
+  
+    ldw (r1)
     stw (r2)
 
     with r2
     add #2
+    with r1
     add #2
-  endfor
+  
+    ldw (r1)
+    stw (r2)
+
+    with r2
+    add #2
+    with r1
+    add #2
+  
+    ldw (r1)
+    stw (r2)
+
+    with r2
+    add #2
+    with r1
+    add #2
+  
    
    return
 endfunction
