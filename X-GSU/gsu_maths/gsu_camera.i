@@ -67,15 +67,15 @@ camera_lookAt_XAXIS:
     ;copy the normalized vector to YAXIS @r0 = @VECTOR_COPY_IN
     call vector3_copy
 
-    iwt r1, #(CAMERA + camera::eye)
     iwt r0, #(__LOOKAT_XAXIS__)
+    iwt r1, #(CAMERA + camera::eye)
     call vector3_dot
 
     fixed88_negate r3
     sm (LOOKAT_MATRIX + 6),r3
 
-    iwt r1, #(CAMERA + camera::eye)
     iwt r0, #(__LOOKAT_YAXIS__)
+    iwt r1, #(CAMERA + camera::eye)
     call vector3_dot
 
     fixed88_negate r3
