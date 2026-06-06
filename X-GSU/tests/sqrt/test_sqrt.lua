@@ -17,7 +17,7 @@ function setupFirstTest(address, value)
 	emu.log(string.format("0x%04x%04x",input_high[1],input_low[1]))
 	emu.writeWord(input_addr,input_high[1],emu.memType.gsuWorkRam)
 	emu.writeWord(input_addr + 2,input_low[1],emu.memType.gsuWorkRam)
-	emu.breakExecution()
+	--emu.breakExecution()
 end
 
 emu.addMemoryCallback(setupFirstTest,
@@ -49,8 +49,9 @@ end
 function loopOrExit()
 	if index > 1 then
 		emu.log("Done")
-		--emu.stop(fail)
-		emu.breakExecution()
+		emu.stop(fail)
+		--emu.breakExecution()
+		
 	else
 		setNextInput()
 	end

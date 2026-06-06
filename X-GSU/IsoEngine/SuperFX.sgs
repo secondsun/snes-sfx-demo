@@ -1,0 +1,84 @@
+.include "libSFX.i"
+
+
+;This draws tree.bin
+; Tree.bin is 0x1f columns 
+; Tree.bin is 4bpp data (two pixels per cell)
+; Tree.bin is 0x3f rows
+
+.segment "GSUCODE"
+;lines = 0xA0
+GSU_Code:
+.export GSU_Code
+
+resetFrameBuffer:
+iwt r0,#0
+cmode
+iwt r1, #$4000
+iwt r12, #$1400
+cache
+move r13, r15
+  stw(r1)
+  inc r1
+  loop
+  inc r1
+  
+
+init_gsu_main:
+	iwt r1, #0 ;x = 0
+	iwt r2, #0 ;y = 0
+	iwt r13, #gsu_main ; loop return
+	iwt r12, #172 ;loop counter
+
+	iwt r4, #240 ;how many horizontal pixels
+
+	from r2
+gsu_main:
+
+	and #$F
+	color
+
+	plot
+	plot
+	plot
+	plot
+
+	plot
+	plot
+	plot
+	plot
+
+	plot
+	plot
+	plot
+	plot
+
+	plot
+	plot
+	plot
+	plot
+
+	from r4; if x > 240
+	cmp r1
+	blt gsu_main ; jump to main	with r1 is executed due to pipeliing
+	from r2
+
+	; else draw new line
+	iwt r1, #0 ;x = 0
+	inc r2; y++
+	loop
+	from r1
+
+
+finish:
+
+	shutdown:
+	rpix
+	rpix
+	stop
+	nop
+	nop
+	nop
+
+
+.segment "GSURAM"

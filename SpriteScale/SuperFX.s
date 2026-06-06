@@ -24,10 +24,7 @@ Main:
         HDMA_set_absolute 3, 2, $E, HDMA2
 
         RW a8
-        lda #$3F
-        sta $210F
-        sta $210F
-        
+
         lda #$70
         sta $210F
         sta $210F
