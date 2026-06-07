@@ -28,7 +28,7 @@ init_gsu_main:
 	iwt r1, #0 ;x = 0
 	iwt r2, #0 ;y = 0
 	iwt r13, #gsu_main ; loop return
-	iwt r12, #172 ;loop counter
+	iwt r12, #256 ;loop counter
 
 	iwt r4, #240 ;how many horizontal pixels
 

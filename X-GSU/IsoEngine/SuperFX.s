@@ -16,35 +16,25 @@ Main:
 	VRAM_memcpy VRAM_tilemap, Map, Map_end - Map
         
 
-        RW a8
         
         ;Configure GSU
         initGSU_4bpp_obj 
-        phb
-        RW a8
         
-        plb
+        ;Start running snes cpu from work ram
         jml __MAIN_LOOP_RUN__
 
 .SEGMENT "MAIN_LOOP"
 Main2:
-        ;Start GSU
-        ;gsuOn
-
-        RW a16
-        lda #0
-        sub #10
-        RW a8
-        sta BG1VOFS
-        xba
-        sta BG1VOFS
-        
         ;Set up screen mode
         lda     #bgmode(BG_MODE_1, BG3_PRIO_NORMAL, BG_SIZE_8X8, BG_SIZE_8X8, BG_SIZE_8X8, BG_SIZE_8X8)
         sta     BGMODE
         lda     #bgsc(VRAM_tilemap, SC_SIZE_32X32)	;position of map and tiles for images
+        sta     BG1SC
+        
+        ldx     #bg12nba(VRAM_screen_1, 0)
         stx     BG12NBA
-        lda     #tm(OFF, ON, OFF, OFF, OFF)	;screen buffer use
+        
+        lda     #tm(ON, OFF, OFF, OFF, OFF)	;screen buffer use
         sta     TM
 
         
@@ -60,7 +50,15 @@ Main2:
         ;Turn on screen
         lda     #inidisp(ON, DISP_BRIGHTNESS_MAX)
         sta     SFX_inidisp
+        
 
+        lda #$0
+        sta BG1VOFS
+        sta BG1VOFS
+        lda #$0
+        sta BG1HOFS
+        sta BG1HOFS
+        
         
         VBL_set Vblank
         VBL_on
@@ -85,15 +83,10 @@ gsu_is_idle:
 
 
 Vblank:
-        stz HDMAEN ; disable HDMA
         lda #$0
         sta BG1VOFS
         lda #$0
         sta BG1HOFS
-        lda #$11
-        sta MOSAIC
-        lda #$0C
-        sta HDMAEN
         
 
         ;RW_forced a8i8
@@ -121,8 +114,9 @@ drawScreen2:
                 VRAM_memcpy (VRAM_screen_2 + screenbuffer_len), (screenbuffer ), screenbuffer_len
                 stz z:SFX_buffer_position ;sfx reads from start of work ram
                 stz z:VRAM_screen_select ; write to the other screen
-                
-               ; gsuOn
+                ldx     #bg12nba(VRAM_screen_2, 0)
+                stx     BG12NBA
+               
                 endVBlank
         :;copyFromStart:        
                 VRAM_memcpy VRAM_screen_2, screenbuffer, screenbuffer_len
@@ -141,7 +135,9 @@ drawScreen1:
                 sta z:SFX_buffer_position ;sfx reads from start of work ram
                 lda #$01
                 sta z:VRAM_screen_select ; write to the other screen
-                
+                ldx #bg12nba(VRAM_screen_1, 0)
+                stx BG12NBA
+
                 ;gsuOn
                 endVBlank
         copyFromStart:        
