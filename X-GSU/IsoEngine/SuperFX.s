@@ -59,6 +59,9 @@ Main2:
         sta BG1HOFS
         sta BG1HOFS
         
+        ;setup super fx vram buffer positions
+        stz z:SFX_buffer_position ;sfx reads from start of work ram
+        stz z:VRAM_screen_select ; write to the other screen
         
         VBL_set Vblank
         VBL_on
@@ -78,6 +81,8 @@ infinite_loop:
 gsu_is_idle:
     ; Code to handle the case where the Super FX is NOT running
     ; (e.g., preparing a new program or waiting for activation)
+    ldx z:SFX_buffer_position
+    stx GSU_R0
     gsuOn
     bra     infinite_loop
 

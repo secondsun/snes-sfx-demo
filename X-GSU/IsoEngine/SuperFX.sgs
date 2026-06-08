@@ -1,17 +1,12 @@
 .include "libSFX.i"
 
 
-;This draws tree.bin
-; Tree.bin is 0x1f columns 
-; Tree.bin is 4bpp data (two pixels per cell)
-; Tree.bin is 0x3f rows
-
 .segment "GSUCODE"
-;lines = 0xA0
 GSU_Code:
 .export GSU_Code
 
 resetFrameBuffer:
+move r3, r0       ; preserve the execution index passed from the CPU
 iwt r0,#0
 cmode
 iwt r1, #$4000
@@ -21,54 +16,46 @@ move r13, r15
   stw(r1)
   inc r1
   loop
+  nop
   inc r1
   
 
 init_gsu_main:
-	iwt r1, #0 ;x = 0
-	iwt r2, #0 ;y = 0
-	iwt r13, #gsu_main ; loop return
-	iwt r12, #256 ;loop counter
-
-	iwt r4, #240 ;how many horizontal pixels
-
-	from r2
-gsu_main:
-
-	and #$F
+	
+	iwt r0, #0
+	cmode
+	iwt r0, #8
 	color
 
+	iwt r0, #0
+	cmp r3
+	bne right_half
+	nop
+	iwt r4, #120      ; left half: first 8 pixels of a 16-pixel centered square
+	bra x_ready
+	nop
+right_half:
+	iwt r4, #0; right half: next 8 pixels of the same centered square
+x_ready:
+	iwt r2, #64; start Y for the centered square
+	iwt r13, #draw_square_row
+	iwt r12, #16; draw 16 rows
+
+	draw_square_row:
+	move r1, r4
+	plot
+	plot
+	plot
+	plot
 	plot
 	plot
 	plot
 	plot
 
-	plot
-	plot
-	plot
-	plot
-
-	plot
-	plot
-	plot
-	plot
-
-	plot
-	plot
-	plot
-	plot
-
-	from r4; if x > 240
-	cmp r1
-	blt gsu_main ; jump to main	with r1 is executed due to pipeliing
-	from r2
-
-	; else draw new line
-	iwt r1, #0 ;x = 0
-	inc r2; y++
+	
+	inc r2            ; move to the next row
 	loop
-	from r1
-
+	nop
 
 finish:
 
