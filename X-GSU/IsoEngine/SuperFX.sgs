@@ -1,9 +1,12 @@
 .include "libSFX.i"
-
+.include "../common/stack.i"
+.include "../common/function.i"
 
 .segment "GSUCODE"
 GSU_Code:
 .export GSU_Code
+
+init_stack
 
 resetFrameBuffer:
 move r3, r0       ; preserve the execution index passed from the CPU
@@ -21,8 +24,12 @@ move r13, r15
   
 
 init_gsu_main:
-	
-	iwt r0, #0
+	;set plot register options
+	; bit 0 = 0 Transparency On
+	; bit 1 = 0 dither off
+	; bit 2 = 0 upper 4 bit color off
+	; bit 3 = 1 sprite mode on
+	iwt r0, #$8
 	cmode
 	iwt r0, #8
 	color
@@ -57,6 +64,31 @@ x_ready:
 	loop
 	nop
 
+draw_polygon:
+	
+	;xPoints
+	move r3, r10
+	ibt r0, #$10
+	gsu_stack_push 
+	ibt r0, #$20
+	gsu_stack_push 
+	ibt r0, #$30
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	ibt r0, #$30
+	gsu_stack_push 
+	ibt r0, #$20
+	gsu_stack_push 
+	ibt r0, #$10
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$A
+
+	call draw_triangle
+
 finish:
 
 	shutdown:
@@ -66,6 +98,14 @@ finish:
 	nop
 	nop
 	nop
+
+.align 2
+xPoints:
+.dword $10, $20, $30
+yPoints:
+.dword $10, $20, $30
+
+.include "./triangle/drawTriangle.i"
 
 
 .segment "GSURAM"
