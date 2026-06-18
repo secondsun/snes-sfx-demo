@@ -8,7 +8,7 @@
 .include "libSFX.i"
 .include "../../common/stack.i"
 .include "../../common/function.i"
-
+.include "../../common/control.i"
 
 ; In : r3 = xPoints array pointer
 ;      r4 = yPoints array pointer
@@ -29,50 +29,37 @@ function draw_triangle
         ; yMin = yPoints[0]
         move yMin, yMax
 
-        ;    if (yPoints[1] < minY) minY = yPoints[1]
+        ;    if (yPoints[1] < yMin) yMin = yPoints[1]
         from r4 
         add #2
         ldw (r0)
-        cmp yMin
-        bge :+
-        nop
-        move yMin, r0
+        if_lt r0, yMin, {move yMin, r0}
         
-        : ;    if (yPoints[1] > maxY) maxY = yPoints[1]
-        cmp yMax
-        blt :+
-        nop
-        move yMax, r0
+
+        ;    if (yPoints[1] > yMax) yMax = yPoints[1]
+        if_gt r0, yMax, {move yMax, r0}
         
-        :;    if (yPoints[2] < minY) minY = yPoints[2]
+        ;    if (yPoints[2] < yMin) yMin = yPoints[2]
         from r4 
         add #4
         ldw (r0)
-        cmp yMin
-        bge :+
-        nop
-        move yMin, r0
+        if_lt r0, yMin, {move yMin, r0}
         
-        :;    if (yPoints[2] > maxY) maxY = yPoints[2]
-        cmp yMax
-        blt :+
-        nop
-        move yMax, r0
-        : ;skip
-
-        ;   minY = Math.max(0, minY)
-        sub r0
-        cmp yMin
-        blt :+
-        nop
-        move yMin, r0       
-        : ;   maxY = Math.min(height - 1, maxY)
+        
+        ;    if (yPoints[2] > yMax) yMax = yPoints[2]
+        if_gt r0, yMax, {move yMax, r0}
+        
+        ;clamp yMin and yMax to 0-172
+        ;   yMin = Math.max(0, yMin)
+        ;sub r0
+        if_gt r0, yMin, {move yMin, r0}
+        
+        ;   yMax = Math.min(172, yMax)
         iwt r0, #172
-        cmp yMax
-        bge :+
-        nop
-        move yMax, r0       
-        : ; skip
+        if_lt r0, yMax, {move yMax, r0}
+        
+        ; 
+
 
     return
 endfunction

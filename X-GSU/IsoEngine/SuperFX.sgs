@@ -70,18 +70,18 @@ draw_polygon:
 	move r3, r10
 	ibt r0, #$10
 	gsu_stack_push 
-	ibt r0, #$20
-	gsu_stack_push 
 	ibt r0, #$30
+	gsu_stack_push 
+	ibt r0, #$20
 	gsu_stack_push 
 
 	;yPoints
 	move r4, r10
-	ibt r0, #$30
-	gsu_stack_push 
 	ibt r0, #$20
 	gsu_stack_push 
-	ibt r0, #$10
+	ibt r0, #$60
+	gsu_stack_push 
+	ibt r0, #$40
 	gsu_stack_push 
 
 	;color
