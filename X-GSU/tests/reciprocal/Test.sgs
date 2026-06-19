@@ -7,6 +7,7 @@
 .include "../../common/function.i"
 .include "../../common/structs.i"
 .include "../../common/var.i"
+.include "../../common/control.i"
 .include "libSFX.i"
 
 .segment "GSURAM"
@@ -42,6 +43,11 @@ test_call:
 	nop
 	nop
 	nop
+	iwt r0, #$400
+	iwt r1, #$200
+	iwt r2, #$100
+	iwt r3, #$80
+	loop
 	nop
 	nop
 	nop

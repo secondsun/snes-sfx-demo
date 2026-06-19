@@ -148,8 +148,8 @@ endfunction
         .error "reciprocal_lookup: destination is required"
     .endif
 
-	ibt dest,#$3
-	from dest
+	ibt r14,#$3
+	from r14
     romb
 
 	iwt r14, #reciprocal_table
@@ -267,7 +267,7 @@ reciprocal_table:
 .word $02C8 ; (1/92)
 .word $02C1 ; (1/93)
 .word $02B9 ; (1/94)
-.word $git  ; (1/95)
+.word $02B2 ; (1/95)
 .word $02AB ; (1/96)
 .word $02A4 ; (1/97)
 .word $029D ; (1/98)
