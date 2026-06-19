@@ -51,16 +51,34 @@ function draw_triangle
         
         ;clamp yMin and yMax to 0-172
         ;   yMin = Math.max(0, yMin)
-        ;sub r0
+        sub r0
         if_gt r0, yMin, {move yMin, r0}
         
         ;   yMax = Math.min(172, yMax)
         iwt r0, #172
         if_lt r0, yMax, {move yMax, r0}
         
-        ; 
+        if_lt yMax, yMin, { return }
 
+        ;y = yMin
+        move r2, yMin
+        iwt r13, #yLoop
+        to r12
+        from yMax
+        sub yMin
+            
+            yLoop:
+            ;we are done with yMin and yMax so lets reuse the registers
+            register xMin = yMin
+            register xMax = yMin
 
+            
+            reciprocal_lookup_rom r2, r0 ; r0 = 1/y
+
+        loop
+        inc r2
+    
+    
     return
 endfunction
 

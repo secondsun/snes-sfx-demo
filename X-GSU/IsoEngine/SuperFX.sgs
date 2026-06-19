@@ -3,6 +3,7 @@
 .include "../common/function.i"
 
 .segment "GSUCODE"
+.include "../gsu_maths/gsu_recip.i"
 GSU_Code:
 .export GSU_Code
 

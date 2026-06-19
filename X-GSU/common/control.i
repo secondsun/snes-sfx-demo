@@ -10,7 +10,7 @@
 .include "../common/function.i"
 
 .macro if_lt R, V, instruction 
-
+    .local  Skip
     ; Error check: Ensure all parameters are provided
     .ifblank(R)
         .error "if_lt: R parameter is required"
@@ -29,14 +29,15 @@
         from R
     .endif
     cmp V
-    bge :+
+    bge Skip
     nop
     instruction
-    :
+    Skip:
 
 .endmacro
 
 .macro if_eq R, V, instruction
+    .local  Skip
     ; Execute instruction if R == V
     .ifblank(R)
         .error "if_eq: R parameter is required"
@@ -52,13 +53,14 @@
         from R
     .endif
     cmp V
-    bne :+
+    bne Skip
     nop
     instruction
-    :
+    Skip:
 .endmacro
 
 .macro if_ne R, V, instruction
+    .local  Skip
     ; Execute instruction if R != V
     .ifblank(R)
         .error "if_ne: R parameter is required"
@@ -74,13 +76,14 @@
         from R
     .endif
     cmp V
-    beq :+
+    beq Skip
     nop
     instruction
-    :
+    Skip:
 .endmacro
 
 .macro if_gte R, V, instruction
+    .local  Skip
     ; Execute instruction if R >= V (signed comparison)
     .ifblank(R)
         .error "if_gte: R parameter is required"
@@ -96,13 +99,14 @@
         from R
     .endif
     cmp V
-    blt :+
+    blt Skip
     nop
     instruction
-    :
+    Skip:
 .endmacro
 
 .macro if_gt R, V, instruction
+    .local  Skip
     ; Execute instruction if R > V (signed comparison)
     ; Condition requires: (S^O = 0) AND (Z = 0)
     ; Skip if: < OR =
@@ -120,15 +124,17 @@
         from R
     .endif
     cmp V
-    blt :+
+    blt Skip
     nop
-    beq :+
+    beq Skip
     nop
     instruction
-    :
+    Skip:
 .endmacro
 
 .macro if_lte R, V, instruction
+    .local  check_eq
+    .local  skip_end
     ; Execute instruction if R <= V (signed comparison)
     ; Condition requires: (S^O = 1) OR (Z = 1)
     ; Skip if: > (which is >= AND !=)
@@ -146,17 +152,17 @@
         from R
     .endif
     cmp V
-    bge :check_eq
+    bge check_eq
     ; If less than, execute
     nop
     instruction
-    bra :skip_end
+    bra Skip_end
     nop
     :check_eq
-    bne :skip_end   ; If >= but not equal (i.e., >), skip
+    bne Skip_end   ; If >= but not equal (i.e., >), skip
     nop
     instruction
-    :skip_end
+    Skip_end
 .endmacro
 
 .endif

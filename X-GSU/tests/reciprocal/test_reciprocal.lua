@@ -11,8 +11,8 @@ index = 1
 output = 0x0
 fail = 0
 
-INPUT_ADDRESS = 0x9FE
-OUTPUT_ADDRESS = 0xA00
+INPUT_ADDRESS = 0x0C38
+OUTPUT_ADDRESS = 0x0C3A
 function setupFirstTest(address, value)
 	--emu.log(string.format("%x",input[index]))
 	emu.writeWord(INPUT_ADDRESS,input[index],emu.memType.gsuWorkRam)
