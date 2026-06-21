@@ -132,20 +132,36 @@ function draw_triangle
             
 
             
+            ;x1-x0
+            with x1
+            sub x0
+
+            from r1 ; r1 = (y - y0)
+            to x1
+            mult x1 ; r6 = (y - y0) * (x1 - x0) 
             
+
             ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
             ; r0 = 1 / (y1 - y0)
             from y1
             sub y0
+            
+            beq :+
+                nop
+            bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
+                   ; the sign when we get the reciprocol
+                nop
+                with x1
+                not
+                with x1
+                add #1
+            :
+            
             reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
-            with x1
-            sub x0
-            ;x1-x0
+            
+            
             to x1
-            fmult ;r6 = ((x1 - x0) / (y1 - y0))
-            from r1 ; r1 = (y - y0)
-            to x1
-            mult x1 ; r6 = (y - y0) * (x1 - x0) / (y1 - y0)
+            fmult ;r6 = ((y - y0) * (x1 - x0)  / (y1 - y0))
             to x0
             from r6
             add x0
@@ -206,22 +222,35 @@ function draw_triangle
             to x1
             ldw(r0) ;x1=xPoints[2]
             
+            ;x1-x0
+            with x1
+            sub x0
 
-            
-            
+            from r1 ; r1 = (y - y0)
+            to x1
+            mult x1 ; r6(x1) = (y - y0) * (x1 - x0) 
+
             ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
             ; r0 = 1 / (y1 - y0)
             from y1
             sub y0
+            
+            beq :+
+                nop
+            bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
+                   ; the sign when we get the reciprocol
+                nop
+                with x1
+                not
+                with x1
+                add #1
+            :
+            
             reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
-            with x1
-            sub x0
-            ;x1-x0
+            
+            
             to x1
-            fmult ;r6 = ((x1 - x0) / (y1 - y0))
-            from r1 ; r1 = (y - y0)
-            to x1
-            mult x1 ; r6 = (y - y0) * (x1 - x0) / (y1 - y0)
+            fmult ;r6 = ((y - y0) * (x1 - x0)  / (y1 - y0))
             to x0
             from r6
             add x0
@@ -278,22 +307,37 @@ function draw_triangle
             to x1
             ldw(xPoints) ;x1=xPoints[0]
             
+            ;x1-x0
+            with x1
+            sub x0
 
+            from r1 ; r1 = (y - y0)
+            to x1
+            mult x1 ; r6 = (y - y0) * (x1 - x0) 
             
-            
+
             ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
             ; r0 = 1 / (y1 - y0)
             from y1
             sub y0
+            
+            beq :+
+                nop
+            bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
+                   ; the sign when we get the reciprocol. This negation here 
+                   ; preserves it
+                nop
+                with x1
+                not
+                with x1
+                add #1
+            :
+            
             reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
-            with x1
-            sub x0
-            ;x1-x0
+            
+            
             to x1
-            fmult ;r6 = ((x1 - x0) / (y1 - y0))
-            from r1 ; r1 = (y - y0)
-            to x1
-            mult x1 ; r6 = (y - y0) * (x1 - x0) / (y1 - y0)
+            fmult ;r6 = ((y - y0) * (x1 - x0)  / (y1 - y0))
             to x0
             from r6
             add x0

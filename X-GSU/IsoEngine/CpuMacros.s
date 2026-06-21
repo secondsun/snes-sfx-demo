@@ -33,7 +33,7 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
   lda     #%00111101 ;4bpp_obj SuperFX controls ram and rom
   sta     GSU_SCMR
   
-  lda     #%10000000 ;mask interrupts from GSU
+  lda     #%10100000			; GSU IRQs DISABLED, HighSpeed Multiply
   sta     GSU_CFGR
   
   lda     #$01 ; 21.4 MHZ speed

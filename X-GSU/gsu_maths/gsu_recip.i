@@ -163,10 +163,10 @@ endfunction
 	with arg
 	add #0
 	bmi negative
-	iwt r14, #reciprocal_table
+	nop
 
 	positive:
-		
+		iwt r14, #reciprocal_table
 		with r14
 		add arg
 		with r14
@@ -181,6 +181,7 @@ endfunction
 		bra done
 		nop
 	negative : 
+		iwt r14, #reciprocal_table
 		;arg is negative, negate
 		with arg
 		not
