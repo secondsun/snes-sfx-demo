@@ -36,32 +36,33 @@ function draw_triangle
         add #2
         ldw (r0)
         if_lt r0, yMin, {move yMin, r0}
+        nop
         
 
         ;    if (yPoints[1] > yMax) yMax = yPoints[1]
         if_gt r0, yMax, {move yMax, r0}
-        
+        nop
         ;    if (yPoints[2] < yMin) yMin = yPoints[2]
         from yPoints 
         add #4
         ldw (r0)
         if_lt r0, yMin, {move yMin, r0}
-        
+        nop
         
         ;    if (yPoints[2] > yMax) yMax = yPoints[2]
         if_gt r0, yMax, {move yMax, r0}
-        
+        nop
         ;clamp yMin and yMax to 0-172
         ;   yMin = Math.max(0, yMin)
         sub r0
         if_gt r0, yMin, {move yMin, r0}
-        
+        nop
         ;   yMax = Math.min(172, yMax)
         iwt r0, #172
         if_lt r0, yMax, {move yMax, r0}
-        
+        nop
         if_lt yMax, yMin, { return }
-
+        nop
         ;y = yMin
         ;start (y in minY..maxY) {
         move r2, yMin
@@ -118,11 +119,11 @@ function draw_triangle
             register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
 
             to x0
-            lda(xPoints) ;x0=xPoints[0]
+            ldw(xPoints) ;x0=xPoints[0]
             from xPoints
             add #2
             to x1
-            lda(r0) ;x1=xPoints[1]
+            ldw(r0) ;x1=xPoints[1]
             
 
             
@@ -191,12 +192,12 @@ function draw_triangle
             from xPoints
             add #2
             to x0
-            lda(r0) ;x0=xPoints[1]
+            ldw(r0) ;x0=xPoints[1]
             
             from xPoints
             add #4
             to x1
-            lda(r0) ;x1=xPoints[2]
+            ldw(r0) ;x1=xPoints[2]
             
 
             
@@ -263,10 +264,10 @@ function draw_triangle
             from xPoints
             add #4
             to x0
-            lda(r0) ;x0=xPoints[2]
+            ldw(r0) ;x0=xPoints[2]
             
             to x1
-            lda(xPoints) ;x1=xPoints[0]
+            ldw(xPoints) ;x1=xPoints[0]
             
 
             
