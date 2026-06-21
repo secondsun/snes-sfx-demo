@@ -138,7 +138,10 @@ function reciprocal
 			return 
 endfunction
 
-
+; for arg = rester containing int (0 - 255) store 1/arg in q0.16 
+; format in register dest
+; dest may equal arg, they will not clash
+;clobbers r14 and dest. arg unchanged
 .macro reciprocal_lookup_rom arg, dest
 	 .ifblank(arg)
         .error "reciprocal_lookup: argument is required"

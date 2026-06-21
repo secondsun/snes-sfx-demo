@@ -20,19 +20,19 @@ function draw_triangle
     color
 
     register yMin = r5
-    register yMax = r6
+    register yMax = r8
     register yPoints = r4
     register xPoints = r3
 
     ;; Find the min and max y values
         ; xMin = yPoints[0]
         to yMax
-        ldw (r4)
+        ldw (yPoints)
         ; yMin = yPoints[0]
         move yMin, yMax
 
         ;    if (yPoints[1] < yMin) yMin = yPoints[1]
-        from r4 
+        from yPoints 
         add #2
         ldw (r0)
         if_lt r0, yMin, {move yMin, r0}
@@ -42,7 +42,7 @@ function draw_triangle
         if_gt r0, yMax, {move yMax, r0}
         
         ;    if (yPoints[2] < yMin) yMin = yPoints[2]
-        from r4 
+        from yPoints 
         add #4
         ldw (r0)
         if_lt r0, yMin, {move yMin, r0}
@@ -73,11 +73,12 @@ function draw_triangle
             yLoop:
             ;we are done with yMin and yMax so lets reuse the registers
             register xMin = yMin
-            register xMax = yMin
+            register xMax = yMax
             ;var minX = Int.MAX_VALUE
             ;var maxX = Int.MIN_VALUE
-            iwt minX, #$7FFF
-            iwt maxX, #$8000
+            
+            ;iwt minX, #$7FFF
+            ;iwt maxX, #$8000
             
             ;We're unrolling  for (i in 0 until nPoints) since nPoints is always 3 for a triangle
             ;val j = (i + 1) % nPoints : i == 0 j == 1
@@ -85,11 +86,13 @@ function draw_triangle
             ; y1 = yPoints[1]
             ; x0 = xPoints[0]
             ; x1 = xPoints[1]
-
+            i_eq_0:
             ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
-            to r1
+            register y0 = r9
+            register y1 = r11
+            to y0
             ldw (r4) ; r1 = yPoints[0]
 
             to r1
@@ -101,24 +104,200 @@ function draw_triangle
             add #2
             ldw (r0) ; r0 = yPoints[1]
             from r2
-            sub r0; r0 = y - y1
+            to r6
+            sub r0; r6 = y - y1
 
             from r1
-            xor r0 ; r0= (y - y0) ^ (y - y1)
+            xor r6 ; r0= (y - y0) ^ (y - y1)
 
-            ivt r1, #0
+            ibt r7, #0 ;we will save r1 for y-y0 in it
             ;TODO : implement from here
-            if_lt r0, r1, {
-;               val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
-;               if (x < minX) minX = x
+            if_gt r0, r7, { bra i_eq_1 }
+            nop
+            register x0 = r7
+            register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
+
+            to x0
+            lda(xPoints) ;x0=xPoints[0]
+            from xPoints
+            add #2
+            to x1
+            lda(r0) ;x1=xPoints[1]
+            
+
+            
+            
+            ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
+            ; r0 = 1 / (y1 - y0)
+            from y1
+            sub y0
+            reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
+            with x1
+            sub x0
+            ;x1-x0
+            to x1
+            fmult ;r6 = ((x1 - x0) / (y1 - y0))
+            from r1 ; r1 = (y - y0)
+            to x1
+            mult x1 ; r6 = (y - y0) * (x1 - x0) / (y1 - y0)
+            to x0
+            from r6
+            add x0
+
+;                minX = x
 ;               if (x > maxX) maxX = x
-            }
+             move xMin, x0
+            nop
+             move xMax, x0
+            nop
 
             ;val j = (i + 1) % nPoints : i == 1  j == 2
+            i_eq_1:
+            ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
+            ; this is a range check that y is between y0 and y1, exclusive of the max value. 
+            ; simplified logic ((y - y0) ^ (y - y1)) < 0
+;            register y0 = r9
+;            register y1 = r11
             
-            ;val j = (i + 1) % nPoints :   i == 2  j == 0
+            to r0
+            from r4
+            add #2
+            to y0
+            ldw (r0) ; r1 = yPoints[1]
 
+            to r1
+            from r2
+            sub r1; r1 = y - y0
+
+            to r0
+            from r4
+            add #4
+            ldw (r0) ; r0 = yPoints[2]
+            from r2
+            to r6
+            sub r0; r6 = y - y1
+
+            from r1
+            xor r6 ; r0= (y - y0) ^ (y - y1)
+
+            ibt r7, #0 ;we will save r1 for y-y0 in it
+            ;TODO : implement from here
+            if_gt r0, r7, { bra i_eq_2 }
+            nop
+;            register x0 = r7
+;            register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
+
+            
+            from xPoints
+            add #2
+            to x0
+            lda(r0) ;x0=xPoints[1]
+            
+            from xPoints
+            add #4
+            to x1
+            lda(r0) ;x1=xPoints[2]
+            
+
+            
+            
+            ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
+            ; r0 = 1 / (y1 - y0)
+            from y1
+            sub y0
+            reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
+            with x1
+            sub x0
+            ;x1-x0
+            to x1
+            fmult ;r6 = ((x1 - x0) / (y1 - y0))
+            from r1 ; r1 = (y - y0)
+            to x1
+            mult x1 ; r6 = (y - y0) * (x1 - x0) / (y1 - y0)
+            to x0
+            from r6
+            add x0
+
+;               if (x0 < minX) minX = x0
+;               if (x0 > maxX) maxX = x0
+            if_lt r7, r5, { move r5, r7 }
+            nop
+            if_gt r7, r8, { move r8, r7 }
+            nop
+
+
+            ;val j = (i + 1) % nPoints :   i == 2  j == 0
+            i_eq_2:
+            ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
+            ; this is a range check that y is between y0 and y1, exclusive of the max value. 
+            ; simplified logic ((y - y0) ^ (y - y1)) < 0
+            ;register y0 = x9
+            ;register y1 = x11
+            
+            to r0
+            from r4
+            add #4
+            to y0
+            ldw (r0) ; r1 = yPoints[2]
+
+            to r1
+            from r2
+            sub r1; r1 = y - y0
+
+            ldw (r4) ; r0 = yPoints[0]
+            from r2
+            to r6
+            sub r0; r6 = y - y1
+
+            from r1
+            xor r6 ; r0= (y - y0) ^ (y - y1)
+
+            ibt r7, #0 ;we will save r1 for y-y0 in it
+            ;TODO : implement from here
+            if_gt r0, r7, {bra plotXLoop}
+            nop
+            ;register x0 = r7
+            ;register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
+
+            
+            from xPoints
+            add #4
+            to x0
+            lda(r0) ;x0=xPoints[2]
+            
+            to x1
+            lda(xPoints) ;x1=xPoints[0]
+            
+
+            
+            
+            ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
+            ; r0 = 1 / (y1 - y0)
+            from y1
+            sub y0
+            reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
+            with x1
+            sub x0
+            ;x1-x0
+            to x1
+            fmult ;r6 = ((x1 - x0) / (y1 - y0))
+            from r1 ; r1 = (y - y0)
+            to x1
+            mult x1 ; r6 = (y - y0) * (x1 - x0) / (y1 - y0)
+            to x0
+            from r6
+            add x0
+
+;               if (x < minX) minX = x
+;               if (x > maxX) maxX = x
+            if_lt r7, r5, { move r5, r7 }
+            nop
+            if_gt r7, r8, { move r8, r7 }
+            nop
+
+            plotXLoop:
             ;end unrolled loop for (i in 0 until nPoints)
+; unscope all registers but r2 (y), r12 and r13 (loop control), xMin and xMax. Color has been dealt with
 
             ;if (minX <= maxX) {
             ;    val startX = Math.max(0, minX)
