@@ -78,8 +78,8 @@ function draw_triangle
             ;var minX = Int.MAX_VALUE
             ;var maxX = Int.MIN_VALUE
             
-            ;iwt minX, #$7FFF
-            ;iwt maxX, #$8000
+            iwt xMin, #$7FFF
+            iwt xMax, #$8000
             
             ;We're unrolling  for (i in 0 until nPoints) since nPoints is always 3 for a triangle
             ;val j = (i + 1) % nPoints : i == 0 j == 1
@@ -94,19 +94,21 @@ function draw_triangle
             register y0 = r9
             register y1 = r11
             to y0
-            ldw (r4) ; r1 = yPoints[0]
+            ldw (yPoints) ; r1 = yPoints[0]
 
             to r1
             from r2
-            sub r1; r1 = y - y0
+            sub y0; r1 = y - y0
 
-            to r0
-            from r4
+            
+            from yPoints
             add #2
+            to y1
             ldw (r0) ; r0 = yPoints[1]
+            
             from r2
             to r6
-            sub r0; r6 = y - y1
+            sub y1; r6 = y - y1
 
             from r1
             xor r6 ; r0= (y - y0) ^ (y - y1)
@@ -160,8 +162,8 @@ function draw_triangle
 ;            register y0 = r9
 ;            register y1 = r11
             
-            to r0
-            from r4
+            
+            from yPoints
             add #2
             to y0
             ldw (r0) ; r1 = yPoints[1]
@@ -170,10 +172,11 @@ function draw_triangle
             from r2
             sub r1; r1 = y - y0
 
-            to r0
-            from r4
+            from yPoints
             add #4
             ldw (r0) ; r0 = yPoints[2]
+            move y1, r0;y1 = yPoints[2]
+
             from r2
             to r6
             sub r0; r6 = y - y1
@@ -236,7 +239,7 @@ function draw_triangle
             ;register y1 = x11
             
             to r0
-            from r4
+            from yPoints
             add #4
             to y0
             ldw (r0) ; r1 = yPoints[2]
@@ -245,7 +248,8 @@ function draw_triangle
             from r2
             sub r1; r1 = y - y0
 
-            ldw (r4) ; r0 = yPoints[0]
+            ldw (yPoints) ; r0 = yPoints[0]
+            move y1, r0;y1 = yPoints[0]
             from r2
             to r6
             sub r0; r6 = y - y1
@@ -298,11 +302,19 @@ function draw_triangle
 
             plotXLoop:
             ;end unrolled loop for (i in 0 until nPoints)
-; unscope all registers but r2 (y), r12 and r13 (loop control), xMin and xMax. Color has been dealt with
+; unscope all registers but r2 (y), r12 and r13 (loop control), xMin and xMax. 
 
             ;if (minX <= maxX) {
+            if_gt xMin, xMax, { bra nextY }
+            nop
             ;    val startX = Math.max(0, minX)
             ;    val endX = Math.min(width - 1, maxX)
+            move r1, xMin
+            
+            nextX:
+                plot
+                if_lt r1, xMax, { bra nextX }
+                nop
             ;    for (x in startX..endX) {
             ;        if (!isPixelSet(x, y)) {
             ;            pixels[y * width + x] = color
@@ -313,7 +325,7 @@ function draw_triangle
             
             
            
-
+        nextY:
         loop
         inc r2
         ; //end for (y in minY..maxY) 

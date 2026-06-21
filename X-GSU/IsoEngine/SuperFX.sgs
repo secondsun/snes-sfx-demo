@@ -80,7 +80,7 @@ draw_polygon:
 	move r4, r10
 	ibt r0, #$20
 	gsu_stack_push 
-	ibt r0, #$60
+	ibt r0, #$20
 	gsu_stack_push 
 	ibt r0, #$40
 	gsu_stack_push 
