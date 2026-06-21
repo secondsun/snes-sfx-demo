@@ -2,6 +2,7 @@
 .include "../common/stack.i"
 .include "../common/function.i"
 
+
 .segment "GSUCODE"
 .include "../gsu_maths/gsu_recip.i"
 GSU_Code:
@@ -39,50 +40,38 @@ init_gsu_main:
 	cmp r3
 	bne right_half
 	nop
-	iwt r4, #120      ; left half: first 8 pixels of a 16-pixel centered square
-	bra x_ready
+;leftHalf
+	iwt r4, #0      ; left half: first 8 pixels of a 16-pixel centered square
+	sm (FRAME_BUFFER_X_MIN), r4
+	iwt r0, #127
+	sm (FRAME_BUFFER_X_MAX), r0
+	bra draw_polygons
 	nop
+
 right_half:
-	iwt r4, #0; right half: next 8 pixels of the same centered square
-x_ready:
-	iwt r2, #64; start Y for the centered square
-	iwt r13, #draw_square_row
-	iwt r12, #16; draw 16 rows
+	iwt r4, #128; right half: next 8 pixels of the same centered square
+	sm (FRAME_BUFFER_X_MIN), r4
+	iwt r0, #255
+	sm (FRAME_BUFFER_X_MAX), r0
 
-	draw_square_row:
-	move r1, r4
-	plot
-	plot
-	plot
-	plot
-	plot
-	plot
-	plot
-	plot
-
-	
-	inc r2            ; move to the next row
-	loop
-	nop
-
-draw_polygon:
+draw_polygons:
 	
 	;xPoints
 	move r3, r10
-	ibt r0, #$10
+	iwt r0, #10
 	gsu_stack_push 
-	ibt r0, #$30
+	iwt r0, #20
 	gsu_stack_push 
-	ibt r0, #$20
+	iwt r0, #40
 	gsu_stack_push 
 
 	;yPoints
 	move r4, r10
-	ibt r0, #$20
+	iwt r0, #10
 	gsu_stack_push 
-	ibt r0, #$20
+	iwt r0, #100
 	gsu_stack_push 
-	ibt r0, #$40
+	iwt r0, #100
 	gsu_stack_push 
 
 	;color
@@ -108,5 +97,3 @@ yPoints:
 
 .include "./triangle/drawTriangle.i"
 
-
-.segment "GSURAM"

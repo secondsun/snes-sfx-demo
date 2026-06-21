@@ -25,7 +25,7 @@ function draw_triangle
     register yPoints = r4
     register xPoints = r3
 
-    ;; Find the min and max y values
+        ;; Find the min and max y values
         ; xMin = yPoints[0]
         to yMax
         ldw (yPoints)
@@ -64,6 +64,7 @@ function draw_triangle
         nop
         if_lt yMax, yMin, { return }
         nop
+        ;cache the loop
         cache
         ;y = yMin
         ;start (y in minY..maxY) {
@@ -72,7 +73,7 @@ function draw_triangle
         to r12
         from yMax
         sub yMin
-          ;cache the loop
+          
             yLoop:
             ;we are done with yMin and yMax so lets reuse the registers
             register xMin = yMin
@@ -150,11 +151,15 @@ function draw_triangle
                 nop
             bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
                    ; the sign when we get the reciprocol
+
                 nop
                 with x1
                 not
                 with x1
                 add #1
+                not
+                add #1
+
             :
             
             reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
@@ -174,7 +179,7 @@ function draw_triangle
             nop
 
             ;val j = (i + 1) % nPoints : i == 1  j == 2
-            i_eq_1:
+        i_eq_1:
             ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
@@ -244,6 +249,8 @@ function draw_triangle
                 not
                 with x1
                 add #1
+                not
+                add #1
             :
             
             reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
@@ -264,7 +271,7 @@ function draw_triangle
 
 
             ;val j = (i + 1) % nPoints :   i == 2  j == 0
-            i_eq_2:
+        i_eq_2:
             ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
@@ -331,6 +338,8 @@ function draw_triangle
                 not
                 with x1
                 add #1
+                not
+                add #1
             :
             
             reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
@@ -351,18 +360,22 @@ function draw_triangle
 
             plotXLoop:
             ;end unrolled loop for (i in 0 until nPoints)
-            ; unscope all registers but r2 (y), r12 and r13 (loop control), xMin and xMax. 
+            ; unscope all registers but r2 (y), r12 and r13 (loop control), xMin(r5) and xMax(r8). 
 
             ;if (minX <= maxX) {
             if_gt xMin, xMax, { bra nextY }
             nop
-            ;    val startX = Math.max(0, minX)
-            ;    val endX = Math.min(width - 1, maxX)
-            ibt r0, #127
+
+
+            
+            ;    val startX = Math.max(FRAME_BUFFER_MIN, minX)
+            ;    val endX = Math.min(FB_MAX, maxX)
+            
+            lm r0, (FRAME_BUFFER_X_MAX) ;0x7f or 0xFF
             if_gt xMax, r0, {move xMax, r0}
             nop
 
-            ibt r0, #0
+            lm r0, (FRAME_BUFFER_X_MIN); 0x0 or 0x80
             if_lt xMin, r0, {move xMin, r0}
             nop
             move r1, xMin
