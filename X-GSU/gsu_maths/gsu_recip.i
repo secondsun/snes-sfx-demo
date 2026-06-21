@@ -143,6 +143,11 @@ endfunction
 ; dest may equal arg, they will not clash
 ;clobbers r14 and dest. arg unchanged
 .macro reciprocal_lookup_rom arg, dest
+
+	.local positive
+	.local negative
+	.local done
+
 	 .ifblank(arg)
         .error "reciprocal_lookup: argument is required"
     .endif
@@ -155,19 +160,53 @@ endfunction
 	from r14
     romb
 
+	with arg
+	add #0
+	bmi negative
 	iwt r14, #reciprocal_table
-	with r14
-	add arg
-	with r14
-	add arg
-	
-	to dest
-	getbl
-	with r14
-	add #1
 
-	with dest
-	getbh
+	positive:
+		
+		with r14
+		add arg
+		with r14
+		add arg
+		
+		to dest
+		getbl
+		with r14
+		add #1
+		with dest
+		getbh
+		bra done
+		nop
+	negative : 
+		;arg is negative, negate
+		with arg
+		not
+		with arg
+		add #1
+		
+		with r14
+		add arg
+		with r14
+		add arg
+		
+
+		;reset arg is negative, negate
+		with arg
+		not
+		with arg
+		add #1
+
+		to dest
+		getbl
+		with r14
+		add #1
+		with dest
+		getbh
+		bra done
+	done:	
 .endmacro
 
 ; Reciprocal Lookup Table (0-255)

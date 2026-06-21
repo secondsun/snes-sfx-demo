@@ -16,6 +16,7 @@
 ; Clobbers : r0, r1, r2, r3, r4, r5, r6, r7, r8, r12, r13
 ; Out : Nada
 function draw_triangle
+    
     with r5
     color
 
@@ -63,6 +64,7 @@ function draw_triangle
         nop
         if_lt yMax, yMin, { return }
         nop
+        cache
         ;y = yMin
         ;start (y in minY..maxY) {
         move r2, yMin
@@ -70,7 +72,7 @@ function draw_triangle
         to r12
         from yMax
         sub yMin
-            
+          ;cache the loop
             yLoop:
             ;we are done with yMin and yMax so lets reuse the registers
             register xMin = yMin
@@ -94,7 +96,7 @@ function draw_triangle
             register y0 = r9
             register y1 = r11
             to y0
-            ldw (yPoints) ; r1 = yPoints[0]
+            ldw (yPoints) ; y0 = yPoints[0]
 
             to r1
             from r2
@@ -104,7 +106,7 @@ function draw_triangle
             from yPoints
             add #2
             to y1
-            ldw (r0) ; r0 = yPoints[1]
+            ldw (r0) ; y1 = yPoints[1]
             
             from r2
             to r6
@@ -115,13 +117,14 @@ function draw_triangle
 
             ibt r7, #0 ;we will save r1 for y-y0 in it
             ;TODO : implement from here
-            if_gt r0, r7, { bra i_eq_1 }
+            if_gte r0, r7, { bra i_eq_1 }
             nop
             register x0 = r7
             register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
 
             to x0
             ldw(xPoints) ;x0=xPoints[0]
+            
             from xPoints
             add #2
             to x1
@@ -147,11 +150,11 @@ function draw_triangle
             from r6
             add x0
 
-;                minX = x
-;               if (x > maxX) maxX = x
-             move xMin, x0
+;           if (x < xMin) xMin = x
+;           if (x > xMax) xMax = x
+            if_lt r7, r5, { move r5, r7 }
             nop
-             move xMax, x0
+            if_gt r7, r8, { move r8, r7 }
             nop
 
             ;val j = (i + 1) % nPoints : i == 1  j == 2
@@ -166,27 +169,28 @@ function draw_triangle
             from yPoints
             add #2
             to y0
-            ldw (r0) ; r1 = yPoints[1]
+            ldw (r0) ; y0 = yPoints[1]
 
             to r1
             from r2
-            sub r1; r1 = y - y0
+            sub y0; r1 = y - y0
 
             from yPoints
             add #4
+            to y1
             ldw (r0) ; r0 = yPoints[2]
-            move y1, r0;y1 = yPoints[2]
+            
 
             from r2
             to r6
-            sub r0; r6 = y - y1
+            sub y1; r6 = y - y1
 
             from r1
             xor r6 ; r0= (y - y0) ^ (y - y1)
 
             ibt r7, #0 ;we will save r1 for y-y0 in it
             ;TODO : implement from here
-            if_gt r0, r7, { bra i_eq_2 }
+            if_gte r0, r7, { bra i_eq_2 }
             nop
 ;            register x0 = r7
 ;            register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
@@ -246,20 +250,21 @@ function draw_triangle
 
             to r1
             from r2
-            sub r1; r1 = y - y0
+            sub y0; r1 = y - y0
 
+            to y1
             ldw (yPoints) ; r0 = yPoints[0]
-            move y1, r0;y1 = yPoints[0]
+            
             from r2
             to r6
-            sub r0; r6 = y - y1
+            sub y1; r6 = y - y1
 
             from r1
             xor r6 ; r0= (y - y0) ^ (y - y1)
 
             ibt r7, #0 ;we will save r1 for y-y0 in it
             ;TODO : implement from here
-            if_gt r0, r7, {bra plotXLoop}
+            if_gte r0, r7, {bra plotXLoop}
             nop
             ;register x0 = r7
             ;register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
@@ -302,13 +307,20 @@ function draw_triangle
 
             plotXLoop:
             ;end unrolled loop for (i in 0 until nPoints)
-; unscope all registers but r2 (y), r12 and r13 (loop control), xMin and xMax. 
+            ; unscope all registers but r2 (y), r12 and r13 (loop control), xMin and xMax. 
 
             ;if (minX <= maxX) {
             if_gt xMin, xMax, { bra nextY }
             nop
             ;    val startX = Math.max(0, minX)
             ;    val endX = Math.min(width - 1, maxX)
+            ibt r0, #127
+            if_gt xMax, r0, {move xMax, r0}
+            nop
+
+            ibt r0, #0
+            if_lt xMin, r0, {move xMin, r0}
+            nop
             move r1, xMin
             
             nextX:
