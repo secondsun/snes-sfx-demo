@@ -15,14 +15,15 @@ move r3, r0       ; preserve the execution index passed from the CPU
 iwt r0,#0
 cmode
 iwt r1, #$4000
-iwt r12, #$1400
+iwt r12, #$1440
 cache
 move r13, r15
   stw(r1)
   inc r1
   loop
-  nop
   inc r1
+  nop
+  
   
 
 init_gsu_main:
@@ -58,24 +59,24 @@ draw_polygons:
 	
 	;xPoints
 	move r3, r10
-	iwt r0, #10
+	iwt r0, #0
 	gsu_stack_push 
 	iwt r0, #20
 	gsu_stack_push 
-	iwt r0, #40
+	iwt r0, #0
 	gsu_stack_push 
 
 	;yPoints
 	move r4, r10
 	iwt r0, #10
 	gsu_stack_push 
-	iwt r0, #100
+	iwt r0, #$20
 	gsu_stack_push 
-	iwt r0, #100
+	iwt r0, #$61
 	gsu_stack_push 
 
 	;color
-	iwt r5, #$A
+	iwt r5, #$4
 
 	call draw_triangle
 
