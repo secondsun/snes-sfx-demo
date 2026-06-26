@@ -136,8 +136,7 @@ drawScreen1:
                 jmp copyFromStart
         copyFromHalf:
                 VRAM_memcpy (VRAM_screen_1 + screenbuffer_len), (screenbuffer ), screenbuffer_len
-                lda #$00
-                sta z:SFX_buffer_position ;sfx reads from start of work ram
+                stz z:SFX_buffer_position ;sfx reads from start of work ram
                 lda #$01
                 sta z:VRAM_screen_select ; write to the other screen
                 ldx #bg12nba(VRAM_screen_1, 0)

@@ -61,7 +61,7 @@ draw_polygons:
 	move r3, r10
 	iwt r0, #0
 	gsu_stack_push 
-	iwt r0, #20
+	iwt r0, #127
 	gsu_stack_push 
 	iwt r0, #0
 	gsu_stack_push 
@@ -70,9 +70,9 @@ draw_polygons:
 	move r4, r10
 	iwt r0, #10
 	gsu_stack_push 
-	iwt r0, #$20
+	iwt r0, #20
 	gsu_stack_push 
-	iwt r0, #$61
+	iwt r0, #60
 	gsu_stack_push 
 
 	;color
