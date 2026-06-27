@@ -22,7 +22,7 @@ screenbuffer_copy_len = $1400 ; How much to copy per vblank
 VRAM_tilemap = $E800; start of tileMap
 
 VRAM_screen_1 = $0 ; Start of first frame of background
-VRAM_screen_2 = $7000 ; start of second frame of background
+VRAM_screen_2 = $6000 ; start of second frame of background
 VRAM_road_tiles = $C000 ; start of road tile map Data
 
 
