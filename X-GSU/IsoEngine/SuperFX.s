@@ -15,6 +15,7 @@ Main:
         ;Copy SuperFX tileMap
 	VRAM_memcpy VRAM_tilemap, Map, Map_end - Map
         
+        stz z:pos_y
 
         
         ;Configure GSU
@@ -92,7 +93,21 @@ gsu_is_idle:
 Vblank:
         
 
-        ;RW_forced a8i8
+        RW_forced a8i8
+        lda #$80 ;make the databank correct for MMIO
+        pha
+        plb
+
+        
+        ;;Scroll POC
+        ;lda $213F       
+        ;lda z:pos_y
+        ;sub #1
+        ;sta z:pos_y        
+        ;sta BG1VOFS
+        ;stz BG1VOFS
+
+
         ;prepare for dma to vram
         ;display off
 
@@ -100,7 +115,8 @@ transfer:
         lda #inidisp(OFF, DISP_BRIGHTNESS_MAX)
         sta INIDISP
         ;if frame finished?
-        
+
+
         gsuRunning
         beq :+
         endVBlank
@@ -153,6 +169,8 @@ drawScreen1:
 
 
 .segment "ZEROPAGE"
+pos_y: .res 1
+
 VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_VRAM in todo.pointers
                                 ; This is where SFX buffers are copied to.
                                 ; 0 = screen 1
