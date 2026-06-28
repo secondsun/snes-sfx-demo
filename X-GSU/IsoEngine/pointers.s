@@ -12,7 +12,7 @@ screenbuffer = $704000 ; start of the SFX screen buffer
                        ; This memory will be DMA'd into VRAM during V-Blank
 
 
-screenbuffer_len = $1800 ; Size of the buffer from the super fx. 
+screenbuffer_len = $2800 ; Size of the buffer from the super fx. 
                          ;We're using a 160 line 4 bpp screen mode
                          ; So 160 (lines) * 256 (dots / line) * 4 (bpp)                       
                          ; in 128 dot wide buffers

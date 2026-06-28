@@ -18,7 +18,8 @@ Main:
 
         
         ;Configure GSU
-        initGSU_4bpp_obj 
+        ;initGSU_4bpp_obj 
+        initGSU_4bpp_160
         
         ;Start running snes cpu from work ram
         jml __MAIN_LOOP_RUN__
@@ -53,6 +54,7 @@ Main2:
         
 
         lda #$0
+        sub #$20
         sta BG1VOFS
         sta BG1VOFS
         lda #$0
@@ -88,10 +90,6 @@ gsu_is_idle:
 
 
 Vblank:
-        lda #$0
-        sta BG1VOFS
-        lda #$0
-        sta BG1HOFS
         
 
         ;RW_forced a8i8
@@ -151,7 +149,7 @@ drawScreen1:
                 ;gsuOn
                 endVBlank
 .segment "RODATA"
-.include "objFXMap.s"
+.include "backgroundMap.s"
 
 
 .segment "ZEROPAGE"
