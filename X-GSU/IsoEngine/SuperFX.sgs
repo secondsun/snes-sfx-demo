@@ -61,24 +61,154 @@ draw_polygons:
 	move r3, r10
 	iwt r0, #0
 	gsu_stack_push 
-	iwt r0, #127
+	iwt r0, #128
 	gsu_stack_push 
 	iwt r0, #0
 	gsu_stack_push 
 
 	;yPoints
 	move r4, r10
-	iwt r0, #10
+	iwt r0, #00
 	gsu_stack_push 
-	iwt r0, #20
+	iwt r0, #0
 	gsu_stack_push 
-	iwt r0, #60
+	iwt r0, #40
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$1
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+;xPoints
+	move r3, r10
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$2
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+
+	;xPoints
+	move r3, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$3
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+;xPoints
+	move r3, r10
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #80
 	gsu_stack_push 
 
 	;color
 	iwt r5, #$4
 
 	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+
+	;xPoints
+	move r3, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #120
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$5
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+;xPoints
+	move r3, r10
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #120
+	gsu_stack_push 
+	iwt r0, #120
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$6
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
 
 finish:
 

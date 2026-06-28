@@ -56,6 +56,15 @@
 		sub R
 	.endmacro
 
+
+	.macro gsu_stack_free_bytes S
+		.if .blank({S})
+				.error "gsu_stack_alloc: S is blank"
+		.endif
+		with r10
+		sub S
+	.endmacro
+	
 	; Frees a struct on the stack
 	; assumes r10 is stack pointer
 	; R is used as a temp register to store the size of the struct
