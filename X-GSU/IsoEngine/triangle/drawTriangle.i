@@ -65,6 +65,7 @@ function draw_triangle
         if_lt yMax, yMin, { return }
         nop
         ;cache the loop
+        startCache:
         cache
         ;y = yMin
         ;start (y in minY..maxY) {
@@ -366,24 +367,23 @@ function draw_triangle
             if_gt xMin, xMax, { bra nextY }
             nop
 
-
-            
-            ;    val startX = Math.max(FRAME_BUFFER_MIN, minX)
-            ;    val endX = Math.min(FB_MAX, maxX)
-            
-            lm r0, (FRAME_BUFFER_X_MAX) ;0x7f or 0xFF
-            if_gt xMax, r0, {move xMax, r0}
-            nop
-
-            lm r0, (FRAME_BUFFER_X_MIN); 0x0 or 0x80
-            if_lt xMin, r0, {move xMin, r0}
+            from xMin 
+            xor xMax
+            lsr
+            bcc startX
             nop
             move r1, xMin
+            plot
             
+            if_gte r1, xMax, { bra nextY }
+            nop
+            startX:
+            move r1, xMin
+
             nextX:
                 plot
                 if_lt r1, xMax, { bra nextX }
-                nop
+                plot
             ;    for (x in startX..endX) {
             ;        if (!isPixelSet(x, y)) {
             ;            pixels[y * width + x] = color
@@ -398,7 +398,7 @@ function draw_triangle
         loop
         inc r2
         ; //end for (y in minY..maxY) 
-    
+    endcache:
     return
 endfunction
 

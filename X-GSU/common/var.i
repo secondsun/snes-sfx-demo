@@ -78,10 +78,5 @@ lengthTable:
 ;val positionTable = HuffTree();
 positionTable:
 	.res .sizeof(hufftree)
-FRAME_BUFFER_X_MIN:
-.res 2
-FRAME_BUFFER_X_MAX:
-.res 2
-
 
 .endif

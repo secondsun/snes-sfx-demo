@@ -56,6 +56,7 @@ Main2:
 
         lda #$0
         sub #$20
+        sta V_SCROLL_OFFSET
         sta BG1VOFS
         sta BG1VOFS
         lda #$0
@@ -112,8 +113,21 @@ Vblank:
         ;display off
 
 transfer:
+        ;screen off
         lda #inidisp(OFF, DISP_BRIGHTNESS_MAX)
         sta INIDISP
+
+
+        ;update v offset
+        ;lda $213F
+        lda V_SCROLL_OFFSET
+        sub #1
+        sta V_SCROLL_OFFSET
+        ;sta BG1VOFS
+        ;stz BG1VOFS
+        lda #$0
+        ;sta BG1HOFS
+        ;sta BG1HOFS
         ;if frame finished?
 
 
@@ -178,7 +192,7 @@ VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_V
 SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram; 
                                 ; 0 = $700400
                                 ; 1 = $702900
-
+V_SCROLL_OFFSET: .res 1 
 
 .segment "RODATA"
    incbin  Palette,        "Data/superfx.palette.bin"
