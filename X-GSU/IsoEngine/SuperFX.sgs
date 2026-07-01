@@ -11,7 +11,6 @@ GSU_Code:
 init_stack
 
 resetFrameBuffer:
-move r3, r0       ; preserve the execution index passed from the CPU
 iwt r0,#0
 cmode
 iwt r1, #$4000
@@ -34,8 +33,137 @@ init_gsu_main:
 	; bit 3 = 1 sprite mode on
 	iwt r0, #$8
 	cmode
-	
-draw_polygons:
+
+
+ draw_polygons:
+ 	
+	;xPoints
+	move r3, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #00
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$1
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+;xPoints
+	move r3, r10
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$2
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+
+	;xPoints
+	move r3, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$3
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+;xPoints
+	move r3, r10
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #40
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$4
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
+
+	;xPoints
+	move r3, r10
+	iwt r0, #0
+	gsu_stack_push 
+	iwt r0, #128
+	gsu_stack_push 
+	iwt r0, #0
+	gsu_stack_push 
+
+	;yPoints
+	move r4, r10
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #80
+	gsu_stack_push 
+	iwt r0, #130
+	gsu_stack_push 
+
+	;color
+	iwt r5, #$5
+
+	call draw_triangle
+
+	gsu_stack_free_bytes #$C
+
 	
 	
 ;xPoints
@@ -51,9 +179,9 @@ draw_polygons:
 	move r4, r10
 	iwt r0, #80
 	gsu_stack_push 
-	iwt r0, #120
+	iwt r0, #130
 	gsu_stack_push 
-	iwt r0, #120
+	iwt r0, #130
 	gsu_stack_push 
 
 	;color
