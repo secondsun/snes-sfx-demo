@@ -179,9 +179,9 @@ init_gsu_main:
 	move r4, r10
 	iwt r0, #80
 	gsu_stack_push 
-	iwt r0, #130
+	iwt r0, #140
 	gsu_stack_push 
-	iwt r0, #130
+	iwt r0, #140
 	gsu_stack_push 
 
 	;color
