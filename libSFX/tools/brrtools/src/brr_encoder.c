@@ -571,6 +571,10 @@ int main(const int argc, char *const argv[])
 		, padding);
 
 		// Increase buffer size and add zeroes at beginning
+		if ((size_t)samples_length > (SIZE_MAX / WIDTH) - (size_t)padding) {
+			fprintf(stderr, "Error : Sample length too large.\n");
+			exit(1);
+		}
 		samples = realloc(samples, WIDTH*(samples_length + padding));
 		if(!samples)
 		{
