@@ -6,6 +6,8 @@
 ;This is the main vector of the Super NES code. it runs from cartidge with the 
 ;SFX off. It copies the Main loop and VBlank code to RAM, and then jumps to the main loop.
 Main:
+        ;CLEAR SFX ram
+       ; memset       $700000, $2000, $0     
         ;Copy SNES code
         memcpy  __MAIN_LOOP_RUN__, __MAIN_LOOP_LOAD__, __MAIN_LOOP_SIZE__
         memcpy  __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__
@@ -56,7 +58,6 @@ Main2:
 
         lda #$0
         sub #$20
-        sta V_SCROLL_OFFSET
         sta BG1VOFS
         sta BG1VOFS
         lda #$0
@@ -69,18 +70,12 @@ Main2:
         
         VBL_set Vblank
         VBL_on
-        
+        gsuOn
 
 ;infinite loop
 infinite_loop:       
    wai
-      
-      
-    gsuRunning
-    beq gsu_is_idle    ; If the result is zero, the G flag was not set (GSU is idle)
-    
-    ; If we reach here, the GSU is running.
-    bra     infinite_loop
+   bra     infinite_loop
 
 gsu_is_idle:
     ; Code to handle the case where the Super FX is NOT running
@@ -120,9 +115,6 @@ transfer:
 
         ;update v offset
         ;lda $213F
-        lda V_SCROLL_OFFSET
-        sub #1
-        sta V_SCROLL_OFFSET
         ;sta BG1VOFS
         ;stz BG1VOFS
         lda #$0
@@ -149,13 +141,13 @@ drawScreen2:
                 stz z:VRAM_screen_select ; write to the other screen
                 ldx     #bg12nba(VRAM_screen_2, 0)
                 stx     BG12NBA
-               
+                gsuOn
                 endVBlank
         :;copyFromStart:        
                 VRAM_memcpy VRAM_screen_2, screenbuffer, screenbuffer_len
                 lda #$01;sfx reads from middle of work ram
                 sta z:SFX_buffer_position        
-                ;gsuOn
+                gsuOn
                 endVBlank
 drawScreen1:        
                 ;Where do we copy from?
@@ -170,13 +162,13 @@ drawScreen1:
                 ldx #bg12nba(VRAM_screen_1, 0)
                 stx BG12NBA
 
-                ;gsuOn
+                gsuOn
                 endVBlank
         copyFromStart:        
                 VRAM_memcpy VRAM_screen_1, screenbuffer, screenbuffer_len
                 lda #$01 ;sfx reads from middle of work ram
                 sta z:SFX_buffer_position
-                ;gsuOn
+                gsuOn
                 endVBlank
 .segment "RODATA"
 .include "backgroundMap.s"
@@ -192,7 +184,7 @@ VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_V
 SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram; 
                                 ; 0 = $700400
                                 ; 1 = $702900
-V_SCROLL_OFFSET: .res 1 
+
 
 .segment "RODATA"
    incbin  Palette,        "Data/superfx.palette.bin"

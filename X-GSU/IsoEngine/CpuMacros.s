@@ -42,13 +42,17 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
 
 
 .macro gsuOn
-  ldx     #.loword(GSU_Code)
-  stx     GSU_R15
+  RW_push set:a16
+  lda     #.loword(GSU_Code)
+  sta    GSU_R15
+  RW_pull  
 .endmac
 
 .macro gsuOff
-  ldx     #$00
-  stx     GSU_SFR
+  RW_push set:a16
+  lda     #$00
+  sta     GSU_SFR
+  RW_pull
 .endmac
 
 ;Is the GSU running
