@@ -34,9 +34,9 @@ init_gsu_main:
 	iwt r0, #$8
 	cmode
 
-
+for 3
  draw_polygons:
- 	
+ 	backuploop
 	;xPoints
 	move r3, r10
 	iwt r0, #0
@@ -186,11 +186,12 @@ init_gsu_main:
 
 	;color
 	iwt r5, #$6
-
+	
 	call draw_triangle
 
 	gsu_stack_free_bytes #$C
-
+	restoreloop
+endfor
 
 finish:
 

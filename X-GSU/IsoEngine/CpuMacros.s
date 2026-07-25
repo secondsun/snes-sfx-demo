@@ -61,8 +61,7 @@ GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
 ; Clobbers the Accumulator
 .macro gsuRunning
   RW_push set:a16
-  lda GSU_SFR
-  and #%00100000
+  lda GSU_R15
   RW_pull
 .endmac
 

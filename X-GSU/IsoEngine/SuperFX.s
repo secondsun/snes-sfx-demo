@@ -74,15 +74,17 @@ Main2:
 
 ;infinite loop
 infinite_loop:       
-   wai
+   
+   gsuRunning
+   beq gsu_is_idle
    bra     infinite_loop
 
 gsu_is_idle:
     ; Code to handle the case where the Super FX is NOT running
     ; (e.g., preparing a new program or waiting for activation)
-    ldx z:SFX_buffer_position
-    stx GSU_R0
-    gsuOn
+    ldx #1
+    stx FRAME_READY
+    
     bra     infinite_loop
 
 
@@ -141,12 +143,14 @@ drawScreen2:
                 stz z:VRAM_screen_select ; write to the other screen
                 ldx     #bg12nba(VRAM_screen_2, 0)
                 stx     BG12NBA
+                stz FRAME_READY
                 gsuOn
                 endVBlank
         :;copyFromStart:        
                 VRAM_memcpy VRAM_screen_2, screenbuffer, screenbuffer_len
                 lda #$01;sfx reads from middle of work ram
                 sta z:SFX_buffer_position        
+                stz FRAME_READY
                 gsuOn
                 endVBlank
 drawScreen1:        
@@ -161,13 +165,14 @@ drawScreen1:
                 sta z:VRAM_screen_select ; write to the other screen
                 ldx #bg12nba(VRAM_screen_1, 0)
                 stx BG12NBA
-
+                stz FRAME_READY
                 gsuOn
                 endVBlank
         copyFromStart:        
                 VRAM_memcpy VRAM_screen_1, screenbuffer, screenbuffer_len
                 lda #$01 ;sfx reads from middle of work ram
                 sta z:SFX_buffer_position
+                stz FRAME_READY
                 gsuOn
                 endVBlank
 .segment "RODATA"
@@ -185,6 +190,6 @@ SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram;
                                 ; 0 = $700400
                                 ; 1 = $702900
 
-
+FRAME_READY: .res 1
 .segment "RODATA"
    incbin  Palette,        "Data/superfx.palette.bin"
