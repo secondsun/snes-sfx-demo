@@ -10,8 +10,8 @@
 .include "../../common/function.i"
 .include "../../common/control.i"
 
-; In : r3 = xPoints array pointer
-;      r4 = yPoints array pointer
+; In : r3 = points array pointer. Points are one byte each, byte aligned. 
+;       The point format is x,y pairs. The array is 6 bytes long for a triangle.
 ;      r5 = color
 ; Clobbers : r0, r1, r2, r3, r4, r5, r6, r7, r8, r12, r13
 ; Out : Nada
@@ -22,20 +22,27 @@ function draw_triangle
 
     register yMin = r5
     register yMax = r8
+    register points = r3
     register yPoints = r4
     register xPoints = r3
+
+        to yPoints
+        from points
+        add #1
+
+        ;move xPoints, points //registers are the same
 
         ;; Find the min and max y values
         ; xMin = yPoints[0]
         to yMax
-        ldw (yPoints)
+        ldb (yPoints)
         ; yMin = yPoints[0]
         move yMin, yMax
 
         ;    if (yPoints[1] < yMin) yMin = yPoints[1]
         from yPoints 
         add #2
-        ldw (r0)
+        ldb (r0)
         if_lt r0, yMin, {move yMin, r0}
         nop
         
@@ -46,7 +53,7 @@ function draw_triangle
         ;    if (yPoints[2] < yMin) yMin = yPoints[2]
         from yPoints 
         add #4
-        ldw (r0)
+        ldb (r0)
         if_lt r0, yMin, {move yMin, r0}
         nop
         
@@ -98,7 +105,7 @@ function draw_triangle
             register y0 = r9
             register y1 = r11
             to y0
-            ldw (yPoints) ; y0 = yPoints[0]
+            ldb (yPoints) ; y0 = yPoints[0]
 
             to r1
             from r2
@@ -108,7 +115,7 @@ function draw_triangle
             from yPoints
             add #2
             to y1
-            ldw (r0) ; y1 = yPoints[1]
+            ldb (r0) ; y1 = yPoints[1]
             
             from r2
             to r6
@@ -125,12 +132,12 @@ function draw_triangle
             register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
 
             to x0
-            ldw(xPoints) ;x0=xPoints[0]
+            ldb(xPoints) ;x0=xPoints[0]
             
             from xPoints
             add #2
             to x1
-            ldw(r0) ;x1=xPoints[1]
+            ldb(r0) ;x1=xPoints[1]
             
 
             
@@ -191,7 +198,7 @@ function draw_triangle
             from yPoints
             add #2
             to y0
-            ldw (r0) ; y0 = yPoints[1]
+            ldb (r0) ; y0 = yPoints[1]
 
             to r1
             from r2
@@ -200,7 +207,7 @@ function draw_triangle
             from yPoints
             add #4
             to y1
-            ldw (r0) ; r0 = yPoints[2]
+            ldb (r0) ; r0 = yPoints[2]
             
 
             from r2
@@ -221,12 +228,12 @@ function draw_triangle
             from xPoints
             add #2
             to x0
-            ldw(r0) ;x0=xPoints[1]
+            ldb(r0) ;x0=xPoints[1]
             
             from xPoints
             add #4
             to x1
-            ldw(r0) ;x1=xPoints[2]
+            ldb(r0) ;x1=xPoints[2]
             
             ;x1-x0
             with x1
@@ -283,14 +290,14 @@ function draw_triangle
             from yPoints
             add #4
             to y0
-            ldw (r0) ; r1 = yPoints[2]
+            ldb (r0) ; r1 = yPoints[2]
 
             to r1
             from r2
             sub y0; r1 = y - y0
 
             to y1
-            ldw (yPoints) ; r0 = yPoints[0]
+            ldb (yPoints) ; r0 = yPoints[0]
             
             from r2
             to r6
@@ -310,10 +317,10 @@ function draw_triangle
             from xPoints
             add #4
             to x0
-            ldw(r0) ;x0=xPoints[2]
+            ldb(r0) ;x0=xPoints[2]
             
             to x1
-            ldw(xPoints) ;x1=xPoints[0]
+            ldb(xPoints) ;x1=xPoints[0]
             
             ;x1-x0
             with x1

@@ -21,6 +21,9 @@
 		inc	stackPointer
 	.endmacro
 
+
+
+
 ; Pushes the value stored in R to the stack
 	; assumes r10 is stack pointer
 	;Example :
@@ -100,4 +103,35 @@
 	.macro init_stack
 		iwt stackPointer, #(gsu_stack_ram)
 	.endmacro 
+
+	;uses a loop, use backuploop and restoreloop if you need to use a loop in your code
+	.macro rom_to_stack rom_addr, rom_bank, size
+
+	.ifblank(rom_addr)
+		.error "rom_to_stack: rom_addr is blank"
+	.endif
+	.ifblank(rom_bank)
+		.error "rom_to_stack: rom_bank is blank"
+	.endif
+	.ifblank(size)
+		.error "rom_to_stack: size is blank"
+	.endif
+
+		;assumes r10 is stack pointer
+		;assumes r0 is free to use as a temp register
+		;assumes r1 is free to use as a temp register
+		ibt r0, #rom_bank
+		romb
+		iwt r14, rom_addr
+		iwt r12, #size ; loop count times 
+		move r13,r15
+		getb
+		inc r14
+		from r0
+		stb (r10)
+		nop
+		loop
+		inc r10
+
+	.endmacro
 .endif

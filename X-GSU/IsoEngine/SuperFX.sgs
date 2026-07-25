@@ -2,7 +2,6 @@
 .include "../common/stack.i"
 .include "../common/function.i"
 
-
 .segment "GSUCODE"
 .include "../gsu_maths/gsu_recip.i"
 GSU_Code:
@@ -34,164 +33,13 @@ init_gsu_main:
 	iwt r0, #$8
 	cmode
 
-for 3
- draw_polygons:
- 	backuploop
-	;xPoints
-	move r3, r10
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #128
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
+    move r3, r10
 
-	;yPoints
-	move r4, r10
-	iwt r0, #00
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #40
-	gsu_stack_push 
+    rom_to_stack #points,3, 6
 
-	;color
-	iwt r5, #$1
+    ibt r5, #12
+    call draw_triangle
 
-	call draw_triangle
-
-	gsu_stack_free_bytes #$C
-
-;xPoints
-	move r3, r10
-	iwt r0, #128
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #128
-	gsu_stack_push 
-
-	;yPoints
-	move r4, r10
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #40
-	gsu_stack_push 
-	iwt r0, #40
-	gsu_stack_push 
-
-	;color
-	iwt r5, #$2
-
-	call draw_triangle
-
-	gsu_stack_free_bytes #$C
-
-
-	;xPoints
-	move r3, r10
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #128
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
-
-	;yPoints
-	move r4, r10
-	iwt r0, #40
-	gsu_stack_push 
-	iwt r0, #40
-	gsu_stack_push 
-	iwt r0, #80
-	gsu_stack_push 
-
-	;color
-	iwt r5, #$3
-
-	call draw_triangle
-
-	gsu_stack_free_bytes #$C
-
-;xPoints
-	move r3, r10
-	iwt r0, #128
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #128
-	gsu_stack_push 
-
-	;yPoints
-	move r4, r10
-	iwt r0, #40
-	gsu_stack_push 
-	iwt r0, #80
-	gsu_stack_push 
-	iwt r0, #80
-	gsu_stack_push 
-
-	;color
-	iwt r5, #$4
-
-	call draw_triangle
-
-	gsu_stack_free_bytes #$C
-
-
-	;xPoints
-	move r3, r10
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #128
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
-
-	;yPoints
-	move r4, r10
-	iwt r0, #80
-	gsu_stack_push 
-	iwt r0, #80
-	gsu_stack_push 
-	iwt r0, #130
-	gsu_stack_push 
-
-	;color
-	iwt r5, #$5
-
-	call draw_triangle
-
-	gsu_stack_free_bytes #$C
-
-	
-	
-;xPoints
-	move r3, r10
-	iwt r0, #128
-	gsu_stack_push 
-	iwt r0, #0
-	gsu_stack_push 
-	iwt r0, #128
-	gsu_stack_push 
-
-	;yPoints
-	move r4, r10
-	iwt r0, #80
-	gsu_stack_push 
-	iwt r0, #140
-	gsu_stack_push 
-	iwt r0, #140
-	gsu_stack_push 
-
-	;color
-	iwt r5, #$6
-	
-	call draw_triangle
-
-	gsu_stack_free_bytes #$C
-	restoreloop
-endfor
 
 finish:
 
@@ -204,10 +52,11 @@ finish:
 	nop
 
 .align 2
-xPoints:
-.dword $10, $20, $30
-yPoints:
-.dword $10, $20, $30
+points:
+.byte $30, $10
+.byte $10, $20
+.byte $30, $30
+
 
 .include "./triangle/drawTriangle.i"
 

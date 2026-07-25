@@ -164,8 +164,7 @@ endfunction
 		
 		to dest
 		getbl
-		with r14
-		add #1
+		inc r14
 		with dest
 		getbh
 .endmacro

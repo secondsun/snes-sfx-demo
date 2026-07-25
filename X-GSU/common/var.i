@@ -4,7 +4,7 @@ __VARS_DEFINED__ = 1
 .include "structs.i"
 
 .segment "GSURAM"
-.res 1
+.res 0
 gsu_stack_ram:
 	.res .sizeof(gsu_stack)
 	
