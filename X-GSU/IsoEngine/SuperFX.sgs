@@ -1,7 +1,7 @@
 .include "libSFX.i"
 .include "../common/stack.i"
 .include "../common/function.i"
-
+.include "./macros/geometry.i"
 .segment "GSUCODE"
 .include "../gsu_maths/gsu_recip.i"
 GSU_Code:
@@ -35,7 +35,7 @@ init_gsu_main:
 
     move r3, r10
 
-    rom_to_stack #points,3, 6
+    rom_to_stack #cube_model,3, 216
 
     ibt r5, #12
     call draw_triangle
@@ -52,10 +52,8 @@ finish:
 	nop
 
 .align 2
-points:
-.byte $30, $10
-.byte $10, $20
-.byte $30, $30
+cube_model:
+ cube $2000,$2000,$2000, $4000
 
 
 .include "./triangle/drawTriangle.i"

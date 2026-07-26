@@ -1,27 +1,66 @@
-;.ifndef ::__GEOMETRY_DEFINED__
-;::__GEOMETRY_DEFINED__ = 1   
+.ifndef ::__GEOMETRY_DEFINED__
+::__GEOMETRY_DEFINED__ = 1   
 ; geometry.i - geometry related macros/definitions
 
     ;Each of these variables is a Q8.8 fixed point number. 
-    ;.macro cube x, y, z, length
+    .macro cube _x, _y, _z, _side_length
     
 
 
-     ;   .if     .paramcount <> 4
-      ;  .error  "Too few parameters for macro cube"
-       ; .endif
-        ; define 8 cube vertices starting at (x, y, z) with edge length
+        .if     .paramcount <> 4
+            .error  "Too few parameters for macro cube"
+        .endif
+        ; define cube as 12 triangles with vertices ordered clockwise when the outside is facing the viewer
 
-        ;.word x, y, z
-        ;.word x + length, y, z
-        ;.word x, y + length, z
-        ;.word x + length, y + length, z
-        ;.word x, y, z + length
-        ;.word x + length, y, z + length
-        ;.word x, y + length, z + length
-        ;.word x + length, y + length, z + length
-    ;.endmac
+        ; front face (+z)
+        .word _x, _y, _z + _side_length
+        .word _x + _side_length, _y, _z + _side_length
+        .word _x + _side_length, _y + _side_length, _z + _side_length
+        .word _x, _y, _z + _side_length
+        .word _x + _side_length, _y + _side_length, _z + _side_length
+        .word _x, _y + _side_length, _z + _side_length
 
-;.endif  ; GEOMETRY_I
+        ; back face (-z)
+        .word _x, _y, _z
+        .word _x + _side_length, _y, _z
+        .word _x + _side_length, _y + _side_length, _z
+        .word _x, _y, _z
+        .word _x + _side_length, _y + _side_length, _z
+        .word _x, _y + _side_length, _z
+
+        ; left face (-x)
+        .word _x, _y, _z
+        .word _x, _y, _z + _side_length
+        .word _x, _y + _side_length, _z + _side_length
+        .word _x, _y, _z
+        .word _x, _y + _side_length, _z + _side_length
+        .word _x, _y + _side_length, _z
+
+        ; right face (+x)
+        .word _x + _side_length, _y, _z
+        .word _x + _side_length, _y + _side_length, _z
+        .word _x + _side_length, _y + _side_length, _z + _side_length
+        .word _x + _side_length, _y, _z
+        .word _x + _side_length, _y + _side_length, _z + _side_length
+        .word _x + _side_length, _y, _z + _side_length
+
+        ; top face (+y)
+        .word _x, _y + _side_length, _z
+        .word _x, _y + _side_length, _z + _side_length
+        .word _x + _side_length, _y + _side_length, _z + _side_length
+        .word _x, _y + _side_length, _z
+        .word _x + _side_length, _y + _side_length, _z + _side_length
+        .word _x + _side_length, _y + _side_length, _z
+
+        ; bottom face (-y)
+        .word _x, _y, _z
+        .word _x + _side_length, _y, _z
+        .word _x + _side_length, _y, _z + _side_length
+        .word _x, _y, _z
+        .word _x + _side_length, _y, _z + _side_length
+        .word _x, _y, _z + _side_length
+    .endmac
+
+.endif  ; GEOMETRY_I
 
 
