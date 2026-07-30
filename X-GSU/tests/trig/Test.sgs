@@ -1,0 +1,61 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+.segment "GSURAM"
+
+INPUT:
+.res 4
+OUTPUT:
+.res 2
+.segment "GSUCODE"
+GSU_Code:
+
+;Setup stack
+init_stack
+
+;This label represents the memory address that begins test setup
+; The lua script will execute setup here
+test_setup:
+iwt  r0, #$0040
+;sm (INPUT), r0
+iwt	r13, #test_call
+iwt r12, #$400 ; loop 1024 times 
+
+;This label represents the memory address that begins test execution
+test_call:
+	lm r1, (INPUT+2)
+	lm r0, (INPUT)
+	call gsu_sqrt32
+ 	nop
+	sm (OUTPUT), r3
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+;This label represents the memory address that ends test execution.
+;The test will loop back to test_call after reaching this label.  
+; The lua script will check values here and prepare for the next loop
+test_stop:    
+	nop
+	;loop
+	nop
+	stop
+	nop
+
+
+
+;Code goes in code segment
+.include "../../gsu_maths/gsu_sqrt.i"
+.include "../../gsu_maths/gsu_vector.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_camera.i"

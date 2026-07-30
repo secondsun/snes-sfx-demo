@@ -9,7 +9,7 @@
 .include "../../common/stack.i"
 .include "../../common/function.i"
 .include "../../common/control.i"
-
+.include "../constants.i"
 ; In : r3 = points array pointer. Points are one byte each, byte aligned. 
 ;       The point format is x,y pairs. The array is 6 bytes long for a triangle.
 ;      r5 = color
@@ -382,7 +382,7 @@ function draw_triangle
             move r1, xMin
             plot
             
-            if_gte r1, xMax, { bra nextY }
+            if_gte r1   , xMax, { bra nextY }
             nop
             startX:
             move r1, xMin

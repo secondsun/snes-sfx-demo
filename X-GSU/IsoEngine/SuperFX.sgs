@@ -2,6 +2,7 @@
 .include "../common/stack.i"
 .include "../common/function.i"
 .include "./macros/geometry.i"
+.include "./constants.i"
 .segment "GSUCODE"
 .include "../gsu_maths/gsu_recip.i"
 GSU_Code:
@@ -40,6 +41,7 @@ init_gsu_main:
     ibt r5, #12
     call draw_triangle
 
+	gsu_stack_free_bytes 216
 
 finish:
 
@@ -53,7 +55,7 @@ finish:
 
 .align 2
 cube_model:
- cube $2000,$2000,$2000, $4000
+ cube $e000,$e000,$e000, $4000
 
 
 .include "./triangle/drawTriangle.i"

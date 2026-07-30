@@ -430,7 +430,5 @@ reciprocal_table:
 .word $0103 ; (1/253)
 .word $0102 ; (1/254)
 .word $0101 ; (1/255)
-		
-
 
 .endif

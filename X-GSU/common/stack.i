@@ -59,10 +59,17 @@
 		sub R
 	.endmacro
 
+	.macro gsu_stack_alloc_bytes S
+		.if .blank({S})
+				.error "gsu_stack_alloc_bytes: S is blank"
+		.endif
+		with r10
+		adds S
+	.endmacro
 
 	.macro gsu_stack_free_bytes S
 		.if .blank({S})
-				.error "gsu_stack_alloc: S is blank"
+				.error "gsu_stack_free_bytes: S is blank"
 		.endif
 		with r10
 		sub S
