@@ -8,19 +8,22 @@
 Main:
 
         memcpy  __MAIN_LOOP_RUN__, __MAIN_LOOP_LOAD__, __MAIN_LOOP_SIZE__
-        memcpy  __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__
        
 
         ;Configure GSU
-        lda     #$70
+        lda     #$03
         sta     GSU_PBR
+  
         lda     #$10
         sta     GSU_SCBR
-        lda     #%00001000
+  
+        lda     #%00011101 ;4bpp_160 SuperFX controls ram and rom
         sta     GSU_SCMR
-        lda     #%10000000
+        
+        lda     #%10000000 ;mask interrupts from GSU
         sta     GSU_CFGR
-        lda     #$01
+        
+        lda     #$01 ; 21.4 MHZ speed
         sta     GSU_CLSR
 
         ;Start GSU
