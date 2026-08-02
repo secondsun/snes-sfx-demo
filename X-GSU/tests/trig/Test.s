@@ -6,8 +6,10 @@
 .include "libSFX.i"
 
 Main:
-        ;Copy GSU code
-        memcpy GSU_SRAM, __GSUCODE_LOAD__, __GSUCODE_SIZE__
+
+        memcpy  __MAIN_LOOP_RUN__, __MAIN_LOOP_LOAD__, __MAIN_LOOP_SIZE__
+        memcpy  __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__
+       
 
         ;Configure GSU
         lda     #$70
@@ -22,8 +24,10 @@ Main:
         sta     GSU_CLSR
 
         ;Start GSU
-        break
-        ldx     __GSUCODE_RUN__
+     jml __MAIN_LOOP_RUN__
+.SEGMENT "MAIN_LOOP"
+    
+        ldx     #.loword(GSU_Code)
         stx     GSU_R15
 
         ;Turn on screen
@@ -31,7 +35,7 @@ Main:
 
         lda     #inidisp(ON, DISP_BRIGHTNESS_MAX)
         sta     SFX_inidisp
-        VBL_on
+        VBL_off
 loops:
 :       wai
         bra :-

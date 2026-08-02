@@ -2,7 +2,7 @@
 
 .include "libSFX.i"
 
-GSU_SFR_HI         = $3031 ;Status/Flag Register Hi byte
+GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
 
 .macro initGSU_4bpp_160
   lda     #$03

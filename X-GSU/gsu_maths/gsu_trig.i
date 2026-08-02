@@ -1,6 +1,6 @@
 
-.ifndef ::__GSU_RECIP_DEFINED__
-::__GSU_RECIP_DEFINED__ = 1   
+.ifndef ::__GSU_TRIG_DEFINED__
+::__GSU_TRIG_DEFINED__ = 1   
 
 
 
