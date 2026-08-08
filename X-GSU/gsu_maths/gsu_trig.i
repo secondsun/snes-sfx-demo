@@ -4,7 +4,7 @@
 
 
 
-; for arg = rester containing int (0 - 90)  
+; for arg = register containing int (0 - 90)  
 ; each index is approximate to 4 degrees in q1.15 format
 ;clobbers r14, and dest. arg unchanged
 .macro cos_lookup_rom arg, dest
@@ -47,7 +47,7 @@
 		getbh
 .endmacro
 
-; for arg = rester containing int (0 - 90)  
+; for arg = register containing int (0 - 90)  
 ; each index is approximate to 4 degrees in q1.15 format
 ;clobbers r14 and dest. arg unchanged
 .macro sin_lookup_rom arg, dest
