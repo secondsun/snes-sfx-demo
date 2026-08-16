@@ -14,7 +14,7 @@
 INPUT:
 .res 4
 OUTPUT:
-.res 2
+.res 4
 .segment "GSUCODE"
 .include "../../gsu_maths/gsu_trig.i"
 GSU_Code:
@@ -36,6 +36,9 @@ test_call:
 	sin_lookup_rom r12, r3
  	nop
 	sm (OUTPUT), r3
+	cos_lookup_rom r12, r4
+ 	nop
+	sm (OUTPUT+2), r4
 	nop
 loop
 	nop

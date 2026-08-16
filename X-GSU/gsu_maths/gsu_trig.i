@@ -21,7 +21,7 @@
 	from r14
     romb
 
-		iwt dest, #90 ; sin(x) = cos(x-90)	
+		iwt dest, #22 ; sin(x) = cos(x-90)	;;22*4 is as close to 90 as we get with 4 degree increments
 		from arg
 		to dest
 		sub dest
