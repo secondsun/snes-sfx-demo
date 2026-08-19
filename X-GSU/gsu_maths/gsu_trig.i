@@ -108,7 +108,7 @@ sin_table:
 .word $33C7
 .word $35AD
 .word $376D
-.word $C000
+.word $3906
 .word $3A78
 .word $3BC0
 .word $3CDE
@@ -153,7 +153,7 @@ sin_table:
 .word $F5FD
 .word $F2B2
 .word $EF70
-.word $4000
+.word $EC39
 .word $E910
 .word $E5F8
 .word $E2F2
