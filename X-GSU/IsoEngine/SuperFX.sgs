@@ -57,6 +57,7 @@ finish:
 .align 2
 cube_model:
  cube $e000, $e000, $e000, $4000
+ 
 
 
 .include "./triangle/drawTriangle.i"
