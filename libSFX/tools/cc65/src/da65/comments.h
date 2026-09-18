@@ -7,7 +7,7 @@
 /*                                                                           */
 /*                                                                           */
 /* (C) 2006      Ullrich von Bassewitz                                       */
-/*               Römerstrasse 52                                             */
+/*               Roemerstrasse 52                                            */
 /*               D-70794 Filderstadt                                         */
 /* EMail:        uz@cc65.org                                                 */
 /*                                                                           */
@@ -38,6 +38,9 @@
 
 
 
+#include <stdint.h>
+
+/* da65 */
 #include "attrtab.h"
 
 
@@ -48,10 +51,10 @@
 
 
 
-void SetComment (unsigned Addr, const char* Comment);
+void SetComment (uint32_t Addr, const char* Text);
 /* Set a comment for the given address */
 
-const char* GetComment (unsigned Addr);
+const char* GetComment (uint32_t Addr);
 /* Return the comment for an address */
 
 

@@ -20,6 +20,9 @@ DESTROY_COUNT   = 1
 RENAME_CALL     = $C2
 RENAME_COUNT    = 2
 
+SET_INFO_CALL   = $C3
+SET_INFO_COUNT  = 7
+
 GET_INFO_CALL   = $C4
 GET_INFO_COUNT  = $A
 
@@ -50,6 +53,13 @@ EOF_COUNT       = 2
 
         .struct MLI
                 .union
+                        ; Pseudo-struct to make clear that calls with a
+                        ; PATHNAME parameter always have PATHNAME in the
+                        ; same place
+                        .struct PATH
+                                PARAM_COUNT     .byte
+                                PATHNAME        .addr
+                        .endstruct
                         .struct RW_BLOCK
                                 PARAM_COUNT     .byte
                                 UNIT_NUM        .byte
@@ -83,8 +93,8 @@ EOF_COUNT       = 2
                                 AUX_TYPE        .word
                                 STORAGE_TYPE    .byte
                                 BLOCKS          .word
-                                MODE_DATE       .word
-                                MODE_TIME       .word
+                                MOD_DATE        .word
+                                MOD_TIME        .word
                                 CREATE_DATE     .word
                                 CREATE_TIME     .word
                         .endstruct
@@ -127,6 +137,13 @@ EOF_COUNT       = 2
                 .endunion
         .endstruct
 
+        ; Assert that PATHNAME parameters is always at the same place
+        .assert MLI::CREATE::PATHNAME  = MLI::PATH::PATHNAME, error
+        .assert MLI::DESTROY::PATHNAME = MLI::PATH::PATHNAME, error
+        .assert MLI::INFO::PATHNAME    = MLI::PATH::PATHNAME, error
+        .assert MLI::PREFIX::PATHNAME  = MLI::PATH::PATHNAME, error
+        .assert MLI::OPEN::PATHNAME    = MLI::PATH::PATHNAME, error
+
         .global         mliparam
         .global         callmli
 
@@ -139,3 +156,6 @@ LEVEL   :=      $BF94           ; File level: used in open, flush, close
 MACHID  :=      $BF98           ; Machine identification
 PFIXPTR :=      $BF9A           ; If = 0, no prefix active
 KVERSION:=      $BFFF           ; Kernel version number
+
+; Max filename length
+FILENAME_MAX =  64+1

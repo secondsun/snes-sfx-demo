@@ -42,7 +42,6 @@
 
 /* common */
 #include "exprdefs.h"
-#include "inline.h"
 
 /* ca65 */
 #include "symentry.h"
@@ -77,6 +76,7 @@ struct SymTable {
     SymTable*           Childs;         /* Pointer to child scopes */
     SymEntry*           Label;          /* Scope label */
     Collection          Spans;          /* Spans for this scope */
+    Collection          OpenSpans;      /* Spans for the current occurrence */
     unsigned            Id;             /* Scope id */
     unsigned short      Flags;          /* Symbol table flags */
     unsigned char       AddrSize;       /* Address size */
@@ -84,6 +84,7 @@ struct SymTable {
     unsigned            Level;          /* Lexical level */
     unsigned            TableSlots;     /* Number of hash table slots */
     unsigned            TableEntries;   /* Number of entries in the table */
+    unsigned long       Size;           /* Total size of all occurrences */
     unsigned            Name;           /* Name of the scope */
     SymEntry*           Table[1];       /* Dynamic allocation */
 };
@@ -135,25 +136,17 @@ SymEntry* SymFindAny (SymTable* Scope, const StrBuf* Name);
 ** scope.
 */
 
-#if defined(HAVE_INLINE)
-INLINE unsigned char GetSymTabType (const SymTable* S)
+static inline unsigned char GetSymTabType (const SymTable* S)
 /* Return the type of the given symbol table */
 {
     return S->Type;
 }
-#else
-#  define GetSymTabType(S)      ((S)->Type)
-#endif
 
-#if defined(HAVE_INLINE)
-INLINE int SymTabIsClosed (const SymTable* S)
+static inline int SymTabIsClosed (const SymTable* S)
 /* Return true if the symbol table has been closed */
 {
     return (S->Flags & ST_CLOSED) != 0;
 }
-#else
-#  define SymTabIsClosed(S)      (((S)->Flags & ST_CLOSED) != 0)
-#endif
 
 void SymCheck (void);
 /* Run through all symbols and check for anomalies and errors */

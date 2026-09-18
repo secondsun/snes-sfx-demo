@@ -110,6 +110,21 @@ char cgetc (void);
 ** 1 (see below), a blinking cursor is displayed while waiting.
 */
 
+char* __fastcall__ cgets (char* buffer, int size);
+/* Get a string of characters directly from the console. The function returns
+** when size - 1 characters or either CR/LF are read. Note the parameters are
+** more aligned with stdio fgets() as opposed to the quirky "standard" conio
+** cgets(). Besides providing saner parameters, the function also echoes CRLF
+** when either CR/LF are read but does NOT append either in the buffer. This is
+** to correspond to stdio fgets() which echoes CRLF, but prevents a "gotcha"
+** where the buffer might not be able to accommodate both CR and LF at the end.
+**
+**   param: buffer - where to save the input, must be non-NULL
+**   param: size - size of the buffer, must be > 1
+**  return: buffer if successful, NULL on error
+**  author: Russell-S-Harper
+*/
+
 int cscanf (const char* format, ...);
 /* Like scanf(), but uses direct keyboard input */
 
@@ -201,19 +216,33 @@ void __fastcall__ cputhex16 (unsigned val);
 */
 
 #ifdef _textcolor
-#  define textcolor(x)          _textcolor(x)
+#  define textcolor(color)      _textcolor(color)
 #endif
 #ifdef _bgcolor
-#  define bgcolor(x)            _bgcolor(x)
+#  define bgcolor(color)        _bgcolor(color)
 #endif
 #ifdef _bordercolor
-#  define bordercolor(x)        _bordercolor(x)
+#  define bordercolor(color)    _bordercolor(color)
 #endif
 #ifdef _cpeekcolor
-#  define cpeekcolor(x)         _cpeekcolor(x)
+#  define cpeekcolor()          _cpeekcolor()
+#endif
+#ifdef _cpeekrevers
+#  define cpeekrevers()         _cpeekrevers()
 #endif
 
-
+#ifdef _chline
+#  define chline(len)      _chline(len)
+#endif
+#ifdef _cvline
+#  define cvline(len)      _cvline(len)
+#endif
+#ifdef _chlinexy
+#  define chlinexy(x, y, len)      _chlinexy(x, y, len)
+#endif
+#ifdef _cvlinexy
+#  define cvlinexy(x, y, len)      _cvlinexy(x, y, len)
+#endif
 
 /* End of conio.h */
 #endif

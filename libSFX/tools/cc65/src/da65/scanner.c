@@ -94,7 +94,7 @@ void InfoWarning (const char* Format, ...)
     xvsprintf (Buf, sizeof (Buf), Format, ap);
     va_end (ap);
 
-    fprintf (stderr, "%s(%u): Warning: %s\n",
+    fprintf (stderr, "%s:%u: Warning: %s\n",
             InputSrcName, InfoErrorLine, Buf);
 }
 
@@ -110,7 +110,7 @@ void InfoError (const char* Format, ...)
     xvsprintf (Buf, sizeof (Buf), Format, ap);
     va_end (ap);
 
-    fprintf (stderr, "%s(%u): Error: %s\n",
+    fprintf (stderr, "%s:%u: Error: %s\n",
             InputSrcName, InfoErrorLine, Buf);
     exit (EXIT_FAILURE);
 }
@@ -372,6 +372,14 @@ Again:
         return;
     }
 
+    /* Decimal number offset? */
+    if (C == '+') {
+        NextChar ();
+        InfoIVal = GetDecimalToken ();
+        InfoTok = INFOTOK_OFFSET_INTCON;
+        return;
+    }
+
     /* Other characters */
     switch (C) {
 
@@ -592,11 +600,11 @@ void InfoAssureIdent (void)
 
 
 
-void InfoRangeCheck (long Lo, long Hi)
+void InfoRangeCheck (const char* Attr, long Lo, long Hi)
 /* Check the range of InfoIVal */
 {
     if (InfoIVal < Lo || InfoIVal > Hi) {
-        InfoError ("Range error");
+        InfoError ("Range error for attribute %s", Attr);
     }
 }
 
@@ -663,8 +671,8 @@ void InfoSetName (const char* Name)
 /* Set a name for a config file */
 {
     InfoFile = Name;
-    xfree(InputSrcName);
-    InputSrcName = xstrdup(Name);
+    xfree (InputSrcName);
+    InputSrcName = xstrdup (Name);
 }
 
 

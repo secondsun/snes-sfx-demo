@@ -107,11 +107,14 @@ void CreateDbgFile (void)
     /* Open the debug info file */
     FILE* F = fopen (DbgFileName, "w");
     if (F == 0) {
-        Error ("Cannot create debug file '%s': %s", DbgFileName, strerror (errno));
+        Error ("Cannot create debug file `%s': %s", DbgFileName, strerror (errno));
     }
 
     /* Output version information */
     fprintf (F, "version\tmajor=2,minor=0\n");
+
+    /* Assign the ids to the items: this must occur before info, as it removes unused items */
+    AssignIds ();
 
     /* Output a line with the item numbers so the debug info module is able
     ** to preallocate the required memory.
@@ -130,9 +133,6 @@ void CreateDbgFile (void)
         DbgSymCount (),
         TypeCount ()
     );
-
-    /* Assign the ids to the items */
-    AssignIds ();
 
     /* Output high level language symbols */
     PrintHLLDbgSyms (F);
@@ -166,6 +166,6 @@ void CreateDbgFile (void)
 
     /* Close the file */
     if (fclose (F) != 0) {
-        Error ("Error closing debug file '%s': %s", DbgFileName, strerror (errno));
+        Error ("Error closing debug file `%s': %s", DbgFileName, strerror (errno));
     }
 }

@@ -117,7 +117,7 @@ SymEntry* DefSizeOfScope (SymTable* Scope, long Size)
 /* Define the size of a scope and return the size symbol */
 {
     SymEntry* SizeSym = GetSizeOfScope (Scope);
-    SymDef (SizeSym, GenLiteralExpr (Size), ADDR_SIZE_DEFAULT, SF_NONE);
+    SymDef (SizeSym, GenLiteralExpr (Size), ADDR_SIZE_DEFAULT, SF_VAR);
     return SizeSym;
 }
 

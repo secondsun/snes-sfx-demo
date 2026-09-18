@@ -16,7 +16,6 @@
 #include <dbg.h>
 
 
-
 /*****************************************************************************/
 /*                             Function forwards                             */
 /*****************************************************************************/
@@ -333,7 +332,7 @@ BreakPoint DbgBreaks [MAX_USERBREAKS+2];
 BreakPoint* DbgGetBreakSlot (void);
 /* Search for a free breakpoint slot. Return a pointer to the slot or 0 */
 
-BreakPoint* DbgIsBreak (unsigned Addr);
+BreakPoint* __cdecl__ DbgIsBreak (unsigned Addr);
 /* Check if there is a user breakpoint at the given address, if so, return
 ** a pointer to the slot, else return 0.
 */
@@ -1064,7 +1063,7 @@ static char StackHandler (void)
                 break;
 
             case 'a':
-#ifdef CH_CURS_UP:
+#ifdef CH_CURS_UP
             case CH_CURS_UP:
 #endif
                 --StackAddr;
@@ -1580,7 +1579,11 @@ void DbgEntry (void)
             case 'q':
                 /* Quit program */
                 clrscr ();
-                exit (1);
+
+                /* Exit intentionally with error because one may
+                **  say that DbgEntry is always abnormal.
+                */
+                exit (EXIT_FAILURE);
 
         }
     }

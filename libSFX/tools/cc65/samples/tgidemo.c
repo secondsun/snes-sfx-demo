@@ -12,8 +12,10 @@
 #  define DYN_DRV       1
 #endif
 
-#define COLOR_BACK      TGI_COLOR_BLACK
-#define COLOR_FORE      TGI_COLOR_WHITE
+
+/* Color values passed to TGI functions are indices into the default palette. */
+#define COLOR_BACK      0
+#define COLOR_FORE      1
 
 
 /*****************************************************************************/
@@ -38,8 +40,9 @@ static unsigned AspectRatio;
 static void CheckError (const char* S)
 {
     unsigned char Error = tgi_geterror ();
+
     if (Error != TGI_ERR_OK) {
-        printf ("%s: %d\n", S, Error);
+        printf ("%s: %u\n", S, Error);
         if (doesclrscrafterexit ()) {
             cgetc ();
         }
@@ -64,50 +67,73 @@ static void DoWarning (void)
 #endif
 
 
+/*
+ * Note that everywhere else in the TGI API, colors are referred to via an index
+ * to the current palette.
+ *
+ * TGI_COLOR_ values can be used (ONLY!) for setting the palette, using them
+ * with other TGI functions only works by chance, on some targets.
+ */
+static void DoPalette (int n)
+{
+    static const unsigned char Palette[4][2] = {
+/* FIXME: add some ifdefs with proper values for targets that need it */
+#if !defined(__APPLE2__)
+        { TGI_COLOR_BLACK, TGI_COLOR_BLUE },
+        { TGI_COLOR_WHITE, TGI_COLOR_BLACK },
+        { TGI_COLOR_RED, TGI_COLOR_BLACK },
+#else
+        { TGI_COLOR_WHITE, TGI_COLOR_BLACK },
+        { TGI_COLOR_BLACK, TGI_COLOR_WHITE },
+        { TGI_COLOR_WHITE, TGI_COLOR_BLACK },
+#endif
+    };
+    tgi_setpalette (Palette[n]);
+}
+
 
 static void DoCircles (void)
 {
-    static const unsigned char Palette[2] = { TGI_COLOR_WHITE, TGI_COLOR_ORANGE };
     unsigned char I;
-    unsigned char Color = COLOR_FORE;
-    unsigned X = MaxX / 2;
-    unsigned Y = MaxY / 2;
+    unsigned char Color = COLOR_BACK;
+    const unsigned X = MaxX / 2;
+    const unsigned Y = MaxY / 2;
+    const unsigned Limit = (X < Y) ? Y : X;
 
-    tgi_setpalette (Palette);
+    tgi_setcolor (COLOR_FORE);
+    tgi_clear ();
+    tgi_line (0, 0, MaxX, MaxY);
+    tgi_line (0, MaxY, MaxX, 0);
     while (!kbhit ()) {
-        tgi_setcolor (COLOR_FORE);
-        tgi_line (0, 0, MaxX, MaxY);
-        tgi_line (0, MaxY, MaxX, 0);
+        Color = (Color == COLOR_FORE) ? COLOR_BACK : COLOR_FORE;
         tgi_setcolor (Color);
-        for (I = 10; I < 240; I += 10) {
+        for (I = 10; I <= Limit; I += 10) {
             tgi_ellipse (X, Y, I, tgi_imulround (I, AspectRatio));
         }
-        Color = Color == COLOR_FORE ? COLOR_BACK : COLOR_FORE;
     }
-
+    while (kbhit ()) {
+        cgetc ();
+    }
     cgetc ();
-    tgi_clear ();
 }
 
 
 
 static void DoCheckerboard (void)
 {
-    static const unsigned char Palette[2] = { TGI_COLOR_WHITE, TGI_COLOR_BLACK };
     unsigned X, Y;
-    unsigned char Color;
+    unsigned char Color = COLOR_BACK;
 
-    tgi_setpalette (Palette);
-    Color = COLOR_BACK;
+    tgi_clear ();
+
     while (1) {
         for (Y = 0; Y <= MaxY; Y += 10) {
             for (X = 0; X <= MaxX; X += 10) {
+                Color = (Color == COLOR_FORE) ? COLOR_BACK : COLOR_FORE;
                 tgi_setcolor (Color);
                 tgi_bar (X, Y, X+9, Y+9);
-                Color = Color == COLOR_FORE ? COLOR_BACK : COLOR_FORE;
                 if (kbhit ()) {
                     cgetc ();
-                    tgi_clear ();
                     return;
                 }
             }
@@ -121,16 +147,15 @@ static void DoCheckerboard (void)
 
 static void DoDiagram (void)
 {
-    static const unsigned char Palette[2] = { TGI_COLOR_WHITE, TGI_COLOR_BLACK };
     int XOrigin, YOrigin;
     int Amp;
     int X, Y;
     unsigned I;
 
-    tgi_setpalette (Palette);
     tgi_setcolor (COLOR_FORE);
+    tgi_clear ();
 
-    /* Determine zero and aplitude */
+    /* Determine zero and amplitude */
     YOrigin = MaxY / 2;
     XOrigin = 10;
     Amp     = (MaxY - 19) / 2;
@@ -157,29 +182,33 @@ static void DoDiagram (void)
         tgi_lineto (XOrigin + X, YOrigin + Y);
     }
 
+    while (kbhit ()) {
+        cgetc ();
+    }
     cgetc ();
-    tgi_clear ();
 }
 
 
 
 static void DoLines (void)
 {
-    static const unsigned char Palette[2] = { TGI_COLOR_WHITE, TGI_COLOR_BLACK };
     unsigned X;
+    const unsigned Min = (MaxX < MaxY) ? MaxX : MaxY;
 
-    tgi_setpalette (Palette);
     tgi_setcolor (COLOR_FORE);
+    tgi_clear ();
 
-    for (X = 0; X <= MaxY; X += 10) {
-        tgi_line (0, 0, MaxY, X);
-        tgi_line (0, 0, X, MaxY);
-        tgi_line (MaxY, MaxY, 0, MaxY-X);
-        tgi_line (MaxY, MaxY, MaxY-X, 0);
+    for (X = 0; X <= Min; X += 10) {
+        tgi_line (0, 0, Min, X);
+        tgi_line (0, 0, X, Min);
+        tgi_line (Min, Min, 0, Min-X);
+        tgi_line (Min, Min, Min-X, 0);
     }
 
+    while (kbhit ()) {
+        cgetc ();
+    }
     cgetc ();
-    tgi_clear ();
 }
 
 
@@ -203,7 +232,6 @@ int main (void)
 
     tgi_init ();
     CheckError ("tgi_init");
-    tgi_clear ();
 
     /* Get stuff from the driver */
     MaxX = tgi_getmaxx ();
@@ -214,10 +242,11 @@ int main (void)
     Border = bordercolor (COLOR_BLACK);
 
     /* Do graphics stuff */
-    DoCircles ();
-    DoCheckerboard ();
-    DoDiagram ();
-    DoLines ();
+
+    /* use default palette */ DoCircles ();
+    DoPalette (0); DoCheckerboard ();
+    DoPalette (1); DoDiagram ();
+    DoPalette (2); DoLines ();
 
 #if DYN_DRV
     /* Unload the driver */

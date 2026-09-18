@@ -10,6 +10,7 @@
 
         .export         __STARTUP__ : absolute = 1      ; Mark as startup
         .export         _exit, start, excexit, SP_save
+        .export         __LMARGN_save                   ; original LMARGN setting
 
         .import         initlib, donelib
         .import         callmain, zerobss
@@ -58,8 +59,8 @@ start:
 
         lda     #<(__MAIN_START__ + __MAIN_SIZE__ + __STACKSIZE__)
         ldx     #>(__MAIN_START__ + __MAIN_SIZE__ + __STACKSIZE__)
-        sta     sp
-        stx     sp+1
+        sta     c_sp
+        stx     c_sp+1
 
 .else
 
@@ -74,22 +75,18 @@ start:
         lda     MEMTOP
         sbc     #<__RESERVED_MEMORY__
         sta     APPMHI                  ; initialize our APPMHI value
-        sta     sp                      ; set up runtime stack part 1
+        sta     c_sp                    ; set up runtime stack part 1
         lda     MEMTOP+1
         sbc     #>__RESERVED_MEMORY__
         sta     APPMHI+1
-        sta     sp+1                    ; set up runtime stack part 2
+        sta     c_sp+1                  ; set up runtime stack part 2
 
 .endif
-
-; Call the module constructors.
-
-        jsr     initlib
 
 ; Set the left margin to 0.
 
         lda     LMARGN
-        sta     LMARGN_save
+        sta     __LMARGN_save
         ldy     #0
         sty     LMARGN
 
@@ -103,6 +100,10 @@ start:
 
         dey                     ; Set Y to $FF
         sty     CH              ; remove keypress which might be in the input buffer
+
+; Call the module constructors.
+
+        jsr     initlib
 
 ; Push the command-line arguments; and, call main().
 
@@ -119,7 +120,7 @@ excexit:jsr     donelib         ; Run module destructors; 'excexit' is called fr
 
 ; Restore the left margin.
 
-        lda     LMARGN_save
+        lda     __LMARGN_save
         sta     LMARGN
 
 ; Restore the kb mode.
@@ -196,10 +197,14 @@ excexit:jsr     donelib         ; Run module destructors; 'excexit' is called fr
 
 SP_save:        .res    1
 SHFLOK_save:    .res    1
-LMARGN_save:    .res    1
+__LMARGN_save:  .res    1
 .ifndef __ATARIXL__
 APPMHI_save:    .res    2
 .endif
+
+; ------------------------------------------------------------------------
+
+.segment "INIT"       ; have at least one (empty) segment of INIT, exehdr.s needs its definition
 
 ; ------------------------------------------------------------------------
 

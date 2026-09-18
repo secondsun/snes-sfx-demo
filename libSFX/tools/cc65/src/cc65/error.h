@@ -55,22 +55,42 @@
 
 
 
+/* Error categories */
+typedef enum errcat_t errcat_t;
+enum errcat_t {
+    EC_PP,      /* Pre-parser phases */
+    EC_PARSER,  /* Parser and later phases */
+};
+
+
+
 /* Count of errors/warnings */
-extern unsigned ErrorCount;
-extern unsigned WarningCount;
+extern unsigned PPErrorCount;           /* Pre-parser errors */
+extern unsigned PPWarningCount;         /* Pre-parser warnings */
+extern unsigned ErrorCount;             /* Errors occurred in parser and later translation phases */
+extern unsigned WarningCount;           /* Warnings occurred in parser and later translation phases */
 
 /* Warning and error options */
 extern IntStack WarnEnable;             /* Enable warnings */
 extern IntStack WarningsAreErrors;      /* Treat warnings as errors */
                                         /* Warn about: */
 extern IntStack WarnConstComparison;    /* - constant comparison results */
+extern IntStack WarnPointerSign;        /* - pointer conversion to pointer differing in signedness */
+extern IntStack WarnPointerTypes;       /* - pointer conversion to incompatible pointer type */
 extern IntStack WarnNoEffect;           /* - statements without an effect */
 extern IntStack WarnRemapZero;          /* - remapping character code zero */
+extern IntStack WarnReturnType;         /* - control reaches end of non-void function */
 extern IntStack WarnStructParam;        /* - structs passed by val */
 extern IntStack WarnUnknownPragma;      /* - unknown #pragmas */
+extern IntStack WarnUnreachableCode;    /* - unreachable code */
 extern IntStack WarnUnusedLabel;        /* - unused labels */
 extern IntStack WarnUnusedParam;        /* - unused parameters */
 extern IntStack WarnUnusedVar;          /* - unused variables */
+extern IntStack WarnUnusedFunc;         /* - unused functions */
+extern IntStack WarnConstOverflow;      /* - overflow conversion of numerical constants */
+
+/* Forward */
+struct StrBuf;
 
 
 
@@ -80,29 +100,53 @@ extern IntStack WarnUnusedVar;          /* - unused variables */
 
 
 
-void Fatal (const char* Format, ...) attribute ((noreturn, format (printf, 1, 2)));
+void PrintFileInclusionInfo (const LineInfo* LI);
+/* Print hierarchy of file inclusion */
+
+LineInfo* GetDiagnosticLI (void);
+/* Get the line info where the diagnostic info refers to */
+
+void Fatal_ (const char *file, int line, const char* Format, ...) attribute ((noreturn, format (printf, 3, 4)));
+#define Fatal(...) Fatal_(__FILE__, __LINE__, __VA_ARGS__)
 /* Print a message about a fatal error and die */
 
-void Internal (const char* Format, ...) attribute ((noreturn, format (printf, 1, 2)));
-/* Print a message about an internal compiler error and die. */
+void Internal_ (const char *file, int line, const char* Format, ...) attribute ((noreturn, format (printf, 3, 4)));
+#define Internal(...) Internal_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print a message about an internal compiler error and die */
 
-void Error (const char* Format, ...) attribute ((format (printf, 1, 2)));
+void Error_ (const char *file, int line, const char* Format, ...) attribute ((format (printf, 3, 4)));
+#define Error(...) Error_(__FILE__, __LINE__, __VA_ARGS__)
 /* Print an error message */
 
-void LIError (const LineInfo* LI, const char* Format, ...) attribute ((format (printf, 2, 3)));
+void LIError_ (const char *file, int line, errcat_t EC, LineInfo* LI, const char* Format, ...) attribute ((format (printf, 5, 6)));
+#define LIError(...) LIError_(__FILE__, __LINE__, __VA_ARGS__)
 /* Print an error message with the line info given explicitly */
 
-void PPError (const char* Format, ...) attribute ((format (printf, 1, 2)));
-/* Print an error message. For use within the preprocessor.  */
+void PPError_ (const char *file, int line, const char* Format, ...) attribute ((format (printf, 3, 4)));
+#define PPError(...) PPError_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print an error message. For use within the preprocessor */
 
-void Warning (const char* Format, ...) attribute ((format (printf, 1, 2)));
-/* Print warning message. */
+void Warning_ (const char *file, int line, const char* Format, ...) attribute ((format (printf, 3, 4)));
+#define Warning(...) Warning_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print a warning message */
 
-void LIWarning (const LineInfo* LI, const char* Format, ...) attribute ((format (printf, 2, 3)));
+void LIWarning_ (const char *file, int line, errcat_t EC, LineInfo* LI, const char* Format, ...) attribute ((format (printf, 5, 6)));
+#define LIWarning(...) LIWarning_(__FILE__, __LINE__, __VA_ARGS__)
 /* Print a warning message with the line info given explicitly */
 
-void PPWarning (const char* Format, ...) attribute ((format (printf, 1, 2)));
-/* Print warning message. For use within the preprocessor. */
+void PPWarning_ (const char *file, int line, const char* Format, ...) attribute ((format (printf, 3, 4)));
+#define PPWarning(...) PPWarning_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print a warning message. For use within the preprocessor */
+
+void UnreachableCodeWarning (void);
+/* Print a warning about unreachable code at the current location if these
+** warnings are enabled.
+*/
+
+void LIUnreachableCodeWarning (LineInfo* LI);
+/* Print a warning about unreachable code at the given location if these
+** warnings are enabled.
+*/
 
 IntStack* FindWarning (const char* Name);
 /* Search for a warning in the WarnMap table and return a pointer to the
@@ -112,8 +156,35 @@ IntStack* FindWarning (const char* Name);
 void ListWarnings (FILE* F);
 /* Print a list of warning types/names to the given file */
 
+void Note_ (const char *file, int line, const char* Format, ...) attribute ((format (printf, 3, 4)));
+#define Note(...) Note_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print a note message */
+
+void LINote_ (const char *file, int line, const LineInfo* LI, const char* Format, ...) attribute ((format (printf, 4, 5)));
+#define LINote(...) LINote_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print a note message with the line info given explicitly */
+
+void PPNote_ (const char *file, int line, const char* Format, ...) attribute ((format (printf, 3, 4)));
+#define PPNote(...) PPNote_(__FILE__, __LINE__, __VA_ARGS__)
+/* Print a note message. For use within the preprocessor */
+
+unsigned GetTotalErrors (void);
+/* Get total count of errors of all categories */
+
+unsigned GetTotalWarnings (void);
+/* Get total count of warnings of all categories */
+
 void ErrorReport (void);
 /* Report errors (called at end of compile) */
+
+void InitDiagnosticStrBufs (void);
+/* Init tracking string buffers used for diagnostics */
+
+void DoneDiagnosticStrBufs (void);
+/* Done with tracked string buffers used for diagnostics */
+
+struct StrBuf* NewDiagnosticStrBuf (void);
+/* Get a new tracked string buffer */
 
 
 

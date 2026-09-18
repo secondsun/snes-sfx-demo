@@ -70,6 +70,7 @@
 /* common */
 #include "attrib.h"
 #include "cmdline.h"
+#include "consprop.h"
 #include "filetype.h"
 #include "fname.h"
 #include "mmodel.h"
@@ -112,12 +113,20 @@ static CmdDesc CO65 = { 0, 0, 0, 0, 0, 0, 0 };
 static CmdDesc LD65 = { 0, 0, 0, 0, 0, 0, 0 };
 static CmdDesc GRC  = { 0, 0, 0, 0, 0, 0, 0 };
 
+/* Pseudo-command to track files we want to delete */
+static CmdDesc RM   = { 0, 0, 0, 0, 0, 0, 0 };
+
 /* Variables controlling the steps we're doing */
 static int DoLink       = 1;
 static int DoAssemble   = 1;
 
 /* The name of the output file, NULL if none given */
 static const char* OutputName = 0;
+
+/* The path part of the output file, NULL if none given
+** or the OutputName is just a filename with no path
+** information. */
+static char *OutputDirectory = 0;
 
 /* The name of the linker configuration file if given */
 static const char* LinkerConfig = 0;
@@ -228,12 +237,8 @@ static char* CmdAllocArg (const char* Arg, unsigned Len)
 static void CmdExpand (CmdDesc* Cmd)
 /* Expand the argument vector */
 {
-    unsigned NewMax  = Cmd->ArgMax + 10;
-    char**       NewArgs = xmalloc (NewMax * sizeof (char*));
-    memcpy (NewArgs, Cmd->Args, Cmd->ArgMax * sizeof (char*));
-    xfree (Cmd->Args);
-    Cmd->Args   = NewArgs;
-    Cmd->ArgMax = NewMax;
+    Cmd->ArgMax += 10;
+    Cmd->Args    = xrealloc (Cmd->Args, Cmd->ArgMax * sizeof (char*));
 }
 
 
@@ -321,12 +326,8 @@ static void CmdAddFile (CmdDesc* Cmd, const char* File)
 {
     /* Expand the file vector if needed */
     if (Cmd->FileCount == Cmd->FileMax) {
-        unsigned NewMax   = Cmd->FileMax + 10;
-        char**   NewFiles = xmalloc (NewMax * sizeof (char*));
-        memcpy (NewFiles, Cmd->Files, Cmd->FileMax * sizeof (char*));
-        xfree (Cmd->Files);
-        Cmd->Files   = NewFiles;
-        Cmd->FileMax = NewMax;
+        Cmd->FileMax += 10;
+        Cmd->Files    = xrealloc (Cmd->Files, Cmd->FileMax * sizeof (char*));
     }
 
     /* If the file name is not NULL (which is legal and is used to terminate
@@ -379,6 +380,14 @@ static void CmdSetOutput (CmdDesc* Cmd, const char* File)
 /* Set the output file in a command desc */
 {
     CmdAddArg2 (Cmd, "-o", File);
+}
+
+
+
+static void CmdSetAsmOutput (CmdDesc* Cmd, const char* File)
+/* Set the output asm file in a command desc for grc65 */
+{
+    CmdAddArg2 (Cmd, "-s", File);
 }
 
 
@@ -456,6 +465,20 @@ static void ExecProgram (CmdDesc* Cmd)
 
 
 
+static void RemoveTempFiles (void)
+{
+    unsigned I;
+
+    for (I = 0; I < RM.FileCount; ++I) {
+        if (remove (RM.Files[I]) < 0) {
+            Warning ("Cannot remove temporary file '%s': %s",
+                     RM.Files[I], strerror (errno));
+        }
+    }
+}
+
+
+
 static void Link (void)
 /* Link the resulting executable */
 {
@@ -517,33 +540,47 @@ static void Link (void)
 
 
 
-static void AssembleFile (const char* File, unsigned ArgCount)
+static void AssembleFile (const char* File, const char* TmpFile, unsigned ArgCount)
 /* Common routine to assemble a file. Will be called by Assemble() and
 ** AssembleIntermediate(). Adds options common for both routines and
 ** assembles the file. Will remove excess arguments after assembly.
 */
 {
+    /* ObjName may be used for temporary or real filename */
+    char *ObjName;
+
     /* Set the target system */
     CmdSetTarget (&CA65, Target);
 
     /* Check if this is the last processing step */
     if (DoLink) {
         /* We're linking later. Add the output file of the assembly
-        ** the the file list of the linker. The name of the output
+        ** to the file list of the linker. The name of the output
         ** file is that of the input file with ".s" replaced by ".o".
         */
-        char* ObjName = MakeFilename (File, ".o");
+        if (TmpFile) {
+            ObjName = MakeFilename (TmpFile, ".o");
+        } else {
+            ObjName = MakeTmpFilename (OutputDirectory, File, ".o");
+        }
+        CmdSetOutput (&CA65, ObjName);
         CmdAddFile (&LD65, ObjName);
+        /* This is just a temporary file, schedule it for removal */
+        CmdAddFile (&RM, ObjName);
         xfree (ObjName);
     } else {
         /* This is the final step. If an output name is given, set it */
         if (OutputName) {
             CmdSetOutput (&CA65, OutputName);
+        } else {
+            ObjName = MakeFilename (File, ".o");
+            CmdSetOutput (&CA65, ObjName);
+            xfree (ObjName);
         }
     }
 
     /* Add the file as argument for the assembler */
-    CmdAddArg (&CA65, File);
+    CmdAddArg (&CA65, TmpFile ? TmpFile : File);
 
     /* Add a NULL pointer to terminate the argument list */
     CmdAddArg (&CA65, 0);
@@ -557,7 +594,7 @@ static void AssembleFile (const char* File, unsigned ArgCount)
 
 
 
-static void AssembleIntermediate (const char* SourceFile)
+static void AssembleIntermediate (const char* SourceFile, const char* TmpFile)
 /* Assemble an intermediate file which was generated by a previous processing
 ** step with SourceFile as input. The -dep options won't be added and
 ** the intermediate assembler file is removed after assembly.
@@ -567,18 +604,20 @@ static void AssembleIntermediate (const char* SourceFile)
     ** name. It's the same name with the extension replaced by ".s"
     */
     char* AsmName = MakeFilename (SourceFile, ".s");
+    char* AsmTmpName = TmpFile ? MakeFilename(TmpFile, ".s") : NULL;
 
     /* Assemble the intermediate assembler file */
-    AssembleFile (AsmName, CA65.ArgCount);
+    AssembleFile (AsmName, AsmTmpName, CA65.ArgCount);
 
     /* Remove the input file */
-    if (remove (AsmName) < 0) {
+    if (remove (AsmTmpName ? AsmTmpName : AsmName) < 0) {
         Warning ("Cannot remove temporary file '%s': %s",
-                 AsmName, strerror (errno));
+                 AsmTmpName ? AsmTmpName : AsmName, strerror (errno));
     }
 
     /* Free the assembler file name which was allocated from the heap */
     xfree (AsmName);
+    xfree (AsmTmpName);
 }
 
 
@@ -601,7 +640,7 @@ static void Assemble (const char* File)
     }
 
     /* Use the common routine */
-    AssembleFile (File, ArgCount);
+    AssembleFile (File, NULL, ArgCount);
 }
 
 
@@ -609,6 +648,9 @@ static void Assemble (const char* File)
 static void Compile (const char* File)
 /* Compile the given file */
 {
+    /* A temporary file name passed to the assembler */
+    char *TmpFile = NULL;
+
     /* Remember the current compiler argument count */
     unsigned ArgCount = CC65.ArgCount;
 
@@ -646,6 +688,12 @@ static void Compile (const char* File)
     /* Add the file as argument for the compiler */
     CmdAddArg (&CC65, File);
 
+    if (DoAssemble) {
+        /* set a temporary output file name */
+        TmpFile = MakeTmpFilename(OutputDirectory, File, ".s");
+        CmdSetOutput (&CC65, TmpFile);
+    }
+
     /* Add a NULL pointer to terminate the argument list */
     CmdAddArg (&CC65, 0);
 
@@ -660,7 +708,10 @@ static void Compile (const char* File)
     */
     if (DoAssemble) {
         /* Assemble the intermediate file and remove it */
-        AssembleIntermediate (File);
+        AssembleIntermediate (File, TmpFile);
+        if (TmpFile) {
+            xfree(TmpFile);
+        }
     }
 }
 
@@ -669,6 +720,9 @@ static void Compile (const char* File)
 static void CompileRes (const char* File)
 /* Compile the given geos resource file */
 {
+    /* tmp Asm file name, if needed */
+    char* AsmName = NULL;
+
     /* Remember the current assembler argument count */
     unsigned ArgCount = GRC.ArgCount;
 
@@ -676,6 +730,14 @@ static void CompileRes (const char* File)
     ** is checked within grc65.
     */
     CmdSetTarget (&GRC, Target);
+
+    /* Changes to output file name must come
+    ** BEFORE adding the file
+    */
+    if (DoAssemble && DoLink) {
+        AsmName = MakeTmpFilename(OutputDirectory, File, ".s");
+        CmdSetAsmOutput(&GRC, AsmName);
+    }
 
     /* Add the file as argument for the resource compiler */
     CmdAddArg (&GRC, File);
@@ -694,7 +756,10 @@ static void CompileRes (const char* File)
     */
     if (DoAssemble) {
         /* Assemble the intermediate file and remove it */
-        AssembleIntermediate (File);
+        AssembleIntermediate (File, AsmName);
+        if (AsmName) {
+            xfree(AsmName);
+        }
     }
 }
 
@@ -730,7 +795,7 @@ static void ConvertO65 (const char* File)
     */
     if (DoAssemble) {
         /* Assemble the intermediate file and remove it */
-        AssembleIntermediate (File);
+        AssembleIntermediate (File, NULL);
     }
 }
 
@@ -794,6 +859,7 @@ static void Usage (void)
             "  --code-label name\t\tDefine and export a CODE segment label\n"
             "  --code-name seg\t\tSet the name of the CODE segment\n"
             "  --codesize x\t\t\tAccept larger code by factor x\n"
+            "  --color [on|auto|off]\t\tColor diagnostics (default: auto)\n"
             "  --config name\t\t\tUse linker config file\n"
             "  --cpu type\t\t\tSet CPU type\n"
             "  --create-dep name\t\tCreate a make dependency file\n"
@@ -807,7 +873,6 @@ static void Usage (void)
             "  --help\t\t\tHelp (this text)\n"
             "  --include-dir dir\t\tSet a compiler include directory path\n"
             "  --ld-args options\t\tPass options to the linker\n"
-            "  --lib file\t\t\tLink this library\n"
             "  --lib-path path\t\tSpecify a library search path\n"
             "  --list-targets\t\tList all available targets\n"
             "  --listing name\t\tCreate an assembler listing file\n"
@@ -817,6 +882,7 @@ static void Usage (void)
             "  --module\t\t\tLink as a module\n"
             "  --module-id id\t\tSpecify a module ID for the linker\n"
             "  --no-target-lib\t\tDon't link the target library\n"
+            "  --no-utf8\t\t\tDisable use of UTF-8 in diagnostics\n"
             "  --o65-model model\t\tOverride the o65 model\n"
             "  --obj file\t\t\tLink this object file\n"
             "  --obj-path path\t\tSpecify an object file search path\n"
@@ -831,6 +897,8 @@ static void Usage (void)
             "  --target sys\t\t\tSet the target system\n"
             "  --version\t\t\tPrint the version number\n"
             "  --verbose\t\t\tVerbose mode\n"
+            "  --warn-align-waste\t\tPrint bytes \"wasted\" for alignment\n"
+            "  --warnings-as-errors\t\tTreat warnings as errors\n"
             "  --zeropage-label name\t\tDefine and export a ZEROPAGE segment label\n"
             "  --zeropage-name seg\t\tSet the name of the ZEROPAGE segment\n",
             ProgName);
@@ -965,6 +1033,19 @@ static void OptConfig (const char* Opt attribute ((unused)), const char* Arg)
 
 
 
+static void OptColor(const char* Opt, const char* Arg)
+/* Handle the --color option */
+{
+    if (CP_Parse (Arg) == CM_INVALID) {
+        Error ("Invalid argument to %s: %s", Opt, Arg);
+    } else {
+        CmdAddArg2 (&CA65, "--color", Arg);
+        CmdAddArg2 (&LD65, "--color", Arg);
+    }
+}
+
+
+
 static void OptCPU (const char* Opt attribute ((unused)), const char* Arg)
 /* Handle the --cpu option */
 {
@@ -1080,14 +1161,6 @@ static void OptLdArgs (const char* Opt attribute ((unused)), const char* Arg)
 
 
 
-static void OptLib (const char* Opt attribute ((unused)), const char* Arg)
-/* Library file follows (linker) */
-{
-    CmdAddArg2 (&LD65, "--lib", Arg);
-}
-
-
-
 static void OptLibPath (const char* Opt attribute ((unused)), const char* Arg)
 /* Library search path (linker) */
 {
@@ -1181,6 +1254,16 @@ static void OptNoTargetLib (const char* Opt attribute ((unused)),
 
 
 
+static void OptNoUtf8 (const char* Opt attribute ((unused)),
+                       const char* Arg attribute ((unused)))
+/* Handle the --no-utf8 option */
+{
+    CmdAddArg (&CA65, "--no-utf8");
+    CmdAddArg (&LD65, "--no-utf8");
+}
+
+
+
 static void OptO65Model (const char* Opt attribute ((unused)), const char* Arg)
 /* Handle the --o65-model option */
 {
@@ -1210,15 +1293,24 @@ static void OptPrintTargetPath (const char* Opt attribute ((unused)),
 /* Print the target file path */
 {
     char* TargetPath;
+    char* tmp;
 
     SearchPaths* TargetPaths = NewSearchPath ();
     AddSubSearchPathFromEnv (TargetPaths, "CC65_HOME", "target");
-#if defined(CL65_TGT) && !defined(_WIN32)
-    AddSearchPath (TargetPaths, STRINGIZE (CL65_TGT));
+#if defined(CL65_TGT) && !defined(_WIN32) && !defined(_AMIGA)
+    AddSearchPath (TargetPaths, CL65_TGT);
 #endif
-    AddSubSearchPathFromWinBin (TargetPaths, "target");
+    AddSubSearchPathFromBin (TargetPaths, "target");
 
-    TargetPath = GetSearchPath (TargetPaths, 0);
+    TargetPath = SearchFile (TargetPaths, ".");
+    if (!TargetPath) {
+        fprintf (stderr, "%s: error - could not determine target path\n", ProgName);
+        exit (EXIT_FAILURE);
+    }
+    tmp = strrchr(TargetPath, '.');
+    if (tmp) {
+        *(--tmp) = 0;
+    }
     while (*TargetPath) {
         if (*TargetPath == ' ') {
             /* Escape spaces */
@@ -1294,6 +1386,9 @@ static void OptStaticLocals (const char* Opt attribute ((unused)),
 static void OptTarget (const char* Opt attribute ((unused)), const char* Arg)
 /* Set the target system */
 {
+    if (FirstInput) {
+        Error ("Target must be specified before input files");
+    }
     Target = FindTarget (Arg);
     if (Target == TGT_UNKNOWN) {
         Error ("No such target system: '%s'", Arg);
@@ -1342,64 +1437,88 @@ static void OptZeropageName (const char* Opt attribute ((unused)), const char* A
 
 
 
+static void OptWarnAlignWaste (const char* Opt attribute ((unused)),
+                               const char* Arg attribute ((unused)))
+/* Handle the --warn-align-waste option */
+{
+    CmdAddArg (&CA65, "--warn-align-waste");
+    CmdAddArg (&LD65, "--warn-align-waste");
+}
+
+
+
+static void OptWarningsAsErrors (const char* Opt attribute ((unused)),
+                                 const char* Arg attribute ((unused)))
+/* Handle the --warnings-as-errors option */
+{
+    CmdAddArg (&CA65, "--warnings-as-errors");
+    CmdAddArg (&CC65, "--warnings-as-errors");
+    CmdAddArg (&LD65, "--warnings-as-errors");
+}
+
+
+
 int main (int argc, char* argv [])
 /* Utility main program */
 {
     /* Program long options */
     static const LongOpt OptTab[] = {
-        { "--add-source",        0, OptAddSource      },
-        { "--all-cdecl",         0, OptAllCDecl       },
-        { "--asm-args",          1, OptAsmArgs        },
-        { "--asm-define",        1, OptAsmDefine      },
-        { "--asm-include-dir",   1, OptAsmIncludeDir  },
-        { "--bin-include-dir",   1, OptBinIncludeDir  },
-        { "--bss-label",         1, OptBssLabel       },
-        { "--bss-name",          1, OptBssName        },
-        { "--cc-args",           1, OptCCArgs         },
-        { "--cfg-path",          1, OptCfgPath        },
-        { "--check-stack",       0, OptCheckStack     },
-        { "--code-label",        1, OptCodeLabel      },
-        { "--code-name",         1, OptCodeName       },
-        { "--codesize",          1, OptCodeSize       },
-        { "--config",            1, OptConfig         },
-        { "--cpu",               1, OptCPU            },
-        { "--create-dep",        1, OptCreateDep      },
-        { "--create-full-dep",   1, OptCreateFullDep  },
-        { "--data-label",        1, OptDataLabel      },
-        { "--data-name",         1, OptDataName       },
-        { "--debug",             0, OptDebug          },
-        { "--debug-info",        0, OptDebugInfo      },
-        { "--feature",           1, OptFeature        },
-        { "--force-import",      1, OptForceImport    },
-        { "--help",              0, OptHelp           },
-        { "--include-dir",       1, OptIncludeDir     },
-        { "--ld-args",           1, OptLdArgs         },
-        { "--lib",               1, OptLib            },
-        { "--lib-path",          1, OptLibPath        },
-        { "--list-targets",      0, OptListTargets    },
-        { "--listing",           1, OptListing        },
-        { "--list-bytes",        1, OptListBytes      },
-        { "--mapfile",           1, OptMapFile        },
-        { "--memory-model",      1, OptMemoryModel    },
-        { "--module",            0, OptModule         },
-        { "--module-id",         1, OptModuleId       },
-        { "--no-target-lib",     0, OptNoTargetLib    },
-        { "--o65-model",         1, OptO65Model       },
-        { "--obj",               1, OptObj            },
-        { "--obj-path",          1, OptObjPath        },
-        { "--print-target-path", 0, OptPrintTargetPath},
-        { "--register-space",    1, OptRegisterSpace  },
-        { "--register-vars",     0, OptRegisterVars   },
-        { "--rodata-name",       1, OptRodataName     },
-        { "--signed-chars",      0, OptSignedChars    },
-        { "--standard",          1, OptStandard       },
-        { "--start-addr",        1, OptStartAddr      },
-        { "--static-locals",     0, OptStaticLocals   },
-        { "--target",            1, OptTarget         },
-        { "--verbose",           0, OptVerbose        },
-        { "--version",           0, OptVersion        },
-        { "--zeropage-label",    1, OptZeropageLabel  },
-        { "--zeropage-name",     1, OptZeropageName   },
+        { "--add-source",          0, OptAddSource          },
+        { "--all-cdecl",           0, OptAllCDecl           },
+        { "--asm-args",            1, OptAsmArgs            },
+        { "--asm-define",          1, OptAsmDefine          },
+        { "--asm-include-dir",     1, OptAsmIncludeDir      },
+        { "--bin-include-dir",     1, OptBinIncludeDir      },
+        { "--bss-label",           1, OptBssLabel           },
+        { "--bss-name",            1, OptBssName            },
+        { "--cc-args",             1, OptCCArgs             },
+        { "--cfg-path",            1, OptCfgPath            },
+        { "--check-stack",         0, OptCheckStack         },
+        { "--code-label",          1, OptCodeLabel          },
+        { "--code-name",           1, OptCodeName           },
+        { "--codesize",            1, OptCodeSize           },
+        { "--color",               1, OptColor              },
+        { "--config",              1, OptConfig             },
+        { "--cpu",                 1, OptCPU                },
+        { "--create-dep",          1, OptCreateDep          },
+        { "--create-full-dep",     1, OptCreateFullDep      },
+        { "--data-label",          1, OptDataLabel          },
+        { "--data-name",           1, OptDataName           },
+        { "--debug",               0, OptDebug              },
+        { "--debug-info",          0, OptDebugInfo          },
+        { "--feature",             1, OptFeature            },
+        { "--force-import",        1, OptForceImport        },
+        { "--help",                0, OptHelp               },
+        { "--include-dir",         1, OptIncludeDir         },
+        { "--ld-args",             1, OptLdArgs             },
+        { "--lib-path",            1, OptLibPath            },
+        { "--list-targets",        0, OptListTargets        },
+        { "--listing",             1, OptListing            },
+        { "--list-bytes",          1, OptListBytes          },
+        { "--mapfile",             1, OptMapFile            },
+        { "--memory-model",        1, OptMemoryModel        },
+        { "--module",              0, OptModule             },
+        { "--module-id",           1, OptModuleId           },
+        { "--no-target-lib",       0, OptNoTargetLib        },
+        { "--no-utf8",             0, OptNoUtf8             },
+        { "--o65-model",           1, OptO65Model           },
+        { "--obj",                 1, OptObj                },
+        { "--obj-path",            1, OptObjPath            },
+        { "--print-target-path",   0, OptPrintTargetPath    },
+        { "--register-space",      1, OptRegisterSpace      },
+        { "--register-vars",       0, OptRegisterVars       },
+        { "--rodata-name",         1, OptRodataName         },
+        { "--signed-chars",        0, OptSignedChars        },
+        { "--standard",            1, OptStandard           },
+        { "--start-addr",          1, OptStartAddr          },
+        { "--static-locals",       0, OptStaticLocals       },
+        { "--target",              1, OptTarget             },
+        { "--verbose",             0, OptVerbose            },
+        { "--version",             0, OptVersion            },
+        { "--zeropage-label",      1, OptZeropageLabel      },
+        { "--zeropage-name",       1, OptZeropageName       },
+        { "--warn-align-waste",    0, OptWarnAlignWaste     },
+        { "--warnings-as-errors",  0, OptWarningsAsErrors   },
     };
 
     char* CmdPath;
@@ -1502,7 +1621,7 @@ int main (int argc, char* argv [])
 
                 case 'E':
                     /* Forward -E to compiler */
-                    CmdAddArg (&CC65, Arg);  
+                    CmdAddArg (&CC65, Arg);
                     DisableAssemblingAndLinking ();
                     break;
 
@@ -1512,7 +1631,7 @@ int main (int argc, char* argv [])
                         OptAsmArgs (Arg, GetArg (&I, 3));
                     } else if (Arg[2] == 'c' && Arg[3] == '\0') {
                         /* -Wc: Pass options to compiler */
-                        /* Remember -Wc sub arguments in cc65 arg struct */ 
+                        /* Remember -Wc sub arguments in cc65 arg struct */
                         OptCCArgs (Arg, GetArg (&I, 3));
                     } else if (Arg[2] == 'l' && Arg[3] == '\0') {
                         /* -Wl: Pass options to linker */
@@ -1562,6 +1681,7 @@ int main (int argc, char* argv [])
                 case 'o':
                     /* Name the output file */
                     OutputName = GetArg (&I, 2);
+                    OutputDirectory = GetFileDirectory(OutputName);
                     break;
 
                 case 'r':
@@ -1600,7 +1720,7 @@ int main (int argc, char* argv [])
             }
 
             /* Determine the file type by the extension */
-            switch (GetFileType (Arg)) {
+            switch (GetTypeOfFile (Arg)) {
 
                 case FILETYPE_C:
                     /* Compile the file */
@@ -1626,7 +1746,7 @@ int main (int argc, char* argv [])
                     break;
 
                 case FILETYPE_O65:
-                    /* Add the the object file converter files */
+                    /* Add the object file converter files */
                     ConvertO65 (Arg);
                     break;
 
@@ -1648,7 +1768,16 @@ int main (int argc, char* argv [])
 
     /* Link the given files if requested and if we have any */
     if (DoLink && LD65.FileCount > 0) {
+        /*
+        ** Link() may not return if there's an error, so we install
+        ** RemoveTempFiles() as an atexit() handler.
+        */
+        atexit (RemoveTempFiles);
         Link ();
+    }
+
+    if (OutputDirectory != NULL) {
+      xfree(OutputDirectory);
     }
 
     /* Return an apropriate exit code */

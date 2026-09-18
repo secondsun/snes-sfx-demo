@@ -37,11 +37,15 @@
 #define _TIME_H
 
 
+/* Forward declaration for target.h */
+typedef unsigned long time_t;
+typedef unsigned long clock_t;
+
+
 
 /* NULL pointer */
-#ifndef _HAVE_NULL
-#define NULL    0
-#define _HAVE_NULL
+#ifndef NULL
+#define NULL ((void *) 0)
 #endif
 
 /* size_t is needed */
@@ -49,10 +53,6 @@
 #define _HAVE_size_t
 typedef unsigned size_t;
 #endif
-
-typedef unsigned long time_t;
-typedef unsigned long clock_t;
-typedef unsigned char clockid_t;
 
 /* Structure for broken down time */
 struct tm {
@@ -66,6 +66,54 @@ struct tm {
     int     tm_yday;
     int     tm_isdst;
 };
+
+#if defined(__ATARI5200__)
+#  define CLOCKS_PER_SEC        60
+#elif defined(__ATMOS__)
+#  define CLOCKS_PER_SEC        100
+#elif defined(__CBM__)
+#  if defined(__CBM510__) || defined(__CBM610__)
+/* The 510/610 gets its clock from the AC current */
+#    define CLOCKS_PER_SEC      50
+#  else
+#    define CLOCKS_PER_SEC      60
+#  endif
+#elif defined(__NES__)
+#  define CLOCKS_PER_SEC        50
+#elif defined(__PCE__)
+#  define CLOCKS_PER_SEC        60
+#elif defined(__GAMATE__)
+#  define CLOCKS_PER_SEC        135   /* FIXME */
+#elif defined(__GEOS__)
+#  define CLOCKS_PER_SEC        1
+#elif defined (__RP6502__)
+#  define CLOCKS_PER_SEC        1000
+#elif defined(__TELESTRAT__)
+#  define CLOCKS_PER_SEC        10
+#elif defined(__ATARI__) || defined (__LYNX__)
+/* Read the clock rate at runtime */
+clock_t __clocks_per_sec (void);
+#  define CLOCKS_PER_SEC        __clocks_per_sec()
+#endif
+#define CLOCK_REALTIME          0
+
+
+
+/* ISO C function prototypes */
+char* __fastcall__ asctime (const struct tm* timep);
+clock_t clock (void);
+char* __fastcall__ ctime (const time_t* timep);
+struct tm* __fastcall__ gmtime (const time_t* timep);
+struct tm* __fastcall__ localtime (const time_t* timep);
+time_t __fastcall__ mktime (struct tm* timep);
+size_t __fastcall__ strftime (char* buf, size_t bufsize, const char* format, const struct tm* tm);
+time_t __fastcall__ time (time_t* t);
+void tzset (void);
+
+
+#if __CC65_STD__ >= __CC65_STD_CC65__
+
+typedef unsigned char clockid_t;
 
 /* Structure for seconds and nanoseconds */
 struct timespec {
@@ -81,74 +129,16 @@ extern struct _timezone {
     char    dstname[5]; /* Name when daylight true, e.g. CEST */
 } _tz;
 
-
-
-#if defined(__ATARI__)
-/* The clock depends on the video standard, so read it at runtime */
-unsigned _clocks_per_sec (void);
-#  define CLK_TCK               _clocks_per_sec()
-#  define CLOCKS_PER_SEC        _clocks_per_sec()
-#elif defined(__ATARI5200__)
-#  define CLK_TCK               60      /* POSIX */
-#  define CLOCKS_PER_SEC        60      /* ANSI */
-#elif defined(__ATMOS__)
-#  define CLK_TCK               100     /* POSIX */
-#  define CLOCKS_PER_SEC        100     /* ANSI */
-#elif defined(__CBM__)
-#  if defined(__CBM510__) || defined(__CBM610__)
-/* The 510/610 gets its clock from the AC current */
-#    define CLK_TCK             50      /* POSIX */
-#    define CLOCKS_PER_SEC      50      /* ANSI */
-#  else
-#    define CLK_TCK             60      /* POSIX */
-#    define CLOCKS_PER_SEC      60      /* ANSI */
-#  endif
-#elif defined(__NES__)
-#  define CLK_TCK               50      /* POSIX */
-#  define CLOCKS_PER_SEC        50      /* ANSI */
-#elif defined(__PCE__)
-#  define CLK_TCK               60      /* POSIX */
-#  define CLOCKS_PER_SEC        60      /* ANSI */
-#elif  defined(__GAMATE__)
-#  define CLK_TCK               135     /* POSIX */     /* FIXME */
-#  define CLOCKS_PER_SEC        135     /* ANSI */      /* FIXME */
-#elif  defined(__GEOS__)
-#  define CLK_TCK               1       /* POSIX */
-#  define CLOCKS_PER_SEC        1       /* ANSI */
-#elif defined(__LYNX__)
-/* The clock-rate depends on the video scan-rate;
-** so, read it at run-time.
-*/
-extern clock_t _clk_tck (void);
-#  define CLK_TCK               _clk_tck()
-#  define CLOCKS_PER_SEC        _clk_tck()
-#endif
-#define CLOCK_REALTIME          0
-
-
-
-/* ISO C function prototypes */
-char* __fastcall__ asctime (const struct tm* timep);
-clock_t clock (void);
-char* __fastcall__ ctime (const time_t* timep);
-struct tm* __fastcall__ gmtime (const time_t* timep);
-struct tm* __fastcall__ localtime (const time_t* timep);
-time_t __fastcall__ mktime (struct tm* timep);
-size_t __fastcall__ strftime (char* buf, size_t bufsize, const char* format, const struct tm* tm);
-time_t __fastcall__ time (time_t* t);
-
-
+#define CLK_TCK                 CLOCKS_PER_SEC
 
 /* POSIX function prototypes */
-int __fastcall__ clock_getres (clockid_t clock_id, struct timespec *res);
-int __fastcall__ clock_gettime (clockid_t clock_id, struct timespec *tp);
-int __fastcall__ clock_settime (clockid_t clock_id, const struct timespec *tp);
+int __fastcall__ clock_getres (clockid_t clock_id, struct timespec* res);
+int __fastcall__ clock_gettime (clockid_t clock_id, struct timespec* tp);
+int __fastcall__ clock_settime (clockid_t clock_id, const struct timespec* tp);
 
+#endif
 
 
 /* End of time.h */
 
 #endif
-
-
-

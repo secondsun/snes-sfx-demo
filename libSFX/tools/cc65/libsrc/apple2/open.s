@@ -9,7 +9,7 @@
         .constructor    raisefilelevel
         .destructor     closeallfiles, 5
 
-        .import         pushname, popname, __dos_type
+        .import         pushname_tos, popname, mli_set_pathname_tos, __dos_type
         .import         iobuf_alloc, iobuf_free
         .import         addysp, incsp4, incaxy, pushax, popax
 
@@ -18,6 +18,7 @@
         .include        "fcntl.inc"
         .include        "mli.inc"
         .include        "filedes.inc"
+        .include        "time.inc"
 
         .segment        "ONCE"
 
@@ -64,11 +65,10 @@ _open:
 errno:  jsr     incsp4          ; Preserves A
 
         ; Set __errno
-        jmp     __directerrno
+        jmp     ___directerrno
 
         ; Save fdtab slot
-found:  tya
-        pha
+found:  sty     tmp2
 
         ; Alloc I/O buffer
         lda     #<(fdtab + FD::BUFFER)
@@ -80,30 +80,18 @@ found:  tya
         jsr     pushax          ; Preserves A
         ldx     #>$0400
         jsr     iobuf_alloc
-        tay                     ; Save errno code
-
-        ; Restore fdtab slot
-        pla
-        sta     tmp2            ; Save fdtab slot
-
-        ; Check for error
-        tya                     ; Restore errno code
-        bne     errno
+        bne     errno           ; Check for error
 
         ; Get and save flags
         jsr     popax
         sta     tmp3
 
         ; Get and push name
-        jsr     popax
-        jsr     pushname
+        jsr     pushname_tos
         bne     oserr1
 
         ; Set pushed name
-        lda     sp
-        ldx     sp+1
-        sta     mliparam + MLI::OPEN::PATHNAME
-        stx     mliparam + MLI::OPEN::PATHNAME+1
+        jsr     mli_set_pathname_tos
 
         ; Check for create flag
         lda     tmp3            ; Restore flags
@@ -147,8 +135,8 @@ oserr1: ldy     tmp2            ; Restore fdtab slot
         jsr     freebuffer
         pla                     ; Restore oserror code
 
-        ; Set __oserror
-        jmp     __mappederrno
+        ; Set ___oserror
+        jmp     ___mappederrno
 
 open:   ldy     tmp2            ; Restore fdtab slot
 
@@ -208,8 +196,8 @@ done:   lda     tmp1            ; Restore fd
         jsr     popname         ; Preserves A
 
         ; Return success
-        ldx     #$00
-        stx     __oserror
+        ldx     #>$0000
+        stx     ___oserror
         rts
 
 freebuffer:

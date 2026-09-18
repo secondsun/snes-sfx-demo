@@ -1,7 +1,7 @@
 ;
 ; Startup code for cc65 (Oric version)
 ;
-; By Debrune Jérôme <jede@oric.org> and Ullrich von Bassewitz <uz@cc65.org>
+; By Debrune JÃ©rÃ´me <jede@oric.org> and Ullrich von Bassewitz <uz@cc65.org>
 ;
 
         .export         _exit
@@ -12,7 +12,6 @@
         .import         __MAIN_START__, __MAIN_SIZE__
 
         .include        "zeropage.inc"
-        .include        "telestrat.inc"
 
 ; ------------------------------------------------------------------------
 ; Place the startup code in a special segment.
@@ -37,20 +36,30 @@
 
 ; Call the module destructors. This is also the exit() entry.
 
-_exit:  jsr     donelib
+_exit:
 
-; Restore the system stuff.
+; Save return code on stack
 
-        ldx     spsave
-        txs
+        pha
+        jsr     donelib
 
 ; Copy back the zero-page stuff.
 
         ldx     #zpspace - 1
 L2:     lda     zpsave,x
-        sta     sp,x
+        sta     c_sp,x
         dex
         bpl     L2
+
+; Restore the return code.
+; The return code is on the stack, so we can just pop it.
+; This is the return code from main().
+        pla
+
+; Restore the system stuff.
+
+        ldx     spsave
+        txs
 
 ; Back to BASIC.
 
@@ -65,7 +74,7 @@ L2:     lda     zpsave,x
 ; Save the zero-page area that we're about to use.
 
 init:   ldx     #zpspace - 1
-L1:     lda     sp,x
+L1:     lda     c_sp,x
         sta     zpsave,x
         dex
         bpl     L1
@@ -75,8 +84,8 @@ L1:     lda     sp,x
 
         lda     #<(__MAIN_START__ + __MAIN_SIZE__)
         ldx     #>(__MAIN_START__ + __MAIN_SIZE__)
-        sta     sp
-        stx     sp+1            ; Set argument stack ptr
+        sta     c_sp
+        stx     c_sp+1          ; Set argument stack ptr
 
 ; Call the module constructors.
 

@@ -153,11 +153,12 @@ static PCXHeader* ReadPCXHeader (FILE* F, const char* Name)
                P->Compressed, Name);
     }
     /* We support:
-    **   - one plane with either 1 or 8 bits per pixel
+    **   - one plane with either 1, 4 or 8 bits per pixel
     **   - three planes with 8 bits per pixel
     **   - four planes with 8 bits per pixel (does this exist?)
     */
     if (!((P->BPP == 1 && P->Planes == 1) ||
+          (P->BPP == 4 && P->Planes == 1) ||
           (P->BPP == 8 && (P->Planes == 1 || P->Planes == 3 || P->Planes == 4)))) {
         /* We could support others, but currently we don't */
         Error ("Unsupported PCX format: %u planes, %u bpp in PCX file '%s'",
@@ -204,11 +205,14 @@ static void DumpPCXHeader (const PCXHeader* P, const char* Name)
 static void ReadPlane (FILE* F, PCXHeader* P, unsigned char* L)
 /* Read one (possibly compressed) plane from the file */
 {
-    if (P->Compressed) {
+    unsigned i;
 
+    if (P->Compressed) {
         /* Uncompress RLE data */
-        unsigned Remaining = P->Width;
-        while (Remaining) {
+        signed Remaining = P->BytesPerPlane;
+        signed WidthCounter = P->Width;
+
+        while (Remaining > 0) {
 
             unsigned char C;
 
@@ -224,21 +228,111 @@ static void ReadPlane (FILE* F, PCXHeader* P, unsigned char* L)
             }
 
             /* Write the data to the buffer */
-            if (C > Remaining) {
-                C = Remaining;
+            switch (P->BPP) {
+            default:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = B;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
+            case 4:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = B >> 4;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = B & 15;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
+            case 2:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = (B >> 6) & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 4) & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 2) & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = B & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
+            case 1:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = (B >> 7) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 6) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 5) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 4) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 3) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 2) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 1) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = B & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
             }
-            memset (L, B, C);
-
-            /* Bump counters */
-            L += C;
-            Remaining -= C;
-
         }
     } else {
-
         /* Just read one line */
-        ReadData (F, L, P->Width);
-
+        if (P->BPP == 4) {
+            printf("Not implemented\n");
+        } else {
+            ReadData (F, L, P->Width);
+        }
     }
 }
 
@@ -287,24 +381,15 @@ Bitmap* ReadPCXFile (const Collection* A)
 
         /* This is either monochrome or indexed */
         if (P->BPP == 1) {
-            /* Monochrome */
+            /* Monochrome (ReadPlane already expands bits to bytes) */
             for (Y = 0, Px = B->Data; Y < P->Height; ++Y) {
-
-                unsigned I;
-                unsigned char Mask;
 
                 /* Read the plane */
                 ReadPlane (F, P, L);
 
                 /* Create pixels */
-                for (X = 0, I = 0, Mask = 0x01; X < P->Width; ++Px) {
-                    Px->Index = (L[I] & Mask) != 0;
-                    if (Mask == 0x80) {
-                        Mask = 0x01;
-                        ++I;
-                    } else {
-                        Mask <<= 1;
-                    }
+                for (X = 0; X < P->Width; ++X, ++Px) {
+                    Px->Index = L[X];
                 }
 
             }

@@ -193,9 +193,17 @@ static void BinWriteMem (BinDesc* D, MemoryArea* M)
                     NewAddr += M->Start;
                 }
                 if (DoWrite || (M->Flags & MF_FILL) != 0) {
-                    /* Seek in "overwrite" segments */
                     if (S->Flags & SF_OVERWRITE) {
-                        fseek (D->F, NewAddr - M->Start, SEEK_SET);
+                        /* Seek in "overwrite" segments. Fill if the seek position has not been reached yet. */
+                        unsigned long FileLength;
+                        unsigned long SeekTarget = NewAddr - M->Start + M->FileOffs;
+                        fseek (D->F, 0, SEEK_END);
+                        FileLength = ftell (D->F);
+                        if (SeekTarget > FileLength) {
+                            WriteMult (D->F, M->FillVal, SeekTarget - FileLength);
+                            PrintNumVal ("SF_OVERWRITE", SeekTarget - FileLength);
+                        }
+                        fseek (D->F, NewAddr - M->Start + M->FileOffs, SEEK_SET);
                     } else {
                         WriteMult (D->F, M->FillVal, NewAddr-Addr);
                         PrintNumVal ("SF_OFFSET", NewAddr - Addr);
@@ -226,6 +234,13 @@ static void BinWriteMem (BinDesc* D, MemoryArea* M)
             unsigned long P = ftell (D->F);
             SegWrite (D->Filename, D->F, S->Seg, BinWriteExpr, D);
             PrintNumVal ("Wrote", (unsigned long) (ftell (D->F) - P));
+            /* If we have just written an OVERWRITE segement, move position to the
+            ** end of file, so that subsequent segments are written in the correct
+            ** place.
+            */
+            if (S->Flags & SF_OVERWRITE) {
+                fseek (D->F, 0, SEEK_END);
+            }
         } else if (M->Flags & MF_FILL) {
             WriteMult (D->F, S->Seg->FillVal, S->Seg->Size);
             PrintNumVal ("Filled", (unsigned long) S->Seg->Size);
@@ -286,11 +301,11 @@ void BinWriteTarget (BinDesc* D, struct File* F)
     /* Open the file */
     D->F = fopen (D->Filename, "wb");
     if (D->F == 0) {
-        Error ("Cannot open '%s': %s", D->Filename, strerror (errno));
+        Error ("Cannot open `%s': %s", D->Filename, strerror (errno));
     }
 
     /* Keep the user happy */
-    Print (stdout, 1, "Opened '%s'...\n", D->Filename);
+    Print (stdout, 1, "Opened `%s'...\n", D->Filename);
 
     /* Dump all memory areas */
     for (I = 0; I < CollCount (&F->MemoryAreas); ++I) {
@@ -302,7 +317,7 @@ void BinWriteTarget (BinDesc* D, struct File* F)
 
     /* Close the file */
     if (fclose (D->F) != 0) {
-        Error ("Cannot write to '%s': %s", D->Filename, strerror (errno));
+        Error ("Cannot write to `%s': %s", D->Filename, strerror (errno));
     }
 
     /* Reset the file and filename */

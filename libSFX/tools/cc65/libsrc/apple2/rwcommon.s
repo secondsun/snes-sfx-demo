@@ -27,17 +27,19 @@ rwcommon:
         ; Set fd
         sta     mliparam + MLI::RW::REF_NUM
 
-        ; Set buf
-        lda     ptr1
-        ldx     ptr1+1
-        sta     mliparam + MLI::RW::DATA_BUFFER
-        stx     mliparam + MLI::RW::DATA_BUFFER+1
+        ; Set buf and count
+        ; buf (ptr1) goes to mliparam + MLI::RW::DATA_BUFFER,
+        ; count (ptr2) goes to mliparam + MLI::RW::REQUEST_COUNT
+        ; Make sure both are at expected offset so we can copy them
+        ; in a small loop.
+        .assert ptr2 = ptr1 + 2, error
+        .assert MLI::RW::REQUEST_COUNT = MLI::RW::DATA_BUFFER + 2, error
 
-        ; Set count
-        lda     ptr2
-        ldx     ptr2+1
-        sta     mliparam + MLI::RW::REQUEST_COUNT
-        stx     mliparam + MLI::RW::REQUEST_COUNT+1
+        ldx     #$03
+:       lda     ptr1,x
+        sta     mliparam + MLI::RW::DATA_BUFFER,x
+        dex
+        bpl     :-
 
         ; Call read or write
         tya
@@ -49,10 +51,10 @@ rwcommon:
 
 rwepilog:
         ; Return success
-        sta     __oserror       ; A = 0
+        sta     ___oserror      ; A = 0
         lda     mliparam + MLI::RW::TRANS_COUNT
         ldx     mliparam + MLI::RW::TRANS_COUNT+1
         rts
 
-        ; Set __oserror
-oserr:  jmp     __mappederrno
+        ; Set ___oserror
+oserr:  jmp     ___mappederrno

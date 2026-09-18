@@ -82,7 +82,7 @@ void tgi_unload (void);
 ** necessary.
 */
 
-void __fastcall__ tgi_install (void* driver);
+void __fastcall__ tgi_install (const void* driver);
 /* Install an already loaded driver. */
 
 void tgi_uninstall (void);
@@ -134,22 +134,23 @@ void __fastcall__ tgi_setdrawpage (unsigned char page);
 /* Set the drawable page. Will set an error if the page is not available. */
 
 unsigned char tgi_getcolorcount (void);
-/* Get the number of available colors. */
+/* Get the number of available colors. Zero means 256 colors. */
 
 unsigned char tgi_getmaxcolor (void);
 /* Return the maximum supported color number (the number of colors would
 ** then be getmaxcolor()+1).
 */
 
-void __fastcall__ tgi_setcolor (unsigned char color);
-/* Set the current drawing color. */
+void __fastcall__ tgi_setcolor (unsigned char color_index);
+/* Set the current drawing color (palette index). */
 
 unsigned char tgi_getcolor (void);
-/* Return the current drawing color. */
+/* Return the current drawing color (palette index). */
 
 void __fastcall__ tgi_setpalette (const unsigned char* palette);
 /* Set the palette (not available with all drivers/hardware). palette is
-** a pointer to as many entries as there are colors.
+** a pointer to as many entries as there are colors required for the drivers
+** palette. This palette is the (only) place where to use the TGI_COLOR values.
 */
 
 const unsigned char* tgi_getpalette (void);
@@ -216,7 +217,7 @@ void __fastcall__ tgi_arc (int x, int y, unsigned char rx, unsigned char ry,
 /* Draw an ellipse arc with center at x/y and radii rx/ry using the current
 ** drawing color. The arc covers the angle between sa and ea (startangle and
 ** endangle), which must be in the range 0..360 (otherwise the function may
-** bevave unextectedly).
+** behave unexpectedly).
 */
 
 void __fastcall__ tgi_pieslice (int x, int y, unsigned char rx, unsigned char ry,

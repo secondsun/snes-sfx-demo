@@ -4,6 +4,8 @@
 ; void cputcxy (unsigned char x, unsigned char y, char c);
 ; void cputc (char c);
 ;
+; Important note: The implementation of cputs() relies on the cputc() function
+; not clobbering ptr1. Beware when rewriting or changing this function!
 
         .export         _cputcxy, _cputc, cputdirect, putchar
         .export         newline, plot
@@ -65,10 +67,9 @@ L3:     sty     CURS_X
 ; Handle character if high bit set
 
 L10:    and     #$7F
-        cmp     #$7E            ; PI?
+        cmp     #$7F            ; PI?
         bne     L11
         lda     #$5E            ; Load screen code for PI
-        bne     cputdirect
 L11:    ora     #$40
         bne     cputdirect      ; Branch always
 

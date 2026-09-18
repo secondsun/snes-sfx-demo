@@ -74,6 +74,15 @@ void RC_InvalidateZP (RegContents* C)
 
 
 
+void RC_InvalidatePS (RegContents* C)
+/* Invalidate processor status */
+{
+    C->PFlags = UNKNOWN_PFVAL_ALL;
+    C->ZNRegs = ZNREG_NONE;
+}
+
+
+
 static void RC_Dump1 (FILE* F, const char* Desc, short Val)
 /* Dump one register value */
 {
@@ -120,6 +129,9 @@ RegInfo* NewRegInfo (const RegContents* RC)
         RC_Invalidate (&RI->In);
         RC_Invalidate (&RI->Out);
         RC_Invalidate (&RI->Out2);
+        RC_InvalidatePS (&RI->In);
+        RC_InvalidatePS (&RI->Out);
+        RC_InvalidatePS (&RI->Out2);
     }
 
     /* Return the new struct */

@@ -5,7 +5,6 @@
 /*                          .STRUCT/.UNION commands                          */
 /*                                                                           */
 /*                                                                           */
-/*                                                                           */
 /* (C) 2003-2011, Ullrich von Bassewitz                                      */
 /*                Roemerstrasse 52                                           */
 /*                D-70794 Filderstadt                                        */
@@ -40,6 +39,7 @@
 /* ca65 */
 #include "condasm.h"
 #include "error.h"
+#include "expect.h"
 #include "expr.h"
 #include "macro.h"
 #include "nexttok.h"
@@ -73,21 +73,22 @@ enum {
 static long Member (long AllocSize)
 /* Read one struct member and return its size */
 {
-    long Multiplicator;
+    long Multiplier;
 
-    /* A multiplicator may follow */
+    /* A multiplier may follow */
     if (CurTok.Tok != TOK_SEP) {
-        Multiplicator = ConstExpression ();
-        if (Multiplicator <= 0) {
+        Multiplier = ConstExpression ();
+        if (Multiplier <= 0) {
             ErrorSkip ("Range error");
-            Multiplicator = 1;
+            Multiplier = 1;
         }
-        AllocSize *= Multiplicator;
+        AllocSize *= Multiplier;
     }
 
     /* Check the size for a reasonable value */
-    if (AllocSize >= 0x10000) {
+    if (AllocSize >= 0x1000000) {
         ErrorSkip ("Range error");
+        AllocSize = 1;
     }
 
     /* Return the size */
@@ -102,16 +103,24 @@ static long DoStructInternal (long Offs, unsigned Type)
     long Size = 0;
 
     /* Outside of other structs, we need a name. Inside another struct or
-    ** union, the struct may be anonymous, in which case no new lexical level
+    ** union, the struct may be anonymous; in which case, no new lexical level
     ** is started.
     */
-    int Anon = (CurTok.Tok != TOK_IDENT);
+    int Anon = (CurTok.Tok == TOK_SEP);
+
     if (!Anon) {
-        /* Enter a new scope, then skip the name */
-        SymEnterLevel (&CurTok.SVal, SCOPE_STRUCT, ADDR_SIZE_ABS, 0);
-        NextTok ();
-        /* Start at zero offset in the new scope */
-        Offs = 0;
+        /* Non anonymous structs must have an identifier as name */
+        if (Expect (TOK_IDENT, "Expected a struct/union name")) {
+            /* Enter a new scope, then skip the name */
+            SymEnterLevel (&CurTok.SVal, SCOPE_STRUCT, ADDR_SIZE_ABS, 0);
+            NextTok ();
+            /* Start at zero offset in the new scope */
+            Offs = 0;
+        } else {
+            /* Skip the junk on the line before proceeding */
+            SkipUntilSep ();
+            Anon = 1;
+        }
     }
 
     /* Test for end of line */
@@ -121,7 +130,6 @@ static long DoStructInternal (long Offs, unsigned Type)
     while (CurTok.Tok != TOK_ENDSTRUCT &&
            CurTok.Tok != TOK_ENDUNION  &&
            CurTok.Tok != TOK_EOF) {
-
         long      MemberSize;
         SymTable* Struct;
         SymEntry* Sym;
@@ -132,14 +140,14 @@ static long DoStructInternal (long Offs, unsigned Type)
             continue;
         }
 
-        /* The format is "[identifier] storage-allocator [, multiplicator]" */
+        /* The format is "[identifier ].storage-allocator[ multiplier]" */
         Sym = 0;
         if (CurTok.Tok == TOK_IDENT) {
-
-            /* Beware: An identifier may also be a macro, in which case we have
-            ** to start over.
+            /* Beware: An identifier may be a macro also;
+            ** in which case, we must start over.
             */
             Macro* M = FindMacro (&CurTok.SVal);
+
             if (M) {
                 MacExpandStart (M);
                 continue;
@@ -155,10 +163,9 @@ static long DoStructInternal (long Offs, unsigned Type)
             NextTok ();
         }
 
-        /* Read storage allocators */
-        MemberSize = 0;                 /* In case of errors, use zero */
+        /* Read the storage allocator */
+        MemberSize = 0;                 /* In case of errors or .ORG, use zero */
         switch (CurTok.Tok) {
-
             case TOK_BYTE:
                 NextTok ();
                 MemberSize = Member (1);
@@ -184,9 +191,24 @@ static long DoStructInternal (long Offs, unsigned Type)
             case TOK_RES:
                 NextTok ();
                 if (CurTok.Tok == TOK_SEP) {
-                    ErrorSkip ("Size is missing");
+                    ErrorExpect ("Expected a byte count");
                 } else {
                     MemberSize = Member (1);
+                }
+                break;
+
+            case TOK_ORG:
+                NextTok ();
+                if (CurTok.Tok == TOK_SEP) {
+                    ErrorExpect ("Expected an address");
+                } else {
+                    Offs = ConstExpression ();
+
+                    /* Check the address for a reasonable value */
+                    if (Offs >= 0x1000000) {
+                        ErrorSkip ("Range error");
+                        Offs = 0;
+                    }
                 }
                 break;
 
@@ -219,7 +241,12 @@ static long DoStructInternal (long Offs, unsigned Type)
             default:
                 if (!CheckConditionals ()) {
                     /* Not a conditional directive */
-                    ErrorSkip ("Invalid storage allocator in struct/union");
+                    if (Sym) {
+                        ErrorExpect ("Expected a storage allocator after the field name");
+                    } else {
+                        ErrorExpect ("Expected a storage allocator");
+                    }
+                    SkipUntilSep ();
                 }
         }
 
@@ -244,8 +271,8 @@ static long DoStructInternal (long Offs, unsigned Type)
         ConsumeSep ();
     }
 
-    /* If this is not a anon struct, enter a special symbol named ".size"
-    ** into the symbol table of the struct that holds the size of the
+    /* If this is not an anon. struct, enter a special symbol named ".size"
+    ** into the symbol table, of the struct, that holds the size of the
     ** struct. Since the symbol starts with a dot, it cannot be accessed
     ** by user code.
     ** Leave the struct scope level.
@@ -261,9 +288,9 @@ static long DoStructInternal (long Offs, unsigned Type)
 
     /* End of struct/union definition */
     if (Type == STRUCT) {
-        Consume (TOK_ENDSTRUCT, "'.ENDSTRUCT' expected");
+        Consume (TOK_ENDSTRUCT, "Expected `.ENDSTRUCT'");
     } else {
-        Consume (TOK_ENDUNION, "'.ENDUNION' expected");
+        Consume (TOK_ENDUNION, "Expected `.ENDUNION'");
     }
 
     /* Return the size of the struct */

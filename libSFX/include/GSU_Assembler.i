@@ -69,7 +69,7 @@ _CASFX_AUTO_NOP = 1
 
 .macro _op16_one_reg op, err, reg
     ; Rn
-    _ASSERT_RANGE_ABS reg, r0, r15, .concat (_CASFX_TEMP_ERR_STRING,err," Rn; R0-R15")
+    _ASSERT_RANGE_ABS reg, r0, r15, .concat (_CASFX_TEMP_ERR_STRING,err," Rn; R0-R15 reg")
     .byte (op+reg)
     .exitmacro
 .endmacro

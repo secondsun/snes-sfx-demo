@@ -39,6 +39,7 @@
 
 
 /* common */
+#include "capability.h"
 #include "cpu.h"
 
 
@@ -57,6 +58,7 @@ typedef enum {
     TGT_ATARI,
     TGT_ATARI2600,
     TGT_ATARI5200,
+    TGT_ATARI7800,
     TGT_ATARIXL,
     TGT_VIC20,
     TGT_C16,
@@ -84,6 +86,12 @@ typedef enum {
     TGT_PCENGINE,
     TGT_GAMATE,
     TGT_C65,
+    TGT_CX16,
+    TGT_SYM1,
+    TGT_MEGA65,
+    TGT_KIM1,
+    TGT_RP6502,
+    TGT_AGAT,
     TGT_COUNT                   /* Number of target systems */
 } target_t;
 
@@ -102,7 +110,7 @@ extern target_t         Target;
 /* Types of available output formats */
 #define BINFMT_DEFAULT          0       /* Default (binary) */
 #define BINFMT_BINARY           1       /* Straight binary format */
-#define BINFMT_O65              2       /* Andre Fachats o65 format */
+#define BINFMT_O65              2       /* Andre Fachat's o65 format */
 #define BINFMT_ATARIEXE         3       /* Standard Atari binary load */
 
 
@@ -124,8 +132,10 @@ const TargetProperties* GetTargetProperties (target_t Target);
 const char* GetTargetName (target_t Target);
 /* Return the name of a target */
 
+int TargetHasCap (capability_t Cap);
+/* Check if the current target has the given capability */
+
 
 
 /* End of target.h */
-
 #endif

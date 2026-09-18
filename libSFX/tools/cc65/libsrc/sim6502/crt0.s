@@ -5,6 +5,7 @@
 ;
 
         .export         _exit
+        .export         startup
         .export         __STARTUP__ : absolute = 1      ; Mark as startup
         .import         zerobss, callmain
         .import         initlib, donelib
@@ -16,13 +17,13 @@
 
         .segment        "STARTUP"
 
-        cld
+startup:cld
         ldx     #$FF
         txs
         lda     #<(__MAIN_START__ + __MAIN_SIZE__ + __STACKSIZE__)
         ldx     #>(__MAIN_START__ + __MAIN_SIZE__ + __STACKSIZE__)
-        sta     sp
-        stx     sp+1
+        sta     c_sp
+        stx     c_sp+1
         jsr     zerobss
         jsr     initlib
         jsr     callmain

@@ -5,9 +5,11 @@
 ; void cputcxy (unsigned char x, unsigned char y, char c);
 ; void cputc (char c);
 ;
+; Important note: The implementation of cputs() relies on the cputc() function
+; not clobbering ptr1. Beware when rewriting or changing this function!
 
         .export         _cputcxy, _cputc
-        .export         setscrptr, putchar
+        .export         setscrptr, cputdirect, putchar
         .constructor    initcputc
         .import         rvs
         .import         popax
@@ -32,13 +34,13 @@ _cputc: cmp     #$0D            ; CR?
         rts
 
 L1:     cmp     #$0A            ; LF?
-        bne     output
+        bne     cputdirect
         inc     CURS_Y          ; Newline
         rts
 
 ; Output the character, then advance the cursor position
 
-output:
+cputdirect:
         jsr     putchar
 
 advance:

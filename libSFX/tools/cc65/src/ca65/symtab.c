@@ -131,6 +131,7 @@ static SymTable* NewSymTable (SymTable* Parent, const StrBuf* Name)
     S->Childs       = 0;
     S->Label        = 0;
     S->Spans        = AUTO_COLLECTION_INITIALIZER;
+    S->OpenSpans    = AUTO_COLLECTION_INITIALIZER;
     S->Id           = ScopeCount++;
     S->Flags        = ST_NONE;
     S->AddrSize     = ADDR_SIZE_DEFAULT;
@@ -138,6 +139,7 @@ static SymTable* NewSymTable (SymTable* Parent, const StrBuf* Name)
     S->Level        = Level;
     S->TableSlots   = Slots;
     S->TableEntries = 0;
+    S->Size         = 0;
     S->Parent       = Parent;
     S->Name         = GetStrBufId (Name);
     while (Slots--) {
@@ -178,7 +180,7 @@ static SymTable* NewSymTable (SymTable* Parent, const StrBuf* Name)
                     }
                 } else {
                     /* Duplicate scope name */
-                    Internal ("Duplicate scope name: '%m%p'", Name);
+                    Internal ("Duplicate scope name: `%m%p'", Name);
                 }
             }
         }
@@ -215,9 +217,14 @@ void SymEnterLevel (const StrBuf* ScopeName, unsigned char Type,
         CurrentScope = SymFindScope (CurrentScope, ScopeName, SYM_ALLOC_NEW);
 
         /* Check if the scope has been defined before */
-        if (CurrentScope->Flags & ST_DEFINED) {
-            Error ("Duplicate scope '%m%p'", ScopeName);
+        if ((CurrentScope->Flags & ST_DEFINED) &&
+            !(MergeScopes && Type == SCOPE_SCOPE && ScopeLabel == 0 &&
+              CurrentScope->Type == SCOPE_SCOPE &&
+              CurrentScope->Label == 0)) {
+            Error ("Duplicate scope `%m%p'", ScopeName);
         }
+        /* Open the scope as we are entering it */
+        CurrentScope->Flags &= ~ST_CLOSED;
 
     } else {
         CurrentScope = RootScope = NewSymTable (0, ScopeName);
@@ -236,7 +243,7 @@ void SymEnterLevel (const StrBuf* ScopeName, unsigned char Type,
     ** space in any segment).
     */
     if (CurrentScope->Type <= SCOPE_HAS_DATA) {
-        OpenSpanList (&CurrentScope->Spans);
+        OpenSpanList (&CurrentScope->OpenSpans);
     }
 }
 
@@ -249,22 +256,25 @@ void SymLeaveLevel (void)
     ** open the spans.
     */
     if (CurrentScope->Type <= SCOPE_HAS_DATA) {
-        CloseSpanList (&CurrentScope->Spans);
+        CloseSpanList (&CurrentScope->OpenSpans);
     }
 
-    /* If we have spans, the first one is the segment that was active, when the
-    ** scope was opened. Set the size of the scope to the number of data bytes
-    ** emitted into this segment. If we have an owner symbol set the size of
-    ** this symbol, too.
+    /* If we have spans, the first one is the segment that was active when the
+    ** scope was opened. Add its data bytes to the scope size. If we have an
+    ** owner symbol, set its size, too.
     */
-    if (CollCount (&CurrentScope->Spans) > 0) {
-        const Span* S = CollAtUnchecked (&CurrentScope->Spans, 0);
-        unsigned long Size = GetSpanSize (S);
-        DefSizeOfScope (CurrentScope, Size);
+    if (CollCount (&CurrentScope->OpenSpans) > 0) {
+        const Span* S = CollAtUnchecked (&CurrentScope->OpenSpans, 0);
+        CurrentScope->Size += GetSpanSize (S);
+        DefSizeOfScope (CurrentScope, CurrentScope->Size);
         if (CurrentScope->Label) {
-            DefSizeOfSymbol (CurrentScope->Label, Size);
+            DefSizeOfSymbol (CurrentScope->Label, CurrentScope->Size);
         }
     }
+
+    /* Keep completed spans and clear the list for a possible reopening. */
+    CollTransfer (&CurrentScope->Spans, &CurrentScope->OpenSpans);
+    CollDeleteAll (&CurrentScope->OpenSpans);
 
     /* Mark the scope as closed */
     CurrentScope->Flags |= ST_CLOSED;
@@ -294,6 +304,8 @@ SymTable* SymFindScope (SymTable* Parent, const StrBuf* Name, SymFindAction Acti
     /* Create a new scope if requested and we didn't find one */
     if (*T == 0 && (Action & SYM_ALLOC_NEW) != 0) {
         *T = NewSymTable (Parent, Name);
+        /* Close the created scope, will be reopened if needed */
+        (*T)->Flags |= ST_CLOSED;
     }
 
     /* Return the scope */
@@ -502,7 +514,7 @@ static void SymCheckUndefined (SymEntry* S)
             if (Sym->Flags & SF_IMPORT) {
                 /* The symbol is already marked as import */
                 LIError (&S->RefLines,
-                         "Symbol '%s' is already an import",
+                         "Symbol `%s' is already an import",
                          GetString (Sym->Name));
             }
             if ((Sym->Flags & SF_EXPORT) == 0) {
@@ -516,7 +528,7 @@ static void SymCheckUndefined (SymEntry* S)
                 if (Sym->AddrSize > Sym->ExportSize) {
                     /* We're exporting a symbol smaller than it actually is */
                     LIWarning (&Sym->DefLines, 1,
-                               "Symbol '%m%p' is %s but exported %s",
+                               "Symbol `%m%p' is %s but exported %s",
                                GetSymName (Sym),
                                AddrSizeToStr (Sym->AddrSize),
                                AddrSizeToStr (Sym->ExportSize));
@@ -541,7 +553,7 @@ static void SymCheckUndefined (SymEntry* S)
         if (S->Flags & SF_EXPORT) {
             /* We will not auto-import an export */
             LIError (&S->RefLines,
-                     "Exported symbol '%m%p' was never defined",
+                     "Exported symbol `%m%p' was never defined",
                      GetSymName (S));
         } else {
             if (AutoImport) {
@@ -554,7 +566,7 @@ static void SymCheckUndefined (SymEntry* S)
             } else {
                 /* Error */
                 LIError (&S->RefLines,
-                         "Symbol '%m%p' is undefined",
+                         "Symbol `%m%p' is undefined",
                          GetSymName (S));
             }
         }
@@ -570,7 +582,18 @@ void SymCheck (void)
 
     /* Check for open scopes */
     if (CurrentScope->Parent != 0) {
-        Error ("Local scope was not closed");
+        if (CurrentScope->Label) {
+            /* proc has a label indicating the line it was opened. */
+            LIError (&CurrentScope->Label->DefLines,
+                     "Local proc `%s' was not closed",
+                     GetString (CurrentScope->Name));
+        } else {
+            /* scope has no label to track a line number, uses end-of-document line instead.
+            ** Anonymous scopes will reveal their internal automatic name.
+            */
+            Error ("Local scope `%s' was not closed",
+                   GetString (CurrentScope->Name));
+        }
     }
 
     /* First pass: Walk through all symbols, checking for undefined's and
@@ -616,7 +639,7 @@ void SymCheck (void)
                 ReleaseFullLineInfo (&S->RefLines);
             } else if ((S->Flags & SF_DEFINED) != 0 && (S->Flags & SF_REFERENCED) == 0) {
                 LIWarning (&S->DefLines, 2,
-                           "Symbol '%m%p' is defined but never used",
+                           "Symbol `%m%p' is defined but never used",
                            GetSymName (S));
             }
 
@@ -625,7 +648,7 @@ void SymCheck (void)
                 if ((S->Flags & (SF_REFERENCED | SF_FORCED)) == SF_NONE) {
                     /* Imported symbol is not referenced */
                     LIWarning (&S->DefLines, 2,
-                               "Symbol '%m%p' is imported but never used",
+                               "Symbol `%m%p' is imported but never used",
                                GetSymName (S));
                 } else {
                     /* Give the import an id, count imports */
@@ -653,7 +676,7 @@ void SymCheck (void)
                     } else if (S->AddrSize > S->ExportSize) {
                         /* We're exporting a symbol smaller than it actually is */
                         LIWarning (&S->DefLines, 1,
-                                   "Symbol '%m%p' is %s but exported %s",
+                                   "Symbol `%m%p' is %s but exported %s",
                                    GetSymName (S),
                                    AddrSizeToStr (S->AddrSize),
                                    AddrSizeToStr (S->ExportSize));
@@ -673,7 +696,7 @@ void SymCheck (void)
                     const FilePos* P = S->GuessedUse[S->AddrSize - 1];
                     if (P) {
                         PWarning (P, 0,
-                                  "Didn't use %s addressing for '%m%p'",
+                                  "Didn't use %s addressing for `%m%p'",
                                   AddrSizeToStr (S->AddrSize),
                                   GetSymName (S));
                     }

@@ -5,7 +5,7 @@
 ;
 
         .export         __sysremove
-        .import         pushname, popname
+        .import         pushname, popname, mli_set_pathname_tos
 
         .include        "zeropage.inc"
         .include        "mli.inc"
@@ -16,10 +16,7 @@ __sysremove:
         bne     oserr
 
         ; Set pushed name
-        lda     sp
-        ldx     sp+1
-        sta     mliparam + MLI::DESTROY::PATHNAME
-        stx     mliparam + MLI::DESTROY::PATHNAME+1
+        jsr     mli_set_pathname_tos
 
         ; Remove file
         lda     #DESTROY_CALL

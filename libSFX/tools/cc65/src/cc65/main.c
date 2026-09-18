@@ -91,8 +91,10 @@ static void Usage (void)
             "  -Os\t\t\t\tInline some standard functions\n"
             "  -T\t\t\t\tInclude source as comment\n"
             "  -V\t\t\t\tPrint the compiler version number\n"
-            "  -W warning[,...]\t\tSuppress warnings\n"
+            "  -W [-+]warning[,...]\t\tControl warnings ('-' disables, '+' enables)\n"
             "  -d\t\t\t\tDebug mode\n"
+            "  -dM\t\t\t\tOutput all user macros (needs -E)\n"
+            "  -dP\t\t\t\tOutput all predefined macros (needs -E)\n"
             "  -g\t\t\t\tAdd debug info to object file\n"
             "  -h\t\t\t\tHelp (this text)\n"
             "  -j\t\t\t\tDefault characters are signed\n"
@@ -114,8 +116,10 @@ static void Usage (void)
             "  --create-full-dep name\tCreate a full make dependency file\n"
             "  --data-name seg\t\tSet the name of the DATA segment\n"
             "  --debug\t\t\tDebug mode\n"
+            "  --debug-tables name\t\tWrite symbol table debug info to a file\n"
             "  --debug-info\t\t\tAdd debug info to object file\n"
             "  --debug-opt name\t\tDebug optimization steps\n"
+            "  --debug-opt-output\t\tDebug output of each optimization step\n"
             "  --dep-target target\t\tUse this dependency target\n"
             "  --disable-opt name\t\tDisable an optimization step\n"
             "  --eagerly-inline-funcs\tEagerly inline some known functions\n"
@@ -136,6 +140,7 @@ static void Usage (void)
             "  --target sys\t\t\tSet the target system\n"
             "  --verbose\t\t\tIncrease verbosity\n"
             "  --version\t\t\tPrint the compiler version number\n"
+            "  --warnings-as-errors\t\tTreat warnings as errors\n"
             "  --writable-strings\t\tMake string literals writable\n",
             ProgName);
 }
@@ -169,6 +174,10 @@ static void SetSys (const char* Sys)
 
         case TGT_ATARI5200:
             DefineNumericMacro ("__ATARI5200__", 1);
+            break;
+
+        case TGT_ATARI7800:
+            DefineNumericMacro ("__ATARI7800__", 1);
             break;
 
         case TGT_ATARI:
@@ -285,12 +294,134 @@ static void SetSys (const char* Sys)
             DefineNumericMacro ("__PCE__", 1);
             break;
 
+        case TGT_CX16:
+            cbmsys ("__CX16__");
+            break;
+
+        case TGT_SYM1:
+            DefineNumericMacro ("__SYM1__", 1);
+            break;
+
+        case TGT_C65:
+            cbmsys ("__C65__");
+            break;
+
+        case TGT_MEGA65:
+            cbmsys ("__MEGA65__");
+            break;
+
+        case TGT_KIM1:
+            DefineNumericMacro ("__KIM1__", 1);
+            break;
+
+        case TGT_RP6502:
+            DefineNumericMacro ("__RP6502__", 1);
+            break;
+
+        case TGT_AGAT:
+            DefineNumericMacro ("__AGAT__", 1);
+            break;
+
         default:
-            AbEnd ("Unknown target system type %d", Target);
+            AbEnd ("Unknown target system '%s'", Sys);
     }
 
     /* Initialize the translation tables for the target system */
     TgtTranslateInit ();
+}
+
+
+
+static void DefineCpuMacros (void)
+/* Define macros for the target CPU */
+{
+    const char* CPUName;
+
+    /* Note: The list of CPUs handled here must match the one checked in
+    ** OptCPU().
+    */
+    switch (CPU) {
+
+        /* The following ones are legal CPUs as far as the assembler is
+        ** concerned but are ruled out earlier in the compiler, so this
+        ** function should never see them.
+        */
+        case CPU_NONE:
+        case CPU_SWEET16:
+        case CPU_M740:
+        case CPU_UNKNOWN:
+            CPUName = (CPU == CPU_UNKNOWN)? "unknown" : CPUNames[CPU];
+            Internal ("Invalid CPU \"%s\"", CPUName);
+            break;
+
+        case CPU_6502:
+            DefineNumericMacro ("__CPU_6502__", 1);
+            break;
+
+        case CPU_6502X:
+            DefineNumericMacro ("__CPU_6502X__", 1);
+            break;
+
+        case CPU_6502DTV:
+            DefineNumericMacro ("__CPU_6502DTV__", 1);
+            break;
+
+        case CPU_65SC02:
+            DefineNumericMacro ("__CPU_65SC02__", 1);
+            break;
+
+        case CPU_65C02:
+            DefineNumericMacro ("__CPU_65C02__", 1);
+            break;
+
+        case CPU_65CE02:
+            DefineNumericMacro ("__CPU_65CE02__", 1);
+            break;
+
+        case CPU_65816:
+            DefineNumericMacro ("__CPU_65816__", 1);
+            break;
+
+        case CPU_W65C02:
+            DefineNumericMacro ("__CPU_W65C02__", 1);
+            break;
+
+        case CPU_HUC6280:
+            DefineNumericMacro ("__CPU_HUC6280__", 1);
+            break;
+
+        case CPU_4510:
+            DefineNumericMacro ("__CPU_4510__", 1);
+            break;
+
+        case CPU_45GS02:
+            DefineNumericMacro ("__CPU_45GS02__", 1);
+            break;
+
+        default:
+            FAIL ("Unexpected value in switch");
+            break;
+    }
+
+    /* Define the macros for instruction sets. We only include the ones for
+    ** the available CPUs.
+    */
+    DefineNumericMacro ("__CPU_ISET_6502__", CPU_ISET_6502);
+    DefineNumericMacro ("__CPU_ISET_6502X__", CPU_ISET_6502X);
+    DefineNumericMacro ("__CPU_ISET_6502DTV__", CPU_ISET_6502DTV);
+    DefineNumericMacro ("__CPU_ISET_65SC02__", CPU_ISET_65SC02);
+    DefineNumericMacro ("__CPU_ISET_65C02__", CPU_ISET_65C02);
+    DefineNumericMacro ("__CPU_ISET_W65C02__", CPU_ISET_W65C02);
+    DefineNumericMacro ("__CPU_ISET_65CE02__", CPU_ISET_65CE02);
+    DefineNumericMacro ("__CPU_ISET_65816__", CPU_ISET_65816);
+    DefineNumericMacro ("__CPU_ISET_HUC6280__", CPU_ISET_HUC6280);
+    DefineNumericMacro ("__CPU_ISET_4510__", CPU_ISET_4510);
+    DefineNumericMacro ("__CPU_ISET_45GS02__", CPU_ISET_45GS02);
+
+    /* Now define the macro that contains the bit set with the available
+    ** cpu instructions.
+    */
+    DefineNumericMacro ("__CPU__", CPUIsets[CPU]);
 }
 
 
@@ -455,10 +586,13 @@ static void OptCreateFullDep (const char* Opt attribute ((unused)),
 static void OptCPU (const char* Opt, const char* Arg)
 /* Handle the --cpu option */
 {
-    /* Find the CPU from the given name */
+    /* Find the CPU from the given name. We do only accept a certain number
+    ** of CPUs. If the list is changed, be sure to adjust SetCpuMacros().
+    */
     CPU = FindCPU (Arg);
     if (CPU != CPU_6502 && CPU != CPU_6502X && CPU != CPU_65SC02 &&
-        CPU != CPU_65C02 && CPU != CPU_65816 && CPU != CPU_HUC6280) {
+        CPU != CPU_65C02 && CPU != CPU_65816 && CPU != CPU_HUC6280 &&
+        CPU != CPU_6502DTV) {
         AbEnd ("Invalid argument for %s: '%s'", Opt, Arg);
     }
 }
@@ -484,7 +618,11 @@ static void OptDebug (const char* Opt attribute ((unused)),
     ++Debug;
 }
 
-
+static void OptDebugTables (const char* Opt, const char* Arg)
+/* Dump tables to file */
+{
+    FileNameOption (Opt, Arg, &DebugTableName);
+}
 
 static void OptDebugInfo (const char* Opt attribute ((unused)),
                           const char* Arg attribute ((unused)))
@@ -726,7 +864,7 @@ static void OptRodataName (const char* Opt attribute ((unused)), const char* Arg
 
 static void OptSignedChars (const char* Opt attribute ((unused)),
                             const char* Arg attribute ((unused)))
-/* Make default characters signed */
+/* Use 'signed char' as the underlying type of 'char' */
 {
     IS_Set (&SignedChars, 1);
 }
@@ -831,6 +969,15 @@ static void OptWarning (const char* Opt attribute ((unused)), const char* Arg)
 
 
 
+static void OptWarningsAsErrors (const char* Opt attribute ((unused)),
+                                 const char* Arg attribute ((unused)))
+/* Generate an error if any warnings occur */
+{
+    IS_Set (&WarningsAreErrors, 1);
+}
+
+
+
 static void OptWritableStrings (const char* Opt attribute ((unused)),
                                 const char* Arg attribute ((unused)))
 /* Make string literals writable */
@@ -855,6 +1002,7 @@ int main (int argc, char* argv[])
         { "--create-full-dep",      1,      OptCreateFullDep        },
         { "--data-name",            1,      OptDataName             },
         { "--debug",                0,      OptDebug                },
+        { "--debug-tables",         1,      OptDebugTables          },
         { "--debug-info",           0,      OptDebugInfo            },
         { "--debug-opt",            1,      OptDebugOpt             },
         { "--debug-opt-output",     0,      OptDebugOptOutput       },
@@ -878,6 +1026,7 @@ int main (int argc, char* argv[])
         { "--target",               1,      OptTarget               },
         { "--verbose",              0,      OptVerbose              },
         { "--version",              0,      OptVersion              },
+        { "--warnings-as-errors",   0,      OptWarningsAsErrors     },
         { "--writable-strings",     0,      OptWritableStrings      },
     };
 
@@ -891,6 +1040,9 @@ int main (int argc, char* argv[])
 
     /* Initialize the default segment names */
     InitSegNames ();
+
+    /* Initialize the segment address sizes table */
+    InitSegAddrSizes ();
 
     /* Initialize the include search paths */
     InitIncludePaths ();
@@ -914,7 +1066,25 @@ int main (int argc, char* argv[])
                     break;
 
                 case 'd':
-                    OptDebug (Arg, 0);
+                    P = Arg + 2;
+                    if (*P == '\0') {
+                        OptDebug (Arg, 0);
+                    } else {
+                        while (*P) {
+                            switch (*P) {
+                                case 'M':
+                                    DumpUserMacros = 1;
+                                    break;
+                                case 'P':
+                                    DumpPredefMacros = 1;
+                                    break;
+                                default:
+                                    UnknownOption (Arg);
+                                    break;
+                            }
+                            ++P;
+                        }
+                    }
                     break;
 
                 case 'h':
@@ -930,6 +1100,14 @@ int main (int argc, char* argv[])
                     OptSignedChars (Arg, 0);
                     break;
 
+                case 'm':
+                    if (Arg[2] == 'm') {
+                        OptMemoryModel (Arg, GetArg (&I, 3));
+                    } else {
+                        UnknownOption (Arg);
+                    }
+                    break;
+
                 case 'o':
                     SetOutputName (GetArg (&I, 2));
                     break;
@@ -940,10 +1118,6 @@ int main (int argc, char* argv[])
 
                 case 't':
                     OptTarget (Arg, GetArg (&I, 2));
-                    break;
-
-                case 'u':
-                    OptCreateDep (Arg, 0);
                     break;
 
                 case 'v':
@@ -1030,13 +1204,20 @@ int main (int argc, char* argv[])
         AbEnd ("No input files");
     }
 
+    /* The options to output macros can only be used with -E */
+    if ((DumpPredefMacros || DumpUserMacros) && !PreprocessOnly) {
+        AbEnd ("Preprocessor macro output can only be used together with -E");
+    }
+
     /* Add the default include search paths. */
     FinishIncludePaths ();
 
     /* Create the output file name if it was not explicitly given */
     MakeDefaultOutputName (InputFile);
 
-    /* If no CPU given, use the default CPU for the target */
+    /* If no CPU given, use the default CPU for the target. Define macros that
+    ** allow to query the CPU.
+    */
     if (CPU == CPU_UNKNOWN) {
         if (Target != TGT_UNKNOWN) {
             CPU = GetTargetProperties (Target)->DefaultCPU;
@@ -1044,6 +1225,7 @@ int main (int argc, char* argv[])
             CPU = CPU_6502;
         }
     }
+    DefineCpuMacros ();
 
     /* If no memory model was given, use the default */
     if (MemoryModel == MMODEL_UNKNOWN) {
@@ -1055,13 +1237,16 @@ int main (int argc, char* argv[])
         IS_Set (&Standard, STD_DEFAULT);
     }
 
+    /* Track string buffer allocation */
+    InitDiagnosticStrBufs ();
+
     /* Go! */
     Compile (InputFile);
 
     /* Create the output file if we didn't had any errors */
-    if (PreprocessOnly == 0 && (ErrorCount == 0 || Debug)) {
+    if (PreprocessOnly == 0 && (GetTotalErrors () == 0 || Debug)) {
 
-        /* Emit literals, externals, do cleanup and optimizations */
+        /* Emit literals, do cleanup and optimizations */
         FinishCompile ();
 
         /* Open the file */
@@ -1078,6 +1263,12 @@ int main (int argc, char* argv[])
         CreateDependencies ();
     }
 
+    /* Done with tracked string buffer allocation */
+    DoneDiagnosticStrBufs ();
+
+    /* Free up the segment address sizes table */
+    DoneSegAddrSizes ();
+
     /* Return an apropriate exit code */
-    return (ErrorCount > 0)? EXIT_FAILURE : EXIT_SUCCESS;
+    return (GetTotalErrors () > 0)? EXIT_FAILURE : EXIT_SUCCESS;
 }

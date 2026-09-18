@@ -39,6 +39,7 @@
 
 /* common */
 #include "addrsize.h"
+#include "chartype.h"
 #include "check.h"
 #include "hashfunc.h"
 #include "lidefs.h"
@@ -166,13 +167,13 @@ Import* ReadImport (FILE* F, ObjData* Obj)
         */
         if (ObjHasFiles (I->Obj)) {
             const LineInfo* LI = GetImportPos (I);
-            Error ("Invalid import size in for '%s', imported from %s(%u): 0x%02X",
+            Error ("Invalid import size in for `%s', imported from %s:%u: 0x%02X",
                    GetString (I->Name),
                    GetSourceName (LI),
                    GetSourceLine (LI),
                    I->AddrSize);
         } else {
-            Error ("Invalid import size in for '%s', imported from %s: 0x%02X",
+            Error ("Invalid import size in for `%s', imported from %s: 0x%02X",
                    GetString (I->Name),
                    GetObjFileName (I->Obj),
                    I->AddrSize);
@@ -199,7 +200,7 @@ Import* GenImport (unsigned Name, unsigned char AddrSize)
         /* We have no object file information and no line info for a new
         ** import
         */
-        Error ("Invalid import size 0x%02X for symbol '%s'",
+        Error ("Invalid import size 0x%02X for symbol `%s'",
                I->AddrSize,
                GetString (I->Name));
     }
@@ -483,7 +484,7 @@ void InsertExport (Export* E)
                     }
                 } else if (AllowMultDef == 0) {
                     /* Duplicate entry, this is fatal unless allowed by the user */
-                    Error ("Duplicate external identifier: '%s'",
+                    Error ("Duplicate external identifier: `%s'",
                            GetString (L->Name));
                 }
                 return;
@@ -662,7 +663,7 @@ long GetExportVal (const Export* E)
 {
     if (E->Expr == 0) {
         /* OOPS */
-        Internal ("'%s' is an undefined external", GetString (E->Name));
+        Internal ("`%s' is an undefined external", GetString (E->Name));
     }
     return GetExprVal (E->Expr);
 }
@@ -690,18 +691,23 @@ static void CheckSymType (const Export* E)
             */
             if (E->Obj) {
                 /* The export comes from an object file */
-                SB_Printf (&ExportLoc, "%s, %s(%u)",
+                SB_Printf (&ExportLoc, "%s, %s:%u",
                            GetString (E->Obj->Name),
                            GetSourceName (ExportLI),
                            GetSourceLine (ExportLI));
-            } else {
-                SB_Printf (&ExportLoc, "%s(%u)",
+            } else if (ExportLI) {
+                SB_Printf (&ExportLoc, "%s:%u",
                            GetSourceName (ExportLI),
                            GetSourceLine (ExportLI));
+            } else {
+                /* The export is linker generated and we don't have line
+                ** information (likely from command line define)
+                */
+                SB_Printf (&ExportLoc, "%s", GetObjFileName (E->Obj));
             }
             if (I->Obj) {
                 /* The import comes from an object file */
-                SB_Printf (&ImportLoc, "%s, %s(%u)",
+                SB_Printf (&ImportLoc, "%s, %s:%u",
                            GetString (I->Obj->Name),
                            GetSourceName (ImportLI),
                            GetSourceLine (ImportLI));
@@ -709,7 +715,7 @@ static void CheckSymType (const Export* E)
                 /* The import is linker generated and we have line
                 ** information
                 */
-                SB_Printf (&ImportLoc, "%s(%u)",
+                SB_Printf (&ImportLoc, "%s:%u",
                            GetSourceName (ImportLI),
                            GetSourceLine (ImportLI));
             } else {
@@ -720,9 +726,9 @@ static void CheckSymType (const Export* E)
             }
 
             /* Output the diagnostic */
-            Warning ("Address size mismatch for '%s': "
-                     "Exported from %s as '%s', "
-                     "import in %s as '%s'",
+            Warning ("Address size mismatch for `%s': "
+                     "Exported from %s as `%s', "
+                     "import in %s as `%s'",
                      GetString (E->Name),
                      SB_GetConstBuf (&ExportLoc),
                      ExpAddrSize,
@@ -769,17 +775,21 @@ static void PrintUnresolved (ExpCheckFunc F, void* Data)
         if (E->Expr == 0 && E->ImpCount > 0 && F (E->Name, Data) == 0) {
             /* Unresolved external */
             Import* Imp = E->ImpList;
-            fprintf (stderr,
-                     "Unresolved external '%s' referenced in:\n",
-                     GetString (E->Name));
+            const char* Name = GetString (E->Name);
             while (Imp) {
-                unsigned J;
-                for (J = 0; J < CollCount (&Imp->RefLines); ++J) {
-                    const LineInfo* LI = CollConstAt (&Imp->RefLines, J);
-                    fprintf (stderr,
-                         "  %s(%u)\n",
-                         GetSourceName (LI),
-                         GetSourceLine (LI));
+                unsigned J, Count = CollCount (&Imp->RefLines);
+                /* The count is 0 when the import was not added by an input
+                ** file, but by the compiler itself.
+                */
+                if (Count == 0) {
+                    Warning ("Unresolved external `%s'", Name);
+                } else {
+                    for (J = 0; J < Count; ++J) {
+                        const LineInfo* LI = CollConstAt (&Imp->RefLines, J);
+                        PWarning (GetSourcePos (LI),
+                                  "Unresolved external `%s'",
+                                  Name);
+                    }
                 }
                 Imp = Imp->Next;
             }
@@ -794,6 +804,15 @@ static int CmpExpName (const void* K1, const void* K2)
 {
     return SB_Compare (GetStrBuf ((*(Export**)K1)->Name),
                        GetStrBuf ((*(Export**)K2)->Name));
+}
+
+
+
+static int CmpExpValue (const void* K1, const void* K2)
+/* Compare function for qsort */
+{
+    long Diff = GetExportVal (*(Export**)K1) - GetExportVal (*(Export**)K2);
+    return Diff < 0? -1 : Diff > 0? 1 : 0;
 }
 
 
@@ -870,19 +889,25 @@ static char GetAddrSizeCode (unsigned char AddrSize)
 
 
 
-void PrintExportMapByName (FILE* F)
-/* Print an export map, sorted by symbol name, to the given file */
+static void PrintExportMap (Export** Pool, unsigned Count, FILE* F)
+/* Print an export map to the given file */
 {
     unsigned I;
-    unsigned Count;
 
     /* Print all exports */
-    Count = 0;
-    for (I = 0; I < ExpCount; ++I) {
-        const Export* E = ExpPool [I];
+    unsigned Col = 0;
+    for (I = 0; I < Count; ++I) {
+        const Export* E = Pool [I];
 
-        /* Print unreferenced symbols only if explictly requested */
-        if (VerboseMap || E->ImpCount > 0 || SYM_IS_CONDES (E->Type)) {
+        /* Print unreferenced symbols only if explictly requested. If Expr is
+        ** NULL, the export is undefined. This happens for imports that don't
+        ** have a matching export, but if we have one of those, we don't come
+        ** here. It does also happen for imports that where satisfied from
+        ** elsewhere, like o65 imports defined in the linker config.
+        ** So ignore exports here that have an invalid Expr.
+        */
+        if (E->Expr != 0 &&
+            (VerboseMap || E->ImpCount > 0 || SYM_IS_CONDES (E->Type))) {
             fprintf (F,
                      "%-25s %06lX %c%c%c%c   ",
                      GetString (E->Name),
@@ -891,8 +916,8 @@ void PrintExportMapByName (FILE* F)
                      SYM_IS_LABEL (E->Type)? 'L' : 'E',
                      GetAddrSizeCode ((unsigned char) E->AddrSize),
                      SYM_IS_CONDES (E->Type)? 'I' : ' ');
-            if (++Count == 2) {
-                Count = 0;
+            if (++Col == 2) {
+                Col = 0;
                 fprintf (F, "\n");
             }
         }
@@ -902,13 +927,10 @@ void PrintExportMapByName (FILE* F)
 
 
 
-static int CmpExpValue (const void* I1, const void* I2)
-/* Compare function for qsort */
+void PrintExportMapByName (FILE* F)
+/* Print an export map, sorted by symbol name, to the given file */
 {
-    long V1 = GetExportVal (ExpPool [*(unsigned *)I1]);
-    long V2 = GetExportVal (ExpPool [*(unsigned *)I2]);
-
-    return V1 < V2 ? -1 : V1 == V2 ? 0 : 1;
+    PrintExportMap (ExpPool, ExpCount, F);
 }
 
 
@@ -916,43 +938,16 @@ static int CmpExpValue (const void* I1, const void* I2)
 void PrintExportMapByValue (FILE* F)
 /* Print an export map, sorted by symbol value, to the given file */
 {
-    unsigned I;
-    unsigned Count;
-    unsigned *ExpValXlat;
+    /* Create a new pool that is sorted by value */
+    Export** Pool = xmalloc (ExpCount * sizeof (Export*));
+    memcpy (Pool, ExpPool, ExpCount * sizeof (Export*));
+    qsort (Pool, ExpCount, sizeof (Export*), CmpExpValue);
 
-    /* Create a translation table where the symbols are sorted by value. */
-    ExpValXlat = xmalloc (ExpCount * sizeof (unsigned));
-    for (I = 0; I < ExpCount; ++I) {
-        /* Initialize table with current sort order.  */
-        ExpValXlat [I] = I;
-    }
+    /* Print the exports */
+    PrintExportMap (Pool, ExpCount, F);
 
-    /* Sort them by value */
-    qsort (ExpValXlat, ExpCount, sizeof (unsigned), CmpExpValue);
-
-    /* Print all exports */
-    Count = 0;
-    for (I = 0; I < ExpCount; ++I) {
-        const Export* E = ExpPool [ExpValXlat [I]];
-
-        /* Print unreferenced symbols only if explictly requested */
-        if (VerboseMap || E->ImpCount > 0 || SYM_IS_CONDES (E->Type)) {
-            fprintf (F,
-                     "%-25s %06lX %c%c%c%c   ",
-                     GetString (E->Name),
-                     GetExportVal (E),
-                     E->ImpCount? 'R' : ' ',
-                     SYM_IS_LABEL (E->Type)? 'L' : 'E',
-                     GetAddrSizeCode ((unsigned char) E->AddrSize),
-                     SYM_IS_CONDES (E->Type)? 'I' : ' ');
-            if (++Count == 2) {
-                Count = 0;
-                fprintf (F, "\n");
-            }
-        }
-    }
-    fprintf (F, "\n");
-    xfree (ExpValXlat);
+    /* Free the allocated buffer */
+    xfree (Pool);
 }
 
 
@@ -991,7 +986,7 @@ void PrintImportMap (FILE* F)
                 const LineInfo* LI = GetImportPos (Imp);
                 if (LI) {
                     fprintf (F,
-                             "    %-25s %s(%u)\n",
+                             "    %-25s %s:%u\n",
                              GetObjFileName (Imp->Obj),
                              GetSourceName (LI),
                              GetSourceLine (LI));
@@ -1011,6 +1006,36 @@ void PrintImportMap (FILE* F)
 
 
 
+void PrintLabelLine (FILE* F, unsigned NameId, long Val)
+/* Output one label into a vice label file doing some cleanup on the name. */
+{
+    /* Get the name */
+    const char* N = GetString (NameId);
+
+    /* Cleanup the name. It might be generated by the assembler when creating
+    ** internally used labels. Such names contain invalid characters to avoid
+    ** clashes with user input and cannot be read by VICE.
+    */
+    fprintf (F, "al %06lX .", Val);
+    if (IsAlpha (*N) || *N == '@' || *N == '?' || *N == '_') {
+        putc (*N, F);
+    } else {
+        putc ('_', F);
+    }
+    ++N;
+    while (*N) {
+        if (IsAlpha (*N) || IsDigit (*N) || *N == '_') {
+            putc (*N, F);
+        } else {
+            putc ('_', F);
+        }
+        ++N;
+    }
+    putc ('\n', F);
+}
+
+
+
 void PrintExportLabels (FILE* F)
 /* Print the exports in a VICE label file */
 {
@@ -1019,7 +1044,8 @@ void PrintExportLabels (FILE* F)
     /* Print all exports */
     for (I = 0; I < ExpCount; ++I) {
         const Export* E = ExpPool [I];
-        fprintf (F, "al %06lX .%s\n", GetExportVal (E), GetString (E->Name));
+        PrintLabelLine (F, E->Name, GetExportVal (E));
+
     }
 }
 
@@ -1053,7 +1079,7 @@ void CircularRefError (const Export* E)
 /* Print an error about a circular reference using to define the given export */
 {
     const LineInfo* LI = GetExportPos (E);
-    Error ("Circular reference for symbol '%s', %s(%u)",
+    Error ("Circular reference for symbol `%s', %s:%u",
            GetString (E->Name),
            GetSourceName (LI),
            GetSourceLine (LI));

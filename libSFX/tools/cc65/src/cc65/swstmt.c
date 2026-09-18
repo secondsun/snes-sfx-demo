@@ -61,19 +61,84 @@
 
 
 
+/* Flow control data for one switch label */
+typedef struct LabelCtrl LabelCtrl;
+struct LabelCtrl {
+    long        Value;          /* Numeric value if any */
+    int         StmtFlags;      /* Collected statement flags for this label */
+    uint8_t     Default;        /* Is this the default label? */
+    uint8_t     Unreachable;    /* Label is unreachable */
+    uint8_t     Warning;        /* We've output a warning for this label */
+    uint8_t     Breaks;         /* Code after this label contains a "break" */
+};
+
+/* Switch control data */
 typedef struct SwitchCtrl SwitchCtrl;
 struct SwitchCtrl {
     Collection* Nodes;          /* CaseNode tree */
-    TypeCode    ExprType;       /* Basic switch expression type */
+    const Type* ExprType;       /* Switch controlling expression type */
     unsigned    Depth;          /* Number of bytes the selector type has */
     unsigned    DefaultLabel;   /* Label for the default branch */
 
-
-
+    /* Data for flow control analysis. The Labels collection will contain
+    ** allocated but the ActiveLabels will contain just pointers to data
+    ** owned by the Labels collection.
+    */
+    int         Weird;          /* Flag for a weird switch that contains gotos
+                                ** or code outside of any label.
+                                */
+    int         StmtFlags;      /* Collected statement flags */
+    Collection  Labels;         /* Collection with all labels */
+    Collection  ActiveLabels;   /* Collection with currently active labels */
 };
 
 /* Pointer to current switch control struct */
 static SwitchCtrl* Switch = 0;
+
+
+
+/*****************************************************************************/
+/*                             struct LabelCtrl                              */
+/*****************************************************************************/
+
+
+
+static void AddLabelCtrl (SwitchCtrl* Switch, uint8_t Default, long Value,
+                          uint8_t Unreachable)
+/* Create a new LabelCtrl structure and add it to the current switch */
+{
+    /* Allocate */
+    LabelCtrl* LC = xmalloc (sizeof (*LC));
+
+    /* Initialize */
+    LC->Value       = Value;
+    LC->StmtFlags   = SF_NONE;
+    LC->Default     = Default;
+    LC->Unreachable = Unreachable;
+    LC->Warning     = 0;
+    LC->Breaks      = 0;
+
+    /* Add it to the labels. If the label isn't unreachable, do also add it
+    ** to the active labels.
+    */
+    CollAppend (&Switch->Labels, LC);
+    if (!LC->Unreachable) {
+        CollAppend (&Switch->ActiveLabels, LC);
+    }
+}
+
+
+
+static void FreeLabels (SwitchCtrl* Switch)
+/* Delete all labels in the given switch control structure */
+{
+    unsigned I;
+    for (I = 0; I < CollCount (&Switch->Labels); ++I) {
+        xfree (CollAtUnchecked (&Switch->Labels, I));
+    }
+    CollDeleteAll (&Switch->Labels);
+    CollDeleteAll (&Switch->ActiveLabels);
+}
 
 
 
@@ -83,8 +148,8 @@ static SwitchCtrl* Switch = 0;
 
 
 
-void SwitchStatement (void)
-/* Handle a switch statement for chars with a cmp cascade for the selector */
+int SwitchStatement (void)
+/* Handle a 'switch' statement and return the corresponding SF_xxx flags */
 {
     ExprDesc    SwitchExpr;     /* Switch statement expression */
     CodeMark    CaseCodeStart;  /* Start of code marker */
@@ -92,11 +157,10 @@ void SwitchStatement (void)
     CodeMark    SwitchCodeEnd;  /* End of switch code */
     unsigned    ExitLabel;      /* Exit label */
     unsigned    SwitchCodeLabel;/* Label for the switch code */
-    int         HaveBreak = 0;  /* True if the last statement had a break */
+    int         StmtFlags;      /* True if the last statement had a break */
     int         RCurlyBrace;    /* True if last token is right curly brace */
     SwitchCtrl* OldSwitch;      /* Pointer to old switch control data */
     SwitchCtrl  SwitchData;     /* New switch data */
-
 
     /* Eat the "switch" token */
     NextToken ();
@@ -105,6 +169,8 @@ void SwitchStatement (void)
     ** integer type.
     */
     ConsumeLParen ();
+
+    ED_Init (&SwitchExpr);
     Expression0 (&SwitchExpr);
     if (!IsClassInt (SwitchExpr.Type))  {
         Error ("Switch quantity is not an integer");
@@ -132,9 +198,13 @@ void SwitchStatement (void)
 
     /* Setup the control structure, save the old and activate the new one */
     SwitchData.Nodes        = NewCollection ();
-    SwitchData.ExprType     = UnqualifiedType (SwitchExpr.Type[0].C);
+    SwitchData.ExprType     = SwitchExpr.Type;
     SwitchData.Depth        = SizeOf (SwitchExpr.Type);
     SwitchData.DefaultLabel = 0;
+    SwitchData.Weird        = 0;
+    SwitchData.StmtFlags    = SF_NONE;
+    SwitchData.Labels       = EmptyCollection;
+    SwitchData.ActiveLabels = EmptyCollection;
     OldSwitch = Switch;
     Switch = &SwitchData;
 
@@ -147,11 +217,11 @@ void SwitchStatement (void)
     /* Parse the following statement, which may actually be a compound
     ** statement if there is a curly brace at the current input position
     */
-    HaveBreak = Statement (&RCurlyBrace);
+    StmtFlags = AnyStatement (&RCurlyBrace, Switch);
 
     /* Check if we had any labels */
     if (CollCount (SwitchData.Nodes) == 0 && SwitchData.DefaultLabel == 0) {
-        Warning ("No case labels");
+        Warning ("No reachable case labels for switch");
     }
 
     /* If the last statement did not have a break, we may have an open
@@ -161,7 +231,7 @@ void SwitchStatement (void)
     ** carry the label), add a jump to the exit. If it is useless, the
     ** optimizer will remove it later.
     */
-    if (!HaveBreak) {
+    if (SF_Unreach (StmtFlags) == SF_NONE) {
         g_jump (ExitLabel);
     }
 
@@ -194,77 +264,132 @@ void SwitchStatement (void)
     /* Free the case value tree */
     FreeCaseNodeColl (SwitchData.Nodes);
 
-    /* If the case statement was terminated by a closing curly
-    ** brace, skip it now.
+    /* If the case statement was terminated by a closing curly brace, skip
+    ** it now.
     */
     if (RCurlyBrace) {
         NextToken ();
     }
+
+    /* Remove "break" from the flags since it is handled completely inside the
+    ** switch statement.
+    */
+    StmtFlags = SwitchData.StmtFlags & ~(SF_ANY_BREAK | SF_BREAK);
+
+    /* If the switch was weird, we cannot really tell if the following code is
+    ** unreachable.
+    */
+    if (!SwitchData.Weird) {
+
+        /* Check the labels. If there is no default label, the code after the
+        ** switch is always reachable. If there is a default label, the code
+        ** after the switch is reachable if the default label code ends with a
+        ** break or no statement that makes following instructions unreachable.
+        ** Otherwise the code after the switch is reachable if any of the
+        ** labels contains a "break" statement.
+        */
+        StmtFlags = SF_NONE;
+        int Reachable = 0;
+        int Default = 0;
+        for (unsigned I = 0; I < CollCount (&SwitchData.Labels); ++I) {
+            const LabelCtrl* LC = CollAtUnchecked (&SwitchData.Labels, I);
+            if (LC->Default) {
+                Default = 1;
+                if (!SF_Unreach (LC->StmtFlags)) {
+                    Reachable = 1;
+                }
+            }
+            if (SF_Any_Break (LC->StmtFlags)) {
+                Reachable = 1;
+            }
+            StmtFlags |= (LC->StmtFlags & ~(SF_ANY_BREAK | SF_BREAK));
+        }
+        if (!Default) {
+            Reachable = 1;
+        }
+        if (Reachable) {
+            StmtFlags &= ~SF_MASK_UNREACH;
+        }
+    }
+
+    /* Now free the labels */
+    FreeLabels (&SwitchData);
+    DoneCollection (&SwitchData.Labels);
+    DoneCollection (&SwitchData.ActiveLabels);
+
+    /* We only return the combined "any" flags from all the statements within
+    ** the switch. Minus "break" which is handled inside the switch.
+    */
+    return StmtFlags;
 }
 
 
 
 void CaseLabel (void)
-/* Handle a case sabel */
+/* Handle a case label */
 {
     ExprDesc CaseExpr;          /* Case label expression */
-    long     Val;               /* Case label value */
-    unsigned CodeLabel;         /* Code label for this case */
-
 
     /* Skip the "case" token */
     NextToken ();
 
     /* Read the selector expression */
-    ConstAbsIntExpr (hie1, &CaseExpr);
-    Val = CaseExpr.IVal;
+    CaseExpr = NoCodeConstAbsIntExpr (hie1);
 
     /* Now check if we're inside a switch statement */
     if (Switch != 0) {
 
         /* Check the range of the expression */
-        switch (Switch->ExprType) {
+        const Type* CaseT       = CaseExpr.Type;
+        long        CaseVal     = CaseExpr.IVal;
+        int         OutOfRange  = 0;
 
-            case T_SCHAR:
-                /* Signed char */
-                if (Val < -128 || Val > 127) {
-                    Error ("Range error");
-                }
-                break;
+        CaseExpr.Type = IntPromotion (Switch->ExprType);
+        LimitExprValue (&CaseExpr, 1);
 
-            case T_UCHAR:
-                if (Val < 0 || Val > 255) {
-                    Error ("Range error");
-                }
-                break;
-
-            case T_SHORT:
-            case T_INT:
-                if (Val < -32768 || Val > 32767) {
-                    Error ("Range error");
-                }
-                break;
-
-            case T_USHORT:
-            case T_UINT:
-                if (Val < 0 || Val > 65535) {
-                    Error ("Range error");
-                }
-                break;
-
-            case T_LONG:
-            case T_ULONG:
-                break;
-
-            default:
-                Internal ("Invalid type: %06lX", Switch->ExprType);
+        if (CaseVal != CaseExpr.IVal ||
+            (IsSignSigned (CaseT) != IsSignSigned (CaseExpr.Type) &&
+            (IsSignSigned (CaseT) ? CaseVal < 0 : CaseExpr.IVal < 0))) {
+            Warning (IsSignSigned (CaseT) ?
+                     IsSignSigned (CaseExpr.Type) ?
+                     "Case value is implicitly converted (%ld to %ld)" :
+                     "Case value is implicitly converted (%ld to %lu)" :
+                     IsSignSigned (CaseExpr.Type) ?
+                     "Case value is implicitly converted (%lu to %ld)" :
+                     "Case value is implicitly converted (%lu to %lu)",
+                     CaseVal, CaseExpr.IVal);
         }
 
-        /* Insert the case selector into the selector table */
-        CodeLabel = InsertCaseValue (Switch->Nodes, Val, Switch->Depth);
+        /* Check the range of the expression */
+        if (IsSignSigned (CaseExpr.Type)) {
+            if (CaseExpr.IVal < GetIntegerTypeMin (Switch->ExprType)) {
+                OutOfRange = 1;
+                Warning ("Case value (%ld) out of range for switch condition type",
+                         CaseExpr.IVal);
+            } else if (IsSignSigned (Switch->ExprType) ?
+                       CaseExpr.IVal > (long)GetIntegerTypeMax (Switch->ExprType) :
+                       SizeOf (CaseExpr.Type) > SizeOf (Switch->ExprType) &&
+                       (unsigned long)CaseExpr.IVal > GetIntegerTypeMax (Switch->ExprType)) {
+                OutOfRange = 1;
+                Warning ("Case value (%ld) out of range for switch condition type",
+                         CaseExpr.IVal);
+            }
+        } else if ((unsigned long)CaseExpr.IVal > GetIntegerTypeMax (Switch->ExprType)) {
+            OutOfRange = 1;
+            Warning ("Case value (%lu) out of range for switch condition type",
+                     (unsigned long) CaseExpr.IVal);
+        }
 
-        /* Define this label */
-        g_defcodelabel (CodeLabel);
+        if (OutOfRange == 0) {
+            /* Insert the case selector into the selector table */
+            unsigned CodeLabel = InsertCaseValue (Switch->Nodes, CaseExpr.IVal, Switch->Depth);
+
+            /* Define this label */
+            g_defcodelabel (CodeLabel);
+        }
+
+        /* Add a label control structure for this label */
+        AddLabelCtrl (Switch, 0, CaseExpr.IVal, OutOfRange);
 
     } else {
 
@@ -295,6 +420,9 @@ void DefaultLabel (void)
             Switch->DefaultLabel = GetLocalLabel ();
             g_defcodelabel (Switch->DefaultLabel);
 
+            /* Add a label control structure for this label */
+            AddLabelCtrl (Switch, 1, 0, 0);
+
         } else {
             /* We had the default label already */
             Error ("Multiple default labels in one switch");
@@ -309,4 +437,69 @@ void DefaultLabel (void)
 
     /* Skip the colon */
     ConsumeColon ();
+}
+
+
+
+void SwitchBodyStatement (struct SwitchCtrl* S, LineInfo* LI, int StmtFlags)
+/* Helper function for flow analysis. Must be called for all statements within
+** a switch passing the flags for special statements.
+*/
+{
+    unsigned I;
+
+    /* The control structure passed must be the current one */
+    PRECONDITION (S == Switch);
+
+    /* Handle code without a label in the switch */
+    if (CollCount (&S->Labels) == 0) {
+        /* This is a statement that preceedes any switch labels. If the
+        ** switch is not already marked as weird and the current statement
+        ** has no label, output a warning about unreachable code.
+        */
+        if (!S->Weird) {
+            if (!SF_Label (StmtFlags)) {
+                LIUnreachableCodeWarning (LI);
+            }
+            S->Weird = 1;
+        }
+    }
+
+    /* If the new statement contains a "goto", mark the switch as "weird" */
+    if (SF_Any_Goto (StmtFlags)) {
+        S->Weird = 1;
+    }
+
+    /* If the switch is marked as weird, no further action */
+    if (S->Weird) {
+        return;
+    }
+
+    /* Handle all currently active labels. Walk from the end since we're
+    ** deleting stuff from the array.
+    */
+    I = CollCount (&S->ActiveLabels);
+    while (I > 0) {
+        LabelCtrl* LC = CollAtUnchecked (&S->ActiveLabels, --I);
+
+        /* Collect the flags for this label */
+        LC->StmtFlags = SF_Any (LC->StmtFlags) | (StmtFlags & ~SF_EMPTY);
+
+        /* If the new statement contains a "break", mark the label code as
+        ** "breaking".
+        */
+        if (SF_Any_Break (StmtFlags)) {
+            LC->Breaks = 1;
+        }
+
+        /* If the new statement makes the following ones unreachable, remove
+        ** the label from the active ones.
+        */
+        if (SF_Unreach (StmtFlags)) {
+            CollDelete (&S->ActiveLabels, I);
+        }
+    }
+
+    /* Collect the statement flags. */
+    S->StmtFlags = SF_Any (S->StmtFlags | StmtFlags);
 }

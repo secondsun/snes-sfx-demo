@@ -40,6 +40,7 @@
 
 /* ca65 */
 #include "error.h"
+#include "expect.h"
 #include "nexttok.h"
 #include "scanner.h"
 #include "symbol.h"
@@ -73,7 +74,7 @@ SymTable* ParseScopedIdent (StrBuf* Name, StrBuf* FullName)
         /* Start from the root scope */
         Scope = RootScope;
 
-    } else if (CurTok.Tok == TOK_IDENT) {
+    } else if (Expect (TOK_IDENT, "Expected an identifier")) {
 
         /* Remember the name and skip it */
         SB_Copy (Name, &CurTok.SVal);
@@ -93,10 +94,14 @@ SymTable* ParseScopedIdent (StrBuf* Name, StrBuf* FullName)
         */
         Scope = SymFindAnyScope (CurrentScope, Name);
         if (Scope == 0) {
-            /* Scope not found */
-            SB_Terminate (FullName);
-            Error ("No such scope: '%m%p'", FullName);
-            return 0;
+            /* Scope not found, create a new scope here */
+            Scope = SymFindScope (CurrentScope, Name, SYM_ALLOC_NEW);
+            if (Scope == 0) {
+                SB_Terminate (FullName);
+                /* Scope not found */
+                Error ("Can't create scope: `%m%p'", FullName);
+                return 0;
+            }
         }
 
     } else {
@@ -115,8 +120,7 @@ SymTable* ParseScopedIdent (StrBuf* Name, StrBuf* FullName)
     while (1) {
 
         /* Next token must be an identifier. */
-        if (CurTok.Tok != TOK_IDENT) {
-            Error ("Identifier expected");
+        if (!Expect (TOK_IDENT, "Expected an identifier")) {
             return 0;
         }
 
@@ -136,10 +140,10 @@ SymTable* ParseScopedIdent (StrBuf* Name, StrBuf* FullName)
         SB_Append (FullName, Name);
 
         /* Search for the child scope */
-        Scope = SymFindScope (Scope, Name, SYM_FIND_EXISTING);
+        Scope = SymFindScope (Scope, Name, SYM_ALLOC_NEW);
         if (Scope == 0) {
             /* Scope not found */
-            Error ("No such scope: '%m%p'", FullName);
+            Error ("Can't create scope: `%m%p'", FullName);
             return 0;
         }
 
@@ -187,7 +191,7 @@ SymEntry* ParseScopedSymName (SymFindAction Action)
         ** may not expect NULL to be returned if Action contains SYM_ALLOC_NEW,
         ** create a new symbol.
         */
-        if (Action & SYM_ALLOC_NEW) { 
+        if (Action & SYM_ALLOC_NEW) {
             Sym = NewSymEntry (&Ident, SF_NONE);
         } else {
             Sym = 0;

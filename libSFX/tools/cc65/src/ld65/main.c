@@ -54,6 +54,7 @@
 #include "asserts.h"
 #include "binfmt.h"
 #include "condes.h"
+#include "consprop.h"
 #include "config.h"
 #include "dbgfile.h"
 #include "error.h"
@@ -87,16 +88,46 @@ static unsigned         LibFiles   = 0; /* Count of library files linked */
 #define INPUT_FILES_SGROUP     3        /* Entry is 'StartGroup' */
 #define INPUT_FILES_EGROUP     4        /* Entry is 'EndGroup' */
 
-#define MAX_INPUTFILES         256
-
 /* Array of inputs (libraries and object files) */
-static struct InputFile {
-    const char *FileName;
-    unsigned Type;
-}                              *InputFiles;
-static unsigned                InputFilesCount = 0;
-static const char              *CmdlineCfgFile = NULL,
-                               *CmdlineTarget = NULL;
+struct InputFile {
+    unsigned char       Type;
+    char                FileName[1];    /* Dynamically allocated */
+};
+typedef struct InputFile InputFile;
+static Collection InputFiles = STATIC_COLLECTION_INITIALIZER;
+
+static const char* CmdlineCfgFile = NULL;
+static const char* CmdlineTarget = NULL;
+
+
+
+/*****************************************************************************/
+/*                             struct InputFile                              */
+/*****************************************************************************/
+
+
+
+static InputFile* NewInputFile (unsigned char Type, const char* FileName)
+/* Create a new InputFile struct and return it */
+{
+    unsigned Length = FileName? strlen (FileName) : 0;
+    InputFile* F = xmalloc (sizeof (InputFile) + Length);
+    F->Type = Type;
+    if (FileName) {
+        memcpy (F->FileName, FileName, Length + 1);
+    } else {
+        F->FileName[0] = '\0';
+    }
+    return F;
+}
+
+
+
+static void FreeInputFile (InputFile* F)
+/* Free an InputFile struct */
+{
+    xfree (F);
+}
 
 
 
@@ -130,22 +161,27 @@ static void Usage (void)
             "Long options:\n"
             "  --allow-multiple-definition\tAllow multiple definitions\n"
             "  --cfg-path path\t\tSpecify a config file search path\n"
+            "  --color [on|auto|off]\t\tColor diagnostics (default: auto)\n"
             "  --config name\t\t\tUse linker config file\n"
             "  --dbgfile name\t\tGenerate debug information\n"
             "  --define sym=val\t\tDefine a symbol\n"
             "  --end-group\t\t\tEnd a library group\n"
             "  --force-import sym\t\tForce an import of symbol 'sym'\n"
             "  --help\t\t\tHelp (this text)\n"
+            "  --large-alignment\t\tDon't warn about large alignments\n"
             "  --lib file\t\t\tLink this library\n"
             "  --lib-path path\t\tSpecify a library search path\n"
             "  --mapfile name\t\tCreate a map file\n"
             "  --module-id id\t\tSpecify a module id\n"
+            "  --no-utf8\t\t\tDisable use of UTF-8 in diagnostics\n"
             "  --obj file\t\t\tLink this object file\n"
             "  --obj-path path\t\tSpecify an object file search path\n"
             "  --start-addr addr\t\tSet the default start address\n"
             "  --start-group\t\t\tStart a library group\n"
             "  --target sys\t\t\tSet the target system\n"
-            "  --version\t\t\tPrint the linker version\n",
+            "  --version\t\t\tPrint the linker version\n"
+            "  --warn-align-waste\t\tPrint bytes \"wasted\" for alignment\n"
+            "  --warnings-as-errors\t\tTreat warnings as errors\n",
             ProgName);
 }
 
@@ -188,7 +224,7 @@ static void LinkFile (const char* Name, FILETYPE Type)
 
     /* If we don't know the file type, determine it from the extension */
     if (Type == FILETYPE_UNKNOWN) {
-        Type = GetFileType (Name);
+        Type = GetTypeOfFile (Name);
     }
 
     /* For known file types, search the file in the directory list */
@@ -215,13 +251,13 @@ static void LinkFile (const char* Name, FILETYPE Type)
 
     /* We must have a valid name now */
     if (PathName == 0) {
-        Error ("Input file '%s' not found", Name);
+        Error ("Input file `%s' not found", Name);
     }
 
     /* Try to open the file */
     F = fopen (PathName, "rb");
     if (F == 0) {
-        Error ("Cannot open '%s': %s", PathName, strerror (errno));
+        Error ("Cannot open `%s': %s", PathName, strerror (errno));
     }
 
     /* Read the magic word */
@@ -247,7 +283,7 @@ static void LinkFile (const char* Name, FILETYPE Type)
 
         default:
             fclose (F);
-            Error ("File '%s' has unknown type", PathName);
+            Error ("File `%s' has unknown type", PathName);
 
     }
 
@@ -309,6 +345,19 @@ static void OptCfgPath (const char* Opt attribute ((unused)), const char* Arg)
 
 
 
+static void OptColor (const char* Opt, const char* Arg)
+/* Handle the --color option */
+{
+    ColorMode Mode = CP_Parse (Arg);
+    if (Mode == CM_INVALID) {
+        Error ("Invalid argument to %s: %s", Opt, Arg);
+    } else {
+        CP_SetColorMode (Mode);
+    }
+}
+
+
+
 static void OptConfig (const char* Opt attribute ((unused)), const char* Arg)
 /* Define the config file */
 {
@@ -323,7 +372,7 @@ static void OptConfig (const char* Opt attribute ((unused)), const char* Arg)
         PathName = SearchFile (CfgDefaultPath, Arg);
     }
     if (PathName == 0) {
-        Error ("Cannot find config file '%s'", Arg);
+        Error ("Cannot find config file `%s'", Arg);
     }
 
     /* Read the config */
@@ -377,7 +426,7 @@ static void OptForceImport (const char* Opt attribute ((unused)), const char* Ar
         /* Get the address size and check it */
         unsigned char AddrSize = AddrSizeFromStr (ColPos+1);
         if (AddrSize == ADDR_SIZE_INVALID) {
-            Error ("Invalid address size '%s'", ColPos+1);
+            Error ("Invalid address size `%s'", ColPos+1);
         }
 
         /* Create a copy of the argument */
@@ -406,13 +455,18 @@ static void OptHelp (const char* Opt attribute ((unused)),
 
 
 
+static void OptLargeAlignment (const char* Opt attribute ((unused)),
+                               const char* Arg attribute ((unused)))
+/* Don't warn about large alignments */
+{
+    LargeAlignment = 1;
+}
+
+
 static void OptLib (const char* Opt attribute ((unused)), const char* Arg)
 /* Link a library */
 {
-    InputFiles[InputFilesCount].Type = INPUT_FILES_FILE_LIB;
-    InputFiles[InputFilesCount].FileName = Arg;
-    if (++InputFilesCount >= MAX_INPUTFILES)
-        Error ("Too many input files");
+    CollAppend (&InputFiles, NewInputFile (INPUT_FILES_FILE_LIB, Arg));
 }
 
 
@@ -448,13 +502,19 @@ static void OptModuleId (const char* Opt, const char* Arg)
 
 
 
+static void OptNoUtf8 (const char* Opt attribute ((unused)),
+                       const char* Arg attribute ((unused)))
+/* Handle the --no-utf8 option */
+{
+    CP_DisableUTF8 ();
+}
+
+
+
 static void OptObj (const char* Opt attribute ((unused)), const char* Arg)
 /* Link an object file */
 {
-    InputFiles[InputFilesCount].Type = INPUT_FILES_FILE_OBJ;
-    InputFiles[InputFilesCount].FileName = Arg;
-    if (++InputFilesCount >= MAX_INPUTFILES)
-        Error ("Too many input files");
+    CollAppend (&InputFiles, NewInputFile (INPUT_FILES_FILE_OBJ, Arg));
 }
 
 
@@ -510,7 +570,7 @@ static void OptTarget (const char* Opt attribute ((unused)), const char* Arg)
     /* Map the target name to a target id */
     Target = FindTarget (Arg);
     if (Target == TGT_UNKNOWN) {
-        Error ("Invalid target name: '%s'", Arg);
+        Error ("Invalid target name: `%s'", Arg);
     }
 
     /* Set the target binary format */
@@ -527,7 +587,7 @@ static void OptTarget (const char* Opt attribute ((unused)), const char* Arg)
         PathName = SearchFile (CfgDefaultPath, SB_GetBuf (&FileName));
     }
     if (PathName == 0) {
-        Error ("Cannot find config file '%s'", SB_GetBuf (&FileName));
+        Error ("Cannot find config file `%s'", SB_GetBuf (&FileName));
     }
 
     /* Free file name memory */
@@ -550,6 +610,24 @@ static void OptVersion (const char* Opt attribute ((unused)),
 
 
 
+static void OptWarnAlignWaste (const char* Opt attribute ((unused)),
+                               const char* Arg attribute ((unused)))
+/* Warn about bytes "wasted" for alignment */
+{
+    WarnAlignWaste = 1;
+}
+
+
+
+static void OptWarningsAsErrors (const char* Opt attribute ((unused)),
+                                 const char* Arg attribute ((unused)))
+/* Generate an error if any warnings occur */
+{
+    WarningsAsErrors = 1;
+}
+
+
+
 static void OptMultDef (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
 /* Set flag to allow multiple definitions of a global symbol */
@@ -563,10 +641,7 @@ static void CmdlOptStartGroup (const char* Opt attribute ((unused)),
                                const char* Arg attribute ((unused)))
 /* Remember 'start group' occurrence in input files array */
 {
-    InputFiles[InputFilesCount].Type = INPUT_FILES_SGROUP;
-    InputFiles[InputFilesCount].FileName = Arg;  /* Unused */
-    if (++InputFilesCount >= MAX_INPUTFILES)
-        Error ("Too many input files");
+    CollAppend (&InputFiles, NewInputFile (INPUT_FILES_SGROUP, 0));
 }
 
 
@@ -575,10 +650,7 @@ static void CmdlOptEndGroup (const char* Opt attribute ((unused)),
                              const char* Arg attribute ((unused)))
 /* Remember 'end group' occurrence in input files array */
 {
-    InputFiles[InputFilesCount].Type = INPUT_FILES_EGROUP;
-    InputFiles[InputFilesCount].FileName = Arg;  /* Unused */
-    if (++InputFilesCount >= MAX_INPUTFILES)
-        Error ("Too many input files");
+    CollAppend (&InputFiles, NewInputFile (INPUT_FILES_EGROUP, 0));
 }
 
 
@@ -605,35 +677,37 @@ static void CmdlOptTarget (const char* Opt attribute ((unused)), const char* Arg
 
 
 
-static void ParseCommandLine(void)
+static void ParseCommandLine (void)
 {
     /* Program long options */
     static const LongOpt OptTab[] = {
         { "--allow-multiple-definition", 0,      OptMultDef              },
         { "--cfg-path",                  1,      OptCfgPath              },
+        { "--color",                     1,      OptColor                },
         { "--config",                    1,      CmdlOptConfig           },
         { "--dbgfile",                   1,      OptDbgFile              },
         { "--define",                    1,      OptDefine               },
         { "--end-group",                 0,      CmdlOptEndGroup         },
         { "--force-import",              1,      OptForceImport          },
         { "--help",                      0,      OptHelp                 },
+        { "--large-alignment",           0,      OptLargeAlignment       },
         { "--lib",                       1,      OptLib                  },
         { "--lib-path",                  1,      OptLibPath              },
         { "--mapfile",                   1,      OptMapFile              },
         { "--module-id",                 1,      OptModuleId             },
+        { "--no-utf8",                   0,      OptNoUtf8               },
         { "--obj",                       1,      OptObj                  },
         { "--obj-path",                  1,      OptObjPath              },
         { "--start-addr",                1,      OptStartAddr            },
         { "--start-group",               0,      CmdlOptStartGroup       },
         { "--target",                    1,      CmdlOptTarget           },
         { "--version",                   0,      OptVersion              },
+        { "--warn-align-waste",          0,      OptWarnAlignWaste       },
+        { "--warnings-as-errors",        0,      OptWarningsAsErrors     },
     };
 
     unsigned I;
     unsigned LabelFileGiven = 0;
-
-    /* Allocate memory for input file array */
-    InputFiles = xmalloc (MAX_INPUTFILES * sizeof (struct InputFile));
 
     /* Defer setting of config/target and input files until all options are parsed */
     I = 1;
@@ -727,13 +801,8 @@ static void ParseCommandLine(void)
             }
 
         } else {
-
             /* A filename */
-            InputFiles[InputFilesCount].Type = INPUT_FILES_FILE;
-            InputFiles[InputFilesCount].FileName = Arg;
-            if (++InputFilesCount >= MAX_INPUTFILES)
-                Error ("Too many input files");
-
+            CollAppend (&InputFiles, NewInputFile (INPUT_FILES_FILE, Arg));
         }
 
         /* Next argument */
@@ -746,17 +815,18 @@ static void ParseCommandLine(void)
         OptConfig (NULL, CmdlineCfgFile);
     }
 
-    /* Process input files */
-    for (I = 0; I < InputFilesCount; ++I) {
-        switch (InputFiles[I].Type) {
+    /* Process input files and delete the entries while doing so */
+    for (I = 0; I < CollCount (&InputFiles); ++I) {
+        InputFile* F = CollAtUnchecked (&InputFiles, I);
+        switch (F->Type) {
             case INPUT_FILES_FILE:
-                LinkFile (InputFiles[I].FileName, FILETYPE_UNKNOWN);
+                LinkFile (F->FileName, FILETYPE_UNKNOWN);
                 break;
             case INPUT_FILES_FILE_LIB:
-                LinkFile (InputFiles[I].FileName, FILETYPE_LIB);
+                LinkFile (F->FileName, FILETYPE_LIB);
                 break;
             case INPUT_FILES_FILE_OBJ:
-                LinkFile (InputFiles[I].FileName, FILETYPE_OBJ);
+                LinkFile (F->FileName, FILETYPE_OBJ);
                 break;
             case INPUT_FILES_SGROUP:
                 OptStartGroup (NULL, 0);
@@ -765,12 +835,14 @@ static void ParseCommandLine(void)
                 OptEndGroup (NULL, 0);
                 break;
             default:
-                abort ();
+                FAIL ("Unknown file type");
         }
+        FreeInputFile (F);
     }
 
     /* Free memory used for input file array */
-    xfree (InputFiles);
+    DoneCollection (&InputFiles);
+    InitCollection (&InputFiles);       /* Don't leave dangling pointers */
 }
 
 
@@ -779,6 +851,9 @@ int main (int argc, char* argv [])
 /* Linker main program */
 {
     unsigned MemoryAreaOverflows;
+
+    /* Initialize console output */
+    CP_Init ();
 
     /* Initialize the cmdline module */
     InitCmdLine (&argc, &argv, "ld65");
@@ -833,6 +908,10 @@ int main (int argc, char* argv [])
         }
         Error ("Cannot generate most of the files due to memory area overflow%c",
                (MemoryAreaOverflows > 1) ? 's' : ' ');
+    }
+
+    if (WarningCount > 0 && WarningsAsErrors) {
+        Error ("Warnings as errors");
     }
 
     /* Create the output file */

@@ -1,7 +1,8 @@
 ;
 ; 2017-11-07, Piotr Fusik
 ;
-; unsigned __fastcall__ inflatemem (char* dest, const char* source);
+; unsigned __fastcall__ inflatemem (unsigned char* dest,
+;                                   const unsigned char* source);
 ;
 ; NOTE: Be extremely careful with modifications, because this code is heavily
 ; optimized for size (for example assumes certain register and flag values
@@ -11,7 +12,7 @@
         .export         _inflatemem
 
         .import         incsp2
-        .importzp       sp, sreg, ptr1, ptr2, ptr3, ptr4
+        .importzp       c_sp, sreg, ptr1, ptr2, ptr3, ptr4
 
 ; --------------------------------------------------------------------------
 ;
@@ -78,10 +79,10 @@ _inflatemem:
         stx     inputPointer+1
 ; outputPointer = dest
         ldy     #1
-        lda     (sp),y
+        lda     (c_sp),y
         sta     outputPointer+1
         dey
-        lda     (sp),y
+        lda     (c_sp),y
         sta     outputPointer
 
 ;       ldy     #0
@@ -128,11 +129,11 @@ inflate_nextBlock:
         lda     outputPointer
 ;       ldy     #0
 ;       sec
-        sbc     (sp),y
+        sbc     (c_sp),y
         iny
         pha
         lda     outputPointer+1
-        sbc     (sp),y
+        sbc     (c_sp),y
         tax
         pla
 ; pop dest
