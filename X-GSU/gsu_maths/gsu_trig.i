@@ -4,9 +4,10 @@
 
 
 
-; for arg = register containing int (0 - 120)  
-; each index is approximate to 3 degrees in q1.15 format
-;clobbers r14, and dest. arg unchanged
+; Looks up cosine of angle from ROM sin_table in signed Q1.15 format
+; In:       arg = register containing angle index (0 - 120, ~3 deg per step), dest = destination register
+; Out:      dest = cos(angle) in signed Q1.15 format
+; Clobbers: dest, r14, flags
 .macro cos_lookup_rom arg, dest
 
 	 .ifblank(arg)
@@ -47,10 +48,10 @@
 		getbh
 .endmacro
 
-; for arg = register containing int (0 - 120)  
-; each index is approximate to 3 degrees in q1.15 format
-; arg must not be r14
-;clobbers r14 and dest. arg unchanged
+; Looks up sine of angle from ROM sin_table in signed Q1.15 format
+; In:       arg = register containing angle index (0 - 120, ~3 deg per step, arg != r14), dest = destination register
+; Out:      dest = sin(angle) in signed Q1.15 format
+; Clobbers: dest, r14
 .macro sin_lookup_rom arg, dest
 
 	 .ifblank(arg)

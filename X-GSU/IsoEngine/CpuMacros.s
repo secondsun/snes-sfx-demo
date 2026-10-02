@@ -1,9 +1,7 @@
-;Sets the GSU registers for 4bpp @ 192px
-
-.include "libSFX.i"
-
-GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
-
+; Configures GSU registers for 4bpp color depth at 160 pixel screen height
+; In:       None
+; Out:      GSU_PBR, GSU_SCBR, GSU_SCMR, GSU_CFGR, GSU_CLSR initialized
+; Clobbers: A (8-bit)
 .macro initGSU_4bpp_160
   lda     #$03
   sta     GSU_PBR
@@ -22,6 +20,10 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
   sta     GSU_CLSR
 .endmac
 
+; Configures GSU registers for 4bpp color depth in OBJ/Sprite mode
+; In:       None
+; Out:      GSU_PBR, GSU_SCBR, GSU_SCMR, GSU_CFGR, GSU_CLSR initialized
+; Clobbers: A (8-bit)
 .macro initGSU_4bpp_obj
   lda     #$03
   sta     GSU_PBR
@@ -40,7 +42,10 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
   sta     GSU_CLSR
 .endmac
 
-
+; Starts GSU execution by setting GSU program counter (R15) to GSU_Code
+; In:       None
+; Out:      GSU_R15 = .loword(GSU_Code)
+; Clobbers: None (registers preserved via RW_push/RW_pull)
 .macro gsuOn
   RW_push set:a16
   lda     #.loword(GSU_Code)
@@ -48,6 +53,10 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
   RW_pull  
 .endmac
 
+; Forces GSU to stop by clearing the Status/Flag Register (SFR)
+; In:       None
+; Out:      GSU_SFR = 0
+; Clobbers: None (registers preserved via RW_push/RW_pull)
 .macro gsuOff
   RW_push set:a16
   lda     #$00
@@ -55,23 +64,28 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
   RW_pull
 .endmac
 
-;Is the GSU running
-; zflag = 1 -> Yes
-; zflag = 0 -> No
-; Clobbers the Accumulator
+; Checks if the GSU is currently running (Z flag = 1 if idle, 0 if running)
+; In:       None
+; Out:      Z flag set if GSU is idle (R15 == 0), clear if running
+; Clobbers: Flags (registers preserved via RW_push/RW_pull)
 .macro gsuRunning
   RW_push set:a16
   lda GSU_R15
   RW_pull
 .endmac
 
+; Exits the VBlank interrupt handler via RTL
+; In:       None
+; Out:      Returns from interrupt subroutine
+; Clobbers: None
 .macro endVBlank
-        ;display on
-        ;lda #inidisp(ON, DISP_BRIGHTNESS_MAX)
-        ;sta SFX_inidisp
         rtl
 .endmac
 
+; Sets up horizontal scanline IRQ timer and jump target vector
+; In:       line = scanline trigger position, addr = optional IRQ handler label
+; Out:      HTIMEL set to line, SFX_irq_jml initialized
+; Clobbers: None (registers preserved via RW_push/RW_pull)
 .macro  IRQ_H_set line, addr
         RW_push set:a8i16
 .ifnblank addr
@@ -85,10 +99,10 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
         RW_pull
 .endmac
 
-/**
-  Macro: IRQ_H_on
-  Enable horizontal line interrupt
-*/
+; Enables horizontal scanline IRQ timer interrupt
+; In:       None
+; Out:      NMITIMEN updated with NMI_H_TIMER_ON, CLI executed
+; Clobbers: None (registers preserved via RW_push/RW_pull)
 .macro  IRQ_H_on
         RW_push set:a8
         lda     SFX_nmitimen; = 0xF600
@@ -99,7 +113,10 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
         RW_pull
 .endmac
 
-
+; Sets up vertical scanline IRQ timer and jump target vector
+; In:       line = scanline trigger position, addr = optional IRQ handler label
+; Out:      VTIMEL set to line, SFX_irq_jml initialized
+; Clobbers: None (registers preserved via RW_push/RW_pull)
 .macro  IRQ_V_set line, addr
         RW_push set:a8i16
 .ifnblank addr
@@ -113,10 +130,10 @@ GSU_SFR_HI         = $7031 ;Status/Flag Register Hi byte
         RW_pull
 .endmac
 
-/**
-  Macro: IRQ_H_on
-  Enable horizontal line interrupt
-*/
+; Enables vertical scanline IRQ timer interrupt
+; In:       None
+; Out:      NMITIMEN updated with NMI_V_TIMER_ON, CLI executed
+; Clobbers: None (registers preserved via RW_push/RW_pull)
 .macro  IRQ_V_on
         RW_push set:a8
         lda     SFX_nmitimen; = 0xF600

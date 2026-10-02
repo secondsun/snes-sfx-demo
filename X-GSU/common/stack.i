@@ -5,11 +5,10 @@
 
 	.define stackPointer r10
 
-	; Peeks the top the value stored in R to the stack
-	; assumes r10 is stack pointer
-	;Example :
-	;   iwt r2, #$4
-	;	gsu_stack_push r2
+	; Peeks the top 16-bit value from the stack without popping
+	; In:       R = destination register
+	; Out:      R = peeked value
+	; Clobbers: None (r10 restored)
 	.macro gsu_stack_peek R
 		dec	stackPointer
 		dec	stackPointer
@@ -21,14 +20,10 @@
 		inc	stackPointer
 	.endmacro
 
-
-
-
-; Pushes the value stored in R to the stack
-	; assumes r10 is stack pointer
-	;Example :
-	;   iwt r2, #$4
-	;	gsu_stack_push r2
+	; Pushes a 16-bit value stored in R onto the stack
+	; In:       R = source register containing value to push
+	; Out:      Memory at (r10) written, r10 incremented by 2
+	; Clobbers: None (updates r10)
 	.macro gsu_stack_push R
 		.if .not(.blank ({R}))
 			from	R
@@ -36,12 +31,12 @@
 		stw	(stackPointer)
 		inc	stackPointer
 		inc	stackPointer
-
 	.endmacro
 
-	; Allocates a struct on the stack
-	; assumes r10 is stack pointer
-	; Returns the address of the struct in R
+	; Allocates a struct on the stack and returns its base pointer
+	; In:       struct = struct type name, R = temp/destination register
+	; Out:      R = base address of allocated struct
+	; Clobbers: R (updates r10)
 	.macro gsu_stack_alloc struct, R
 		.if .blank({R})
 				.error "gsu_stack_alloc: R is blank"
@@ -59,6 +54,10 @@
 		sub R
 	.endmacro
 
+	; Allocates S bytes on the stack
+	; In:       S = number of bytes to allocate
+	; Out:      r10 advanced by S
+	; Clobbers: None (updates r10)
 	.macro gsu_stack_alloc_bytes S
 		.if .blank({S})
 				.error "gsu_stack_alloc_bytes: S is blank"
@@ -67,6 +66,10 @@
 		adds S
 	.endmacro
 
+	; Frees S bytes from the stack
+	; In:       S = number of bytes to free
+	; Out:      r10 decremented by S
+	; Clobbers: None (updates r10)
 	.macro gsu_stack_free_bytes S
 		.if .blank({S})
 				.error "gsu_stack_free_bytes: S is blank"
@@ -75,16 +78,17 @@
 		sub S
 	.endmacro
 	
-	; Frees a struct on the stack
-	; assumes r10 is stack pointer
-	; R is used as a temp register to store the size of the struct
+	; Frees a struct from the stack
+	; In:       struct = struct type name, R = scratch register for sizeof
+	; Out:      r10 decremented by .sizeof(struct)
+	; Clobbers: R (updates r10)
 	.macro gsu_stack_free struct, R
 		.if .blank({R})
-				.error "gsu_stack_alloc: R is blank"
+				.error "gsu_stack_free: R is blank"
 		.endif
 
 		.if .blank({struct})
-				.error "gsu_stack_alloc: struct is blank"
+				.error "gsu_stack_free: struct is blank"
 		.endif
 
 		iwt R, #.sizeof({struct})
@@ -92,11 +96,10 @@
 		sub R
 	.endmacro
 
-	; Pops the value stored in R to the stack
-	; assumes r10 is stack pointer
-	;Example :
-	;   iwt r2, #$4
-	;	gsu_stack_pop r2
+	; Pops a 16-bit value from the stack into R
+	; In:       R = destination register
+	; Out:      R = popped 16-bit value, r10 decremented by 2
+	; Clobbers: None (updates r10)
 	.macro gsu_stack_pop R
 		dec	stackPointer
 		dec	stackPointer
@@ -106,14 +109,19 @@
 		ldw	(stackPointer)
 	.endmacro
 
-	;initialize stackPointer to stack ram;
+	; Initializes the stack pointer register (r10) to gsu_stack_ram
+	; In:       None
+	; Out:      r10 = address of gsu_stack_ram
+	; Clobbers: r10
 	.macro init_stack
 		iwt stackPointer, #(gsu_stack_ram)
 	.endmacro 
 
-	;uses a loop, use backuploop and restoreloop if you need to use a loop in your code
+	; Copies a block of data from ROM to the stack
+	; In:       rom_addr = ROM source address, rom_bank = ROM bank, size = byte count
+	; Out:      Copies bytes to stack, advances r10 by size
+	; Clobbers: r0, r10, r12, r13, r14
 	.macro rom_to_stack rom_addr, rom_bank, size
-
 	.ifblank(rom_addr)
 		.error "rom_to_stack: rom_addr is blank"
 	.endif
@@ -124,9 +132,6 @@
 		.error "rom_to_stack: size is blank"
 	.endif
 
-		;assumes r10 is stack pointer
-		;assumes r0 is free to use as a temp register
-		;assumes r1 is free to use as a temp register
 		ibt r0, #rom_bank
 		romb
 		iwt r14, rom_addr
@@ -139,6 +144,5 @@
 		nop
 		loop
 		inc r10
-
 	.endmacro
 .endif

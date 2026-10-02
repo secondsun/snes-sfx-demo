@@ -1,0 +1,1 @@
+This program will scan *.sgs files and their .includes and add all labels 

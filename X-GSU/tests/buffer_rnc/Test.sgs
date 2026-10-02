@@ -9,12 +9,11 @@
 .include "../../common/var.i"
 .include "libSFX.i"
 
+; Initializes RNC decompression parameters placeholder
+; In:       None
+; Out:      None
+; Clobbers: None
 .macro init_rnc
-	;decompress(bytesIn, *bytesOut, breakAfterBytes)
-	;bytesIn is the romlocation of the compressed data
-	;bytesOut is the ramlocation of the decompressed data
-	;breakAfterBytes is the number of bytes to decompress before returning
-
 .endmacro
 
 

@@ -1,3 +1,4 @@
+.debuginfo + 
 .include "libSFX.i"
 .include "../common/stack.i"
 .include "../common/function.i"
@@ -5,6 +6,7 @@
 .include "./constants.i"
 .segment "GSUCODE"
 .include "../gsu_maths/gsu_recip.i"
+.include "../gsu_maths/gsu_vector.i"
 GSU_Code:
 .export GSU_Code
 
@@ -34,9 +36,15 @@ init_gsu_main:
 	iwt r0, #$8
 	cmode
 
-    move r3, r10
-
+    move r2, r10
     rom_to_stack #cube_model,3, 216
+
+	move r1, r10
+    rom_to_stack #transformation_matrix,3, 32
+
+	move r0, r2
+	call vector3_transform
+
 
     iwt r5, #cube_model
     call draw_triangle
@@ -57,8 +65,16 @@ finish:
 .align 2
 cube_model:
  cube $e000, $e000, $e000, $4000
- 
+transformation_matrix:
+.word $0100, $0000, $0000, $4000
+.word $0000, $0100, $0000, $4000
+.word $0000, $0000, $0100, $0000
+.word $0000, $0000, $0000, $0100
 
 
 .include "./triangle/drawTriangle.i"
+
+.segment "GSURAM"
+POLYGON_OUT:
+.res .sizeof(vector3)
 

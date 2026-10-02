@@ -7,7 +7,11 @@
 .include "../common/function.i"
 
 
- .macro _romreadbyte R
+; Reads a byte from ROM buffer at r14 and increments r14
+; In:       R = destination register, r14 = ROM address pointer
+; Out:      R = byte read (zero-extended), r14 incremented by 1
+; Clobbers: R, r14
+.macro _romreadbyte R
     .if .not( .blank({R}))
         to	R
     .endif
@@ -15,8 +19,10 @@
 	inc	r14
 .endmacro
 
-;resets carry flag
-;logical shift left
+; Performs a logical shift left on R by clearing carry and rotating left
+; In:       R = register to shift
+; Out:      R shifted left by 1 (bit 0 = 0, carry = old bit 15)
+; Clobbers: R, flags
 .macro shl R
     add #0
     .if .not( .blank({R}))
@@ -25,8 +31,10 @@
     rol
 .endmacro
 
-;BIG ENDIAN
-;Z is set on overflow
+; Reads a 16-bit big-endian word from ROM buffer at r14 and increments r14 by 2
+; In:       R = destination register, r14 = ROM address pointer
+; Out:      R = word read (big-endian), r14 incremented by 2
+; Clobbers: R, r14
 .macro _romreadword  R
     .if .not( .blank({R}))
         to	R
@@ -40,8 +48,10 @@
 	inc	r14
 .endmacro
 
-;LITTLE ENDIAN
-;Z is set on overflow of address
+; Reads a 16-bit little-endian word from ROM buffer at r14 and increments r14 by 2
+; In:       R = destination register, r14 = ROM address pointer
+; Out:      R = word read (little-endian), r14 incremented by 2
+; Clobbers: R, r14
 .macro _romreadwordLE  R
     .if .not( .blank({R}))
         to	R

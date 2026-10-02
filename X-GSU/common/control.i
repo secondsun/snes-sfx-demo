@@ -9,9 +9,12 @@
 .include "../common/stack.i"
 .include "../common/function.i"
 
+; Executes instruction if R < V (signed comparison)
+; In:       R = register to test, V = register or immediate value, instruction = statement to execute
+; Out:      Executes instruction if condition met
+; Clobbers: R0 (if R != R0), flags
 .macro if_lt R, V, instruction 
     .local  Skip
-    ; Error check: Ensure all parameters are provided
     .ifblank(R)
         .error "if_lt: R parameter is required"
     .endif
@@ -24,7 +27,6 @@
         .error "if_lt: instruction parameter is required"
     .endif
 
-    ; Your macro implementation follows
     .if ( .not(.xmatch({R}, {r0}) || .xmatch({R}, {R0})))
         from R
     .endif
@@ -33,12 +35,14 @@
     nop
     instruction
     Skip:
-
 .endmacro
 
+; Executes instruction if R == V
+; In:       R = register to test, V = register or immediate value, instruction = statement to execute
+; Out:      Executes instruction if condition met
+; Clobbers: R0 (if R != R0), flags
 .macro if_eq R, V, instruction
     .local  Skip
-    ; Execute instruction if R == V
     .ifblank(R)
         .error "if_eq: R parameter is required"
     .endif
@@ -59,9 +63,12 @@
     Skip:
 .endmacro
 
+; Executes instruction if R != V
+; In:       R = register to test, V = register or immediate value, instruction = statement to execute
+; Out:      Executes instruction if condition met
+; Clobbers: R0 (if R != R0), flags
 .macro if_ne R, V, instruction
     .local  Skip
-    ; Execute instruction if R != V
     .ifblank(R)
         .error "if_ne: R parameter is required"
     .endif
@@ -82,9 +89,12 @@
     Skip:
 .endmacro
 
+; Executes instruction if R >= V (signed comparison)
+; In:       R = register to test, V = register or immediate value, instruction = statement to execute
+; Out:      Executes instruction if condition met
+; Clobbers: R0 (if R != R0), flags
 .macro if_gte R, V, instruction
     .local  Skip
-    ; Execute instruction if R >= V (signed comparison)
     .ifblank(R)
         .error "if_gte: R parameter is required"
     .endif
@@ -105,11 +115,12 @@
     Skip:
 .endmacro
 
+; Executes instruction if R > V (signed comparison)
+; In:       R = register to test, V = register or immediate value, instruction = statement to execute
+; Out:      Executes instruction if condition met
+; Clobbers: R0 (if R != R0), flags
 .macro if_gt R, V, instruction
     .local  Skip
-    ; Execute instruction if R > V (signed comparison)
-    ; Condition requires: (S^O = 0) AND (Z = 0)
-    ; Skip if: < OR =
     .ifblank(R)
         .error "if_gt: R parameter is required"
     .endif
@@ -132,12 +143,13 @@
     Skip:
 .endmacro
 
+; Executes instruction if R <= V (signed comparison)
+; In:       R = register to test, V = register or immediate value, instruction = statement to execute
+; Out:      Executes instruction if condition met
+; Clobbers: R0 (if R != R0), flags
 .macro if_lte R, V, instruction
     .local  check_eq
     .local  skip_end
-    ; Execute instruction if R <= V (signed comparison)
-    ; Condition requires: (S^O = 1) OR (Z = 1)
-    ; Skip if: > (which is >= AND !=)
     .ifblank(R)
         .error "if_lte: R parameter is required"
     .endif
@@ -153,13 +165,12 @@
     .endif
     cmp V
     bge check_eq
-    ; If less than, execute
     nop
     instruction
     bra Skip_end
     nop
     :check_eq
-    bne Skip_end   ; If >= but not equal (i.e., >), skip
+    bne Skip_end
     nop
     instruction
     Skip_end

@@ -8,35 +8,18 @@ __VARS_DEFINED__ = 1
 gsu_stack_ram:
 	.res .sizeof(gsu_stack)
 	
-;Temp variables for return vectors
-LOOKAT_ZAXIS:
-  .res .sizeof(vector3)
-LOOKAT_XAXIS:
-  .res .sizeof(vector3)
-LOOKAT_YAXIS:
-  .res .sizeof(vector3)
 vector_normalize_out:
   .res .sizeof(vector3)
 _normalize_small_big_reciprocal_temp:
   .res 2
-VECTOR_SUBTRACT_IN:
-  .res 2
 VECTOR_SUBTRACT_OUT:
   .res .sizeof(vector3)
-VECTOR_ADD_IN:
-  .res 2
-VECTOR_DOT_IN:
-  .res 2  
 VECTOR_ADD_OUT:
   .res .sizeof(vector3)
 VECTOR_NEGATE_OUT:
   .res .sizeof(vector3)
-VECTOR_CROSS_IN:
-  .res 2
 VECTOR_CROSS_OUT:
   .res .sizeof(vector3)
-VECTOR_COPY_IN:
-  .res 2
 RNC_HEADER:
   .res .sizeof(rnc_header)
 ;Global Camera   
@@ -57,15 +40,6 @@ __LOOKAT_XAXIS_W__ = LOOKAT_MATRIX + .sizeof(vector3)
 ;Decompress GLOBALS
 RNC_WORD_BUFFER:
   .res .sizeof(rncbuffer)
-
-RNC_LITERAL_TABLE:
-	.res .sizeof(hufftree)
-;val lengthTable = HuffTree();
-RNC_LENGTH_TABLE:
-	.res .sizeof(hufftree)
-;val positionTable = HuffTree();
-RNC_POSTION_TABLE:
-	.res .sizeof(hufftree)
 
 ;val literalTable = HuffTree();
 literalTable:

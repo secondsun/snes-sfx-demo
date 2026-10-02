@@ -17,16 +17,11 @@
 
 
 
-    ;This sets up a two byte RNC buffer. The buffer is read using the
-    ; read and peek functions defined in this file. 
-    ; 
-    ;
-    ;
-    ; r0 = start of compressed rnc file
-    ; r1 = bank of compressed rnc file
-    ; r2 = hiword size of compressed rnc file
-    ; r3 = loword size of compressed rnc file
-    function initialize_buffer
+; Sets up a two-byte RNC buffer for stream decompression
+; In:       R0 = start of compressed RNC data, R1 = bank of compressed data, R2 = high word of size, R3 = low word of size
+; Out:      Initializes RNC_WORD_BUFFER in GSURAM
+; Clobbers: R0, R3
+function initialize_buffer
         ;RNC_WORD_BUFFER
         ;from r1
         ;romb
@@ -52,47 +47,43 @@
     endfunction
 
 
-    ; reads a rnc header from the cart and storees data in RNC_HEADER
-    ; In : r0 = start of header data
-    ; Out : r3 = address of header
-    ;
-    ; ROMB should be set to the bank of compressed data before calling this function
-    ; clobbers r1,r14,r3
-    function parseHeader
+; Reads an RNC header from ROM and stores unpacked fields into RNC_HEADER (ROMB must be set)
+; In:       R0 = start of header data in ROM
+; Out:      R3 = address of header (RNC_HEADER)
+; Clobbers: R1, R3, R14
+function parseHeader
 
-        to r14
-        add #4
+    to r14
+    add #4
 
-        ;read uncompressed size
-        _romreadword r1
-        sm (RNC_HEADER), r1
-        _romreadword r1
-        sm (RNC_HEADER+2), r1
+    ;read uncompressed size
+    _romreadword r1
+    sm (RNC_HEADER), r1
+    _romreadword r1
+    sm (RNC_HEADER+2), r1
 
-        ;read compressed size
-        _romreadword r1
-        sm (RNC_HEADER+4), r1
-        _romreadword r1
-        sm (RNC_HEADER+6), r1
+    ;read compressed size
+    _romreadword r1
+    sm (RNC_HEADER+4), r1
+    _romreadword r1
+    sm (RNC_HEADER+6), r1
 
-        with r14
-        add #5
-        
-        ;read packs size
-        _romreadbyte r1
-        sm (RNC_HEADER+8), r1
-
-        iwt r3, #RNC_HEADER
-        return 
-    endfunction
-
+    with r14
+    add #5
     
-    ; r0 = start of compressed data
-    ; r1 = bank of compressed data
-    ; r2 = start of uncompressed data; must be preallocated
-    ; r3 = number of bytes to decompress
-    ; decompress data. 
-        function decompress
+    ;read packs size
+    _romreadbyte r1
+    sm (RNC_HEADER+8), r1
+
+    iwt r3, #RNC_HEADER
+    return 
+endfunction
+
+; Decompresses an RNC-compressed data stream to destination buffer
+; In:       R0 = start of compressed data, R1 = bank of compressed data, R2 = start of uncompressed buffer, R3 = byte count
+; Out:      Decompressed data written to destination buffer at R2
+; Clobbers: All
+function decompress
         from r1
         romb
         move r6, r3
@@ -189,11 +180,11 @@
     return
     endfunction
 
-    ; reads r0 bits from the rnc bitstream
-    ; r0 = number of bits to read
-    ; clobbers r0, r1,r2,r3,r4,r5,r10,r12,r13,r14
-    ; returns r3 = bits read
-    function read_buffer
+; Reads specified number of bits from the RNC bitstream
+; In:       R0 = number of bits to read
+; Out:      R3 = bits read
+; Clobbers: R0, R1, R2, R3, R4, R5, R10, R12, R13, R14
+function read_buffer
     
         lm r5, (RNC_WORD_BUFFER + rncbuffer::bank); bank
         from r5
@@ -258,8 +249,11 @@
     return
     endfunction
 
-    ;R0 = address of hufftree
-    function init_hufftree
+; Reads Huffman tree header and builds decoding table for RNC stream
+; In:       R0 = address of hufftree structure to initialize
+; Out:      Hufftree structure at R0 populated
+; Clobbers: All
+function init_hufftree
         address = r0
         move r1,address ; r1 = address of hufftree
         iwt r0, #$5 ;r0 = bits to read
@@ -399,10 +393,11 @@
     return
     endfunction
 
-    ; INPUT : r0 = value to inverse
-    ;         r1 = bits_count
-    ; OUTPUT : r3 = inverse of value
-    function inverse_bits
+; Reverses bit order of a given value up to bit count
+; In:       R0 = value to invert, R1 = bit count
+; Out:      R3 = bit-reversed value
+; Clobbers: R0, R1, R2, R3
+function inverse_bits
         ;var i = 0
         iwt r3, #0 ; r3 = i = 0
         ;while (bitsCount-- != 0) {

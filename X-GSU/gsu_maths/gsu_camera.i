@@ -13,6 +13,10 @@
 .include "./gsu_vector.i"
 .include "./gsu_recip.i"
 
+; Negates a signed Q8.8 fixed-point number using two's complement (NOT + INC)
+; In:       reg = register to negate (defaults to r0 if blank)
+; Out:      reg (or r0) negated
+; Clobbers: reg (or r0), flags
 .macro fixed88_negate reg
     .if .not(.blank ({reg}))
 		with reg
@@ -28,9 +32,10 @@
     
 .endmacro    
 
-;Calculates LOOKAT_MATRIX from CAMERA
-; This operates on Static values and has no input/output
-; Clobbers : All
+; Computes a 4x4 LookAt view matrix from global CAMERA into LOOKAT_MATRIX
+; In:       None (reads global CAMERA structure)
+; Out:      R3 = address of LOOKAT_MATRIX
+; Clobbers: All
 function camera_lookAt
     ;zaxis = Math.normalize(lookAt.subtract(eye));    
     iwt r0, #(CAMERA + camera::eye)
@@ -41,7 +46,7 @@ function camera_lookAt
     
     iwt r2, #(__LOOKAT_ZAXIS__)
     move r0,r3
-    ;copy the normalized vector to ZAXIS @r0 = @VECTOR_COPY_IN
+    ;copy the normalized vector to ZAXIS (r0=src, r2=dest)
     call vector3_copy
 camera_lookAt_XAXIS:
     ;xaxis = Math.normalize(up.cross(zaxis));
@@ -53,7 +58,7 @@ camera_lookAt_XAXIS:
     
     iwt r2, #(__LOOKAT_XAXIS__)
     move r0,r3
-    ;copy the normalized vector to ZAXIS @r0 = @VECTOR_COPY_IN
+    ;copy the normalized vector to XAXIS (r0=src, r2=dest)
     call vector3_copy
 
     ;yaxis = xaxis.cross(zaxis);
@@ -64,7 +69,7 @@ camera_lookAt_XAXIS:
     
     iwt r2, #(__LOOKAT_YAXIS__)
     move r0,r3
-    ;copy the normalized vector to YAXIS @r0 = @VECTOR_COPY_IN
+    ;copy the cross vector to YAXIS (r0=src, r2=dest)
     call vector3_copy
 
     iwt r0, #(__LOOKAT_XAXIS__)

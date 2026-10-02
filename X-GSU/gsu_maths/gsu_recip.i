@@ -29,6 +29,7 @@
 
 ; In : R0 fixed88 the value to return the reciprocal of
 ; Out : R3 a fixed016 reciprocal
+; Clobbers : r0, r1, r2, r3, r12, r13
 function reciprocal016
     register dividend = r1
 	register divisor  = r2
@@ -85,6 +86,7 @@ endfunction
 
 ; In : R0 fixed88 the value to return the reciprocal of
 ; Out : R3 a fixed88 reciprocal
+; Clobbers : r0, r1, r2, r3, r12, r13
 function reciprocal
     register dividend = r1
 	register divisor  = r2
@@ -138,10 +140,10 @@ function reciprocal
 			return 
 endfunction
 
-; for arg = rester containing int (0 - 255) store 1/arg in q0.16 
-; format in register dest
-; dest may equal arg, they will not clash
-;clobbers r14 and dest. arg unchanged
+; Looks up 1/arg in Q0.16 format from ROM reciprocal table (0 - 255)
+; In:       arg = register containing integer divisor (0 - 255), dest = destination register
+; Out:      dest = 1/arg in unsigned Q0.16 fixed-point (arg unchanged, dest may equal arg)
+; Clobbers: dest, r14
 .macro reciprocal_lookup_rom arg, dest
 
 	 .ifblank(arg)

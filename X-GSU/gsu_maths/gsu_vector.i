@@ -13,12 +13,36 @@
 .include "./gsu_recip.i"
 
 
-;Returns the Address to a copy vector of the input vector
-; Input : R0 address of vector to copy
-; Input : R2 address of vector to copy to
-; Output : R3 address to vector (copied)
 
- function vector3_copy  
+
+; Multiplies St by r6 as signed Q8.8 fixed-point numbers and packs result into D
+; In:       St = source register (St != r4), r6 = multiplicand, D = destination (D != r6)
+; Out:      D = 16-bit Q8.8 fixed-point product
+; Clobbers: r4, D, flags
+.macro condensed_lmult St, D
+  .if .not( .blank({St}))
+        from St
+    .endif
+    .if .not( .blank({D}))
+        to	D
+    .endif
+    lmult ; D = integer portion of S*r6 & r4 = decimal portion of S*r6
+
+    with r4 
+    hib
+    with D  
+    lob
+    with D
+    swap
+    with D
+    or r4
+.endmacro
+
+; Copies a 3D vector from source address to destination address
+; In:       R0 = source vector address, R2 = destination vector address
+; Out:      R3 = destination vector address (copied)
+; Clobbers: R1, R2, R3
+function vector3_copy  
    move r1,r0
    move r3, r2
   
@@ -50,196 +74,124 @@
    return
 endfunction
 
-;Returns the Address to a cross vector of the input vectors
-; Input : R0 address to vector to cross from
-; Input : R1 address of second vector to cross
-; Output : R3,VECTOR_CROSS_OUT  address to vector  result
-; Clobbers All
+; Calculates cross product of two 3D vectors (R0 x R1)
+; In:       R0 = address of first vector, R1 = address of second vector
+; Out:      R3 = address of result vector (VECTOR_CROSS_OUT)
+; Clobbers: All
 function vector3_cross
   
-;Vector3.of(
-  ;(r0+2)*(VECTOR_CROSS_IN+4)-(r0+4*(VECTOR_CROSS_IN+2)),
-  ;(r0+4)*(VECTOR_CROSS_IN)-(r0*(VECTOR_CROSS_IN+4)),
-  ;(r0)*(VECTOR_CROSS_IN+2)-(r0+2*(VECTOR_CROSS_IN))
-;)
-  ;Initialize
-  
-
-  ;Adjust  R0, VECTOR_CROSS_IN to (r0+2),(VECTOR_CROSS_IN+4)
+  ;Adjust R0, R1 to (r0+2),(r1+4)
   add #2
   with r1
   add #4
 
-  ;Begin (r0+2)*(VECTOR_CROSS_IN+4)
+  ;Begin (r0+2)*(r1+4)
   to r5
   ldw (r0) ; r5 = r0.y
   to r6
-  ldw (r1) ; r6 = IN.z
-  from r5
-  to r7
-  lmult; r5.r4 = r5*r6 = this.y*other.z
-  move r8,r4
-  with r7
-  swap
-  to r3
-  merge ; r3  = this.y*other.z at fixed 8.8
-  ; End (r0+2)*(VECTOR_CROSS_IN+4)
+  ldw (r1) ; r6 = r1.z
+  condensed_lmult r5, r3; r3 = this.y*other.z at fixed 8.8
+  ; End (r0+2)*(r1+4)
 
-  ;Adjust  (r0+2),(VECTOR_CROSS_IN+4) to (r0+4),(VECTOR_CROSS_IN+2)
+  ;Adjust (r0+2),(r1+4) to (r0+4),(r1+2)
   add #2
   with r1
   sub #2
 
-
-  ;Begin (r0+4*(VECTOR_CROSS_IN+2))
+  ;Begin (r0+4)*(r1+2)
   to r5
   ldw (r0) ; r5 = r0.z
   to r6
-  ldw (r1) ; r6 = IN.y
-  from r5
-  to r7
-  lmult; r5.r4 = r5*r6 = this.z*other.y
-  move r8,r4
-  with r7
-  swap
-  to r4
-  merge ; r4  = this.z*other.y at fixed 8.8
-  ;End (r0+4*(VECTOR_CROSS_IN+2))
+  ldw (r1) ; r6 = r1.y
+  condensed_lmult r5, r4; r4 = this.z*other.y at fixed 8.8
+  ; End (r0+4)*(r1+2)
   
   ;Begin subtract this.y*other.z - this.z*other.y
   with r3
   sub r4
-  ;End subtract this.y*other.z - this.z*other.y
   ;Write out.x
   sm (VECTOR_CROSS_OUT), r3
 
-
-
-  ;Adjust  (r0+4),(VECTOR_CROSS_IN+2) to (r0+4),(VECTOR_CROSS_IN)
+  ;Adjust (r0+4),(r1+2) to (r0+4),(r1)
   with r1
   sub #2
 
-  ;Begin (r0+4)*(VECTOR_CROSS_IN)
+  ;Begin (r0+4)*(r1)
   to r5
   ldw (r0) ; r5 = this.z
   to r6
   ldw (r1) ; r6 = other.x
-  from r5
-  to r7
-  lmult; r5.r4 = r5*r6 = this.z*other.x
-  with r7
-  swap
-  move r8,r4
-  to r3
-  merge ; r3  = this.z*other.x at fixed 8.8
-  ; End (r0+4)*(VECTOR_CROSS_IN)
+  condensed_lmult r5, r3; r3 = this.z*other.x at fixed 8.8
+  ; End (r0+4)*(r1)
 
-  ;Adjust  (r0+4),(VECTOR_CROSS_IN) to (r0), (VECTOR_CROSS_IN+4)
+  ;Adjust (r0+4),(r1) to (r0),(r1+4)
   sub #4
   with r1
   add #4
 
-
-  ;Begin ((r0)*(VECTOR_CROSS_IN+4))
+  ;Begin (r0)*(r1+4)
   to r5
-  ldw (r0) ; r5 =this.x
+  ldw (r0) ; r5 = this.x
   to r6
   ldw (r1) ; r6 = other.z
-  from r5
-  to r7
-  lmult; r5.r4 = r5*r6 = this.x*other.z
-  with r7
-  swap
-  move r8,r4
-  to r4
-  merge ; r4  = this.x*other.z at fixed 8.8
-  ;End ((r0)*(VECTOR_CROSS_IN+4))
+  condensed_lmult r5, r4; r4 = this.x*other.z at fixed 8.8
+  ; End (r0)*(r1+4)
 
-  ;Begin subtract this.z*other.x - this.x * other.z, 
+  ;Begin subtract this.z*other.x - this.x*other.z
   with r3
   sub r4
-  ;End subtract this.y*other.z - this.z*other.y
   ;Write out.y
   sm (VECTOR_CROSS_OUT+2), r3
 
-
-
-  ;Adjust (r0), (VECTOR_CROSS_IN+4) to (r0)*(VECTOR_CROSS_IN+2)
+  ;Adjust (r0),(r1+4) to (r0)*(r1+2)
   with r1
   sub #2
 
-  ;Begin (r0)*(VECTOR_CROSS_IN+2)
+  ;Begin (r0)*(r1+2)
   to r5
   ldw (r0) ; r5 = this.x
   to r6
   ldw (r1) ; r6 = other.y
-  from r5
-  to r7
-  lmult; r5.r4 = r5*r6 = this.x*other.y
-  with r7
-  swap
-  move r8,r4
-  to r3
-  merge ; r3  = this.x*other.y at fixed 8.8
-  ; End (r0)*(VECTOR_CROSS_IN+2)
+  condensed_lmult r5, r3; r3 = this.x*other.y at fixed 8.8
+  ; End (r0)*(r1+2)
 
-  ;Adjust (r0)*(VECTOR_CROSS_IN+2) to (r0+2),(VECTOR_CROSS_IN)
+  ;Adjust (r0)*(r1+2) to (r0+2),(r1)
   add #2
   with r1
   sub #2
 
-  ;Begin (r0+2)*(VECTOR_CROSS_IN)
+  ;Begin (r0+2)*(r1)
   to r5
   ldw (r0) ; r5 = this.y
   to r6
   ldw (r1) ; r6 = other.x
-  from r5
-  to r7
-  lmult; r5.r4 = r5*r6 = this.y*other.x
-  with r7
-  swap
-  move r8,r4
-  to r4
-  merge ;r4  = this.y*other.x at fixed 8.8
-  ; End (r0+2)*(VECTOR_CROSS_IN)
+  condensed_lmult r5, r4; r4 = this.y*other.x at fixed 8.8
+  ; End (r0+2)*(r1)
 
-  ;Begin subtract this.x*other.y - this.y * other.x,
+  ;Begin subtract this.x*other.y - this.y*other.x
   with r3
   sub r4
-  ;End subtract this.x*other.y - this.y*other.x
-  ;Write out.y
+  ;Write out.z
   sm (VECTOR_CROSS_OUT+4), r3
 
   iwt r3, #VECTOR_CROSS_OUT
   return
 endfunction
 
-;Returns the dot product of two input vectors
-; Input : R0 left vector of dot
-; Input : R1 right vector of dot
-; Output : fixed 8.8 dot product 
-; Clobbers All
+; Calculates dot product of two 3D vectors
+; In:       R0 = address of first vector, R1 = address of second vector
+; Out:      R3 = dot product as fixed Q8.8
+; Clobbers: All
 function vector3_dot
   
   ;r0 = &a.x
   ;r1 = &b.x
-  
 
-  ;r6 = a.x
-  ;r5 = b.x
-  ; r2 = a.x *b.x
-  ; clobber r6,r7,r4,r8
   to r6
   ldw (r0)
   to r7 
   ldw (r1)
-  with r7
-  lmult
-  with r7
-  swap
-  move r8,r4
-  to r2
-  merge
+  condensed_lmult r7, r2; a.x * b.x
 
   ;r0 = &a.y
   ;r1 = &b.y
@@ -247,21 +199,11 @@ function vector3_dot
   with r1
   add #2
   
-  ;r6 = a.y
-  ;r5 = b.y
-  ; r3 = a.y *by
-  ; clobber r6,r7,r4,r8
   to r6
   ldw (r0)
   to r7 
   ldw (r1)
-  with r7
-  lmult
-  with r7
-  swap
-  move r8,r4
-  to r3
-  merge
+  condensed_lmult r7, r3; a.y * b.y
 
   ;r0 = &a.z
   ;r1 = &b.z
@@ -269,40 +211,29 @@ function vector3_dot
   with r1
   add #2
   
-  ;r6 = a.z
-  ;r5 = b.z
-  ; r4 = a.z *b.z
-  ; clobber r6,r7,r4,r8
   to r6
   ldw (r0)
   to r7 
   ldw (r1)
-  with r7
-  lmult
-  with r7
-  swap
-  move r8,r4
-  to r4
-  merge
+  condensed_lmult r7, r4; a.z * b.z
 
   from r2
-  add r4 ; r0 = a.x*b.x+a.z*b.z
+  add r4 ; r0 = a.x*b.x + a.z*b.z
   with r3 ; 
   add r0 ; r3 = a.y*b.y + r0
 
-return
+  return
 endfunction
 
-;Returns the Address to a sum vector of the input vectors
-; Input : R0 address to vector to add from
-; Input : VECTOR_ADD_IN address of second vector to add
-; Output : R3,VECTOR_ADD_OUT  address to vector 
-; Clobbers All
+; Calculates sum of two 3D vectors (R0 + R1)
+; In:       R0 = address of first vector, R1 = address of second vector
+; Out:      R3 = address of sum vector (VECTOR_ADD_OUT)
+; Clobbers: All
 function vector3_add
+  move r3, r1
   to r1 
   ldw (r0)
   add #2 ;bump up r0 = in.y
-  lm r3, (VECTOR_ADD_IN)
   to r2
   ldw (r3)
   with r3
@@ -336,10 +267,10 @@ function vector3_add
 endfunction
 
 
-;Returns the Address to a negated vector of the input vector
-; Input : R0 address to vector to negate
-; Output : R3,VECTOR_NEGATE_OUT  address to negated vector 
-; Clobbers All
+; Negates each component of a 3D vector
+; In:       R0 = address of vector to negate
+; Out:      R3 = address of negated vector (VECTOR_NEGATE_OUT)
+; Clobbers: All
 function vector3_negate
   
   ;r1 = address of vector.x
@@ -372,12 +303,11 @@ function vector3_negate
 
 endfunction
 
-;Returns the Address to a normalize vector of the input vector
-; Input : R0 address to vector to subtract from
-; Input : R3 address of vector to subtract
-; Output : R3,VECTOR_SUBTRACT_OUT  address to vector 
-; Clobbers All
-function vector3_subtract;camera.from = r0/r1 ;camera.to = r3/r2 
+; Calculates difference of two 3D vectors (R0 - R3)
+; In:       R0 = address of vector to subtract from, R3 = address of vector to subtract
+; Out:      R3 = address of result vector (VECTOR_SUBTRACT_OUT)
+; Clobbers: All
+function vector3_subtract
   to r1 
   ldw (r0)
   add #2 ;bump up r0 = in.y
@@ -413,11 +343,10 @@ function vector3_subtract;camera.from = r0/r1 ;camera.to = r3/r2
   return
 endfunction
 
-
-;Returns the Address to a normalize vector of the input vector
-; Input : R0 address to vector to normalize
-; Output : R3 address to vector (normalized)
-; Clobbers All
+; Normalizes a 3D vector to unit length
+; In:       R0 = address of vector to normalize
+; Out:      R3 = address of normalized vector (vector_normalize_out)
+; Clobbers: All
 function vector3_normalize
   ;store referece to in to stack
   sm (_normalize_small_big_reciprocal_temp), r0
@@ -443,8 +372,10 @@ small:  ;calculate using 8 fractional bits and 8 int bits
   return  
 endfunction
 
-;Private
-;calculate using 16 fractional bits and no int bit
+; Normalizes vector using 16 fractional bits (private helper)
+; In:       _normalize_small_big_reciprocal_temp = address of vector
+; Out:      R3 = address of normalized vector (vector_normalize_out)
+; Clobbers: All
 function _normalize_big
   call reciprocal016 ;R3 = 1/length
   ;retrieve referece to in from stack
@@ -478,7 +409,10 @@ function _normalize_big
   return
 endfunction
 
-;calculate using 8 fractional bits and 8 int bit
+; Normalizes vector using 8 fractional bits (private helper)
+; In:       _normalize_small_big_reciprocal_temp = address of vector
+; Out:      R3 = address of normalized vector (vector_normalize_out)
+; Clobbers: All
 function _normalize_small
   call reciprocal ;R3 = 1/length
   ;retrieve referece to in from stack
@@ -489,12 +423,7 @@ function _normalize_small
 
   ;(vector_normalize_out.x) = (R1.x * R6)
   ldw (r1) ;R0 = in.x
-  to r7
-  lmult ; r4 = decimal bits
-  move r8,r4
-  with r7
-  swap
-  merge ; fixed 88 of this.x*1/len
+  condensed_lmult r0, r0; fixed 88 of this.x*1/len
   
   stw (r2)
   with r1
@@ -503,12 +432,7 @@ function _normalize_small
   add #$2 ; R2 = memory address to write to
   ldw (r1) ;R0 = in.x
   
-  to r7
-  lmult ; r4 = decimal bits
-  move r8,r4
-  with r7
-  swap
-  merge ; r0  = fixed 88 of this.y*1/len
+  condensed_lmult r0, r0; r0  = fixed 88 of this.y*1/len
 
   stw (r2)
   with r1
@@ -517,12 +441,7 @@ function _normalize_small
   add #$2 ; R2 = memory address to write to
 
   ldw (r1) ; ;R0 = in.z
-  to r7
-  lmult ; r4 = decimal bits
-  move r8,r4
-  with r7
-  swap
-  merge ; r0  = fixed 88 of this.z*1/len
+  condensed_lmult r0, r0 ; r0  = fixed 88 of this.z*1/len
 
   stw (r2)
   
@@ -531,14 +450,10 @@ function _normalize_small
   return
 endfunction
 
-;Vector.length  puts in r1 the memory address of the vector to get the length of
-;note this isn't going to be accurate, I drop decimals after the square operations. This isn't a
-;problem for "long vectors" but is a problem for short ones.
-;
-; Clobbers All
-; Input : Address of vector to get length of at r0
-; Output : length of vector on r3
-
+; Calculates Euclidean length of a 3D vector
+; In:       R0 = address of vector
+; Out:      R3 = length of vector in fixed Q8.8
+; Clobbers: All
 function vector3_length
 	;r0 = (vec.x)
   move r1,r0
@@ -585,10 +500,10 @@ function vector3_length
   return
 endfunction
 
-; Transforms a vector by multiplying it with a 4x4 matrix.
-; This replaces the vector with the transformed vector.
-; IN : r0 = address of vector to transform
-; IN : r1 = address of matrix to transform by
+; Transforms a 3D vector by multiplying with a 4x4 matrix (in-place)
+; In:       R0 = address of vector to transform, R1 = address of matrix to transform by
+; Out:      Vector at R0 overwritten with transformed coordinates
+; Clobbers: All
 function vector3_transform
   
  for 3
@@ -597,14 +512,7 @@ function vector3_transform
     to r3
     ldw (r1) ; r3 = matrix[0][0]
 
-    to r7
-    from r3
-    lmult ; r4 = decimal bits
-    move r8,r4
-    with r7
-    swap
-    to r9 ; r9 = v.x * m[0][0]
-    merge 
+    condensed_lmult r3, r9; r9 = v.x * m[0][0]
 
     ; setup y* m[0][1]
     add #2
@@ -616,14 +524,7 @@ function vector3_transform
     to r3
     ldw (r1) ; r3 = matrix[0][0]
 
-    to r7
-    from r3
-    lmult ; r4 = decimal bits
-    move r8,r4
-    with r7
-    swap
-    to r5 ; r5 = v.y * m[0][1]
-    merge 
+    condensed_lmult r3, r5; r5 = v.y * m[0][1]
 
     ; setup z* m[0][2]
     add #2
@@ -635,16 +536,8 @@ function vector3_transform
     to r3
     ldw (r1) ; r3 = matrix[0][2]
 
-    to r7
-    from r3
-    lmult ; r4 = decimal bits
-    move r8,r4
-    with r7
-    swap
-    to r11 ; r10 = v.z * m[0][2]
-    merge 
-
-
+    condensed_lmult r3, r11; r11 = v.z * m[0][2]
+    
     ;quick sum of x*m00,y*m01,z*m02 to r9
     with r9
     add r5
@@ -681,5 +574,7 @@ function vector3_transform
   
 return
 endfunction
+
+
 
 .endif

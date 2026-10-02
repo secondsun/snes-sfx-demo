@@ -10,11 +10,10 @@
 .include "../../common/function.i"
 .include "../../common/control.i"
 .include "../constants.i"
-; In : r3 = points array pointer. Points are one byte each, byte aligned. 
-;       The point format is x,y pairs. The array is 6 bytes long for a triangle.
-;      r5 = color
-; Clobbers : r0, r1, r2, r3, r4, r5, r6, r7, r8, r12, r13
-; Out : Nada
+; Rasterizes a flat-shaded triangle to the GSU framebuffer
+; In:       r3 = points array pointer (6 bytes: x0, y0, x1, y1, x2, y2), r5 = color
+; Out:      Pixels plotted to framebuffer
+; Clobbers: r0, r1, r2, r3, r4, r5, r6, r7, r8, r12, r13
 function draw_triangle
     
     with r5

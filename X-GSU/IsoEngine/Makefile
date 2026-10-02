@@ -1,6 +1,6 @@
 # Name
 name        := SuperFX
-debug		:= 1
+debug		:= 2
 
 # Include libSFX.make
 libsfx_dir	:= ../../libSFX

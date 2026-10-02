@@ -13,8 +13,10 @@ POLYGON_LIST:
 
 .include "libSFX.i"
 
-;0xe000,0xa00,0xe000,0x1833,0x0,0x1800,0x0,0x100,0x0
-
+; Initializes test CAMERA eye, lookAt, and up vectors
+; In:       None
+; Out:      Writes test values to global CAMERA struct
+; Clobbers: r0, r1
 .macro init_camera
 	iwt r1, #(CAMERA + camera::eye + vector3::xPos)
 	iwt r0, #$0000;0
@@ -56,8 +58,10 @@ POLYGON_LIST:
 
 .endmacro
 
-
-
+; Initializes test POLYGON_LIST with cube polygon coordinates
+; In:       None
+; Out:      Writes polygon vertices to POLYGON_LIST in GSURAM
+; Clobbers: r0, r1
 .macro init_cube
 	
 	iwt r1, #(POLYGON_LIST + polygon::v1 + vector3::xPos)

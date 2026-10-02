@@ -2,12 +2,14 @@
 ::__GEOMETRY_DEFINED__ = 1   
 ; geometry.i - geometry related macros/definitions
 
-    ;Each of these variables is a Q8.8 fixed point number. 
-    .macro cube _x, _y, _z, _side_length
-
-        .if     .paramcount <> 4
-            .error  "Too few parameters for macro cube"
-        .endif
+; Defines a 3D cube mesh as 12 triangles (36 vertices) with clockwise winding in Q8.8 format
+; In:       _x, _y, _z = origin position (Q8.8), _side_length = cube dimension (Q8.8)
+; Out:      Emits 108 words (36 vertices x 3 coordinates) of triangle mesh data
+; Clobbers: None (data generator)
+.macro cube _x, _y, _z, _side_length
+    .if     .paramcount <> 4
+        .error  "Too few parameters for macro cube"
+    .endif
         ; define cube as 12 triangles with vertices ordered clockwise when the outside is facing the viewer
 
         ; front face (+z)
