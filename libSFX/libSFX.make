@@ -35,7 +35,7 @@ rwildcard = $(strip $(filter $(if $2,$2,%),$(foreach f,$(wildcard $1*),$(eval t 
 # File extensions
 debug_sym_ext	:= cpu.sym
 debug_map_ext	:= dmap
-debug_nfo_ext	:= dnfo
+debug_nfo_ext	:= dbg
 
 # Set defaults
 ifndef obj_dir
