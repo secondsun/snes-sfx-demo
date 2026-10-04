@@ -1,8 +1,7 @@
 ﻿
-test_setup = 0 -- Agent set this from Test.cpu.sym
-
-test_start = 0 -- Agent set this from Test.cpu.sym
-test_stop = 0 -- Agent set this from Test.cpu.sym
+test_setup = 0 -- Agent set this to the lower two bytes of value of test_setup in Test.cpu.sym
+test_start = 0 -- Agent set this to the lower two bytes of value of test_start in Test.cpu.sym
+test_stop = 0  -- Agent set this to the lower two bytes of value of test_stop in Test.cpu.sym
 
 function onTestSetup(address, value)
 	emu.log("setup")
