@@ -1,0 +1,58 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
+
+;includes that will not be in GSURAM
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+
+
+.segment "GSURAM"
+;These values should be word aligned. After assembly, review Test.cpu.sym and ensure "INPUT" is word aligned. If not add .res 1 and reassemble.
+INPUT:
+.res 2
+OUTPUT:
+.res 2
+
+;GSUCODE starts the memory segment of the GSU Code. This code is copied to GSU RAM and executed by the Main CPU.
+.segment "GSUCODE"
+GSU_Code:
+
+;Setup stack
+;The stack register is r10 by convention. Do not modify r10.
+init_stack
+
+	;Setup the test
+	;Here the lua script *MAY* stop emulation, write values to INPUT, and continue emulation
+	;LUA can set a breakpoint using this label.
+	test_setup:
+	nop
+	nop
+	;Execute the test
+	;LUA *MAY* reset the superFX program counter register (r15) to this value after 
+	; breaking on test_stop to run the test again. 
+	test_start:
+	nop
+	nop
+	
+	;Clean up the test and write the value under test to OUTPUT
+	;Here the lua script *MAY* stop emulation, read the values in OUTPUT, and report the test status
+	;LUA can set a breakpoint using this label
+	test_stop:
+	nop
+	nop
+	stop
+	nop
+
+
+;Includes that need to be in GSURAM as part of GSUCODE
+.include "../../gsu_maths/gsu_sqrt.i"
+.include "../../gsu_maths/gsu_vector.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_camera.i"
+.include "../../rnc/gsu_decompress.i"
