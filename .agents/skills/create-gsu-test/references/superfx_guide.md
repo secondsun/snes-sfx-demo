@@ -2,6 +2,12 @@
 
 This guide summarizes key SuperFX (GSU) hardware concepts, register conventions, memory mapping, and pipeline behaviors necessary for writing unit tests.
 
+> [!IMPORTANT]
+> **SuperFX 3 (FX3) Target**: This project targets the unofficial **SuperFX 3 (FX3)** chip documented by Randy Linden ([snes-fx3](https://github.com/LimitedRunGames-Tech/snes-fx3)).
+> - **Key Differences**: Opcode `$70` (`MERGE`) is repurposed for firmware functions; simultaneous ROM and FX SRAM access is supported; memory map is expanded (Mode $30 fast ROM, 3MB FX ROM, 4MB SNES ROM); registers are at `$00:7000`.
+> - See [SuperFX 3 (FX3) Specifications](./fx3_specifications.md) for full hardware details.
+> - See [SuperFX Instruction Set Reference](./superfx_instruction_set.md) for full instruction descriptions.
+
 ---
 
 ## 1. Register Architecture & Conventions

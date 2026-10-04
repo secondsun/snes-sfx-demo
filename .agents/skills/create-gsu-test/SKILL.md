@@ -134,6 +134,8 @@ Mesen --testRunner --timeout=10 tests/<test_name>/test.lua tests/<test_name>/Tes
 
 ## Additional References & Examples
 
+- [SuperFX 3 (FX3) Specifications](./references/fx3_specifications.md): Randy Linden's FX3 technical specifications, memory maps, simultaneous bus access, and MERGE macro workaround.
+- [SuperFX Instruction Set Reference](./references/superfx_instruction_set.md): Complete GSU instruction manual, opcodes, machine cycles, flag behavior, and pipeline delay slots.
 - [Mesen CE Lua API Guide](./references/mesen_lua_api.md): Complete API docs for callbacks, memory read/write, and CLI flags.
-- [SuperFX Guide](./references/superfx_guide.md): Hardware register conventions, pipeline settling, and memory mapping.
+- [SuperFX Test Guide](./references/superfx_guide.md): Hardware register conventions, pipeline settling, and memory mapping.
 - [rom_to_ram Complete Example](./examples/rom_to_ram_example.md): End-to-end code for the `rom_to_ram` unit test.

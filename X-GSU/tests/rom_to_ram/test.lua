@@ -1,4 +1,4 @@
-﻿test_setup = 0x0003
+test_setup = 0x0003
 test_start = 0x0005
 test_stop  = 0x0024
 OUTPUT     = 0x041A
@@ -19,13 +19,12 @@ function onTestStop(address, value)
 		end
 	end
 
-	emu.breakExecution()
 	if pass then
 		print("TEST PASSED: rom_to_ram copied all bytes correctly.")
-		--emu.stop(0)
+		emu.stop(0)
 	else
 		print("TEST FAILED: byte mismatch detected.")
-		--emu.stop(1)
+		emu.stop(1)
 	end
 end
 
