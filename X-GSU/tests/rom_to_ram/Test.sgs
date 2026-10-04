@@ -1,0 +1,52 @@
+; SuperFX
+; Summers Pittman <secondsun@gmail.com>
+; 16-bit 0.16-fixed point reciprocal
+; reciprocal
+
+;includes that will not be in GSURAM
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "libSFX.i"
+
+.segment "GSURAM"
+;These values should be word aligned. After assembly, review Test.cpu.sym and ensure "OUTPUT" is word aligned. If not add .res 1 and reassemble.
+OUTPUT:
+.res 8
+
+;GSUCODE starts the memory segment of the GSU Code. This code is copied to GSU RAM and executed by the Main CPU.
+.segment "GSUCODE"
+GSU_Code:
+
+;Setup stack
+;The stack register is r10 by convention. Do not modify r10.
+init_stack
+
+	;Setup the test
+	test_setup:
+	nop
+	nop
+
+	;Execute the test
+	test_start:
+	rom_to_ram test_rom_data, #$04, OUTPUT, 8
+
+	;Let memory settle
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+
+	;Clean up the test and write the value under test to OUTPUT
+	test_stop:
+	nop
+	nop
+	stop
+	nop
+
