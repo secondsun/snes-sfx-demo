@@ -6,15 +6,15 @@ This guide documents the Mesen CE Lua scripting interface for automated SuperFX 
 
 ## 1. Command-Line Invocation
 
-Mesen supports a headless test runner mode via the `--testRunner` CLI flag.
+Mesen supports a headless test runner mode via the `--testrunner` CLI flag.
 
 ```bash
-Mesen --testRunner [--timeout=N] test.lua Test.sfc
+Mesen --testrunner [--timeout=N] test.lua Test.sfc
 ```
 
 ### Critical Syntax Rules
-- **Use `--testRunner` (or `--testrunner`)**: Do **NOT** use `--test-runner` with a hyphen between "test" and "runner". Mesen's CLI parser strictly strips leading hyphens/slashes and checks for `testrunner`. If a hyphen is kept (`test-runner`), Mesen will not activate test runner mode and will instead launch in interactive GUI mode.
-- **Script Extension**: The script argument passed to `--testRunner` **must end in `.lua`**. Mesen checks the file extension to distinguish between scripts and ROMs.
+- **Use `--testrunner` (or `--testrunner`)**: Do **NOT** use `--test-runner` with a hyphen between "test" and "runner". Mesen's CLI parser strictly strips leading hyphens/slashes and checks for `testrunner`. If a hyphen is kept (`test-runner`), Mesen will not activate test runner mode and will instead launch in interactive GUI mode.
+- **Script Extension**: The script argument passed to `--testrunner` **must end in `.lua`**. Mesen checks the file extension to distinguish between scripts and ROMs.
 - **Timeout**: Use `--timeout=N` (in seconds, e.g. `--timeout=10`) to safeguard against infinite loops. Default timeout is 100 seconds.
 
 ---

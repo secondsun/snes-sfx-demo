@@ -30,7 +30,7 @@ if [ -z "$MESEN_BIN" ] || [ ! -x "$MESEN_BIN" ]; then
 fi
 
 echo "Running Mesen test runner in $TEST_DIR (timeout: ${TIMEOUT}s)..."
-"$MESEN_BIN" --testRunner --timeout="$TIMEOUT" test.lua Test.sfc
+"$MESEN_BIN" --testrunner --timeout="$TIMEOUT" test.lua Test.sfc
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then

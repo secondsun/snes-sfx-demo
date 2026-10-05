@@ -37,7 +37,7 @@ All functions follow the SuperFX calling convention:
 - **`R1` / `R2` / `R3`**: Secondary input parameters / secondary address pointers
 - **`R3`**: Output scalar or pointer to output structure in `GSURAM`
 - **`R10`**: Reserved for software stack pointer
-- **`R11`**: Return address set by `call`
+- **`R15`**: Reserved for program counter. May be modified to jump to an address.
 
 | Function | Source File | Input Registers | Output | GSURAM Output Symbol | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |

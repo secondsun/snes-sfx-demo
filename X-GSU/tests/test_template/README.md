@@ -12,7 +12,7 @@ Makefile Configuration :
 Running Tests : 
  - Run `make clean all` to build a clean version of the Test
  - Review Test.cpu.sym. Set the test_setup, test_start, and test_stop label addresses in the test.lua script to the address values found here. Mesen does not import them correctly.  The first byte of the word should be removed; only include the bottom 2 bytes.
- - run `Mesen --testRunner test.lua Test.sfc` to run the tests (note: use `--testRunner` without the hyphen in the middle). 
+ - run `Mesen --testrunner test.lua Test.sfc` to run the tests (note: use `--testrunner` without the hyphen in the middle). 
  - Mesen should finish, the status of Mesen will match the status that the script set when it finished.
 
 
