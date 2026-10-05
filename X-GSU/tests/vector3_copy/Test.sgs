@@ -1,10 +1,16 @@
-; SuperFX camera_lookAt test
+; SuperFX vector3_copy unit test
 
 .include "../../common/stack.i"
 .include "../../common/function.i"
 .include "../../common/structs.i"
 .include "../../common/var.i"
 .include "libSFX.i"
+
+.segment "GSURAM"
+INPUT:
+.res .sizeof(vector3)
+OUTPUT:
+.res .sizeof(vector3)
 
 .segment "GSUCODE"
 GSU_Code:
@@ -13,14 +19,18 @@ GSU_Code:
 init_stack
 
 test_setup:
-	iwt r12, #12
+	iwt r12, #6
 	iwt r13, #test_call
 
 test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
-	call camera_lookAt
-	; LET MEMORY SETTLE
+
+	iwt r0, #INPUT
+	iwt r2, #OUTPUT
+	call vector3_copy
+
+	; Let memory settle
 	nop
 	nop
 	nop
@@ -29,6 +39,7 @@ test_call:
 	nop
 	nop
 	nop
+
 test_stop:
 	nop
 	nop
@@ -39,7 +50,7 @@ test_stop:
 	stop
 	nop
 
-; Code goes in code segment
+; Include math functions
 .include "../../gsu_maths/gsu_sqrt.i"
 .include "../../gsu_maths/gsu_vector.i"
 .include "../../gsu_maths/gsu_recip.i"

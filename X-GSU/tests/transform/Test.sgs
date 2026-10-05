@@ -131,6 +131,7 @@ test_call:
 		restoreloop
 		gsu_stack_pop r1
 		gsu_stack_pop r0
+		with r0
 		add #.sizeof(vector3)
 	endfor
 	;LET MEMORY SETTLE
@@ -151,8 +152,6 @@ test_stop:
 	stop
 	nop
 
-
-.res 1
 ;Code goes in code segment
 .include "../../gsu_maths/gsu_sqrt.i"
 .include "../../gsu_maths/gsu_vector.i"

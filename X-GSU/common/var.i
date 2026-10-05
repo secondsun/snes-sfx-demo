@@ -20,6 +20,8 @@ VECTOR_NEGATE_OUT:
   .res .sizeof(vector3)
 VECTOR_CROSS_OUT:
   .res .sizeof(vector3)
+VECTOR_TRANSFORM_OUT:
+  .res .sizeof(vector3)
 RNC_HEADER:
   .res .sizeof(rnc_header)
 ;Global Camera   
