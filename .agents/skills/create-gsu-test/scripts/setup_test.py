@@ -47,6 +47,7 @@ def main():
 
     if target_dir.exists():
         print(f"Error: Target directory already exists: {target_dir}", file=sys.stderr)
+        print("Scaffold aborted to prevent clobbering existing test code. Use run-gsu-test to run this test.", file=sys.stderr)
         sys.exit(1)
 
     target_dir.mkdir(parents=True)

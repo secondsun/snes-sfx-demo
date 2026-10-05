@@ -22,7 +22,7 @@ This skill guides the creation of automated unit tests for SuperFX (GSU) assembl
 5. **Build**: Run `make clean all` in `tests/<test_name>/`.
 6. **Extract Symbols**: Parse `Test.cpu.sym` to check word alignment and get 16-bit RAM offsets.
 7. **Write Lua Assertions (`test.lua`)**: Hook `test_stop` execution callback on GSU (`cpuType = 4`), inspect RAM, validate against expectations, and call `emu.stop(0)` or `emu.stop(1)`.
-8. **Execute**: Run `Mesen --testRunner test.lua Test.sfc`.
+8. **Execute**: Run `Mesen --testrunner test.lua Test.sfc`.
 
 ---
 
@@ -124,11 +124,11 @@ Run using [run_test.sh](./scripts/run_test.sh) or directly with Mesen:
 ./.agents/skills/create-gsu-test/scripts/run_test.sh tests/<test_name> 10
 
 # Or directly with Mesen:
-Mesen --testRunner --timeout=10 tests/<test_name>/test.lua tests/<test_name>/Test.sfc
+Mesen --testrunner --timeout=10 tests/<test_name>/test.lua tests/<test_name>/Test.sfc
 ```
 
 > [!IMPORTANT]
-> Always pass `--testRunner` (or `--testrunner`). Do **NOT** include a hyphen (`--test-runner`), which causes Mesen to launch GUI mode instead of headless runner mode.
+> Always pass `--testrunner`. Do **NOT** include a hyphen (`--test-runner`), which causes Mesen to launch GUI mode instead of headless runner mode.
 
 ---
 

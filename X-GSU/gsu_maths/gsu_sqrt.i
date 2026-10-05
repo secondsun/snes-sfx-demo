@@ -13,7 +13,7 @@
 
 ; In :  int part on r0
 ; In :  decimals on r1
-; Out : Sqrt on R3 of Input in fixed88
+; Out : Sqrt on R3 of Input in q8.8
 ; Clobbers : r0, r1, r3, r4, r5, r12, r13
 function gsu_sqrt32
 ;square_root0 (n):
