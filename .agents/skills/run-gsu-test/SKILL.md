@@ -5,9 +5,16 @@ description: >-
   in the tests/ directory using Mesen CE. Use whenever asked to run, execute, verify, or
   regression-test an existing test suite (e.g., sqrt, vector3_add, reciprocal, lookAt).
   Do NOT use for creating or scaffolding new tests; use create-gsu-test instead.
+  Accepts an optional test name argument (e.g., "sqrt"); if omitted, runs all tests.
 ---
 
 # Running SuperFX Unit Tests
+
+## Arguments
+
+- **`test_name`** (optional): Name of a single test directory under `tests/` (e.g. `sqrt`, `vector3_add`). A leading `tests/` prefix is accepted and stripped.
+  - **Provided**: Run the pipeline below only for `tests/<test_name>`. If the directory does not exist (or is `test_template`), stop and list the available tests.
+  - **Omitted**: Discover every feature test directory in `tests/` (excluding `test_template`) and run the pipeline for each, as in the [Batch Verification Example](#batch-verification-example). Report a pass/fail summary at the end.
 
 This skill guides the automated compilation, symbol address synchronization, and execution of SuperFX (GSU / FX3) unit tests within the `tests/` directory using Mesen CE's headless test runner.
 

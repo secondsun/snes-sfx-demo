@@ -55,8 +55,8 @@ fi
 MESEN_BIN="$(command -v Mesen || command -v mesen || true)"
 if [ -z "$MESEN_BIN" ]; then
     # Fallback to local user path if on macOS
-    if [ -x "/Users/summerspittman/Programs/Mesen" ]; then
-        MESEN_BIN="/Users/summerspittman/Programs/Mesen"
+    if [ -x "/Users/summerspittman/Projects/Mesen2/bin/osx-arm64/Release/Mesen" ]; then
+        MESEN_BIN="/Users/summerspittman/Projects/Mesen2/bin/osx-arm64/Release/Mesen"
     fi
 fi
 
@@ -69,7 +69,7 @@ echo "=== Step 3: Executing Mesen test runner ==="
 set +e
 (
     cd "$TEST_DIR"
-    "$MESEN_BIN" --testrunner test.lua Test.sfc
+    "$MESEN_BIN" --testrunner --timeout=3 ./test.lua ./Test.sfc
 )
 EXIT_CODE=$?
 set -e

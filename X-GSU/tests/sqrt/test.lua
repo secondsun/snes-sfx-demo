@@ -1,4 +1,4 @@
-﻿test_setup = 0x0003
+test_setup = 0x0003
 test_stop  = 0x001E
 INPUT      = 0x0AA6
 OUTPUT     = 0x0AAA
@@ -12,11 +12,9 @@ function onTestSetup(address, value)
 	print(string.format("Setting sqrt input: 0x%04X%04X", input_high, input_low))
 	emu.writeWord(INPUT, input_high, emu.memType.gsuWorkRam)
 	emu.writeWord(INPUT + 2, input_low, emu.memType.gsuWorkRam)
-	emu.breakExecution()
 end
 
 function onTestStop(address, value)
-	emu.breakExecution()
 	local result = emu.readWord(OUTPUT, emu.memType.gsuWorkRam, false)
 	local msg = string.format("OUTPUT = 0x%04X (expected: 0x%04X)", result, expected)
 	print(msg)
