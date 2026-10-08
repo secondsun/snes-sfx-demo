@@ -5,59 +5,59 @@
 #include <vector>
 
 struct sfcRom {
-  sfcRom(const std::string& path);
+    sfcRom(const std::string& path);
 
-  bool isValid() const;
-  std::string description(bool silent) const;
-  std::string fix(const std::string& path, bool silent);
+    std::string description(bool silent) const;
+    std::string fix(const std::string& path, bool silent);
 
-private:
-  std::string filepath;
-  std::vector<uint8_t> image;
+    bool isValid = false;
+    bool hasIssues = false;
+    bool hasSevereIssues = false;
 
-  void getHeaderInfo(const std::vector<uint8_t>& header);
-  int scoreHeaderLocation(int location) const;
-  uint16_t calculateChecksum() const;
+    bool hasCopierHeader = false;
+    bool hasCorrectTitle = false;
+    bool hasCorrectRamSize = false;
+    bool hasCorrectChecksum = false;
+    bool hasLegalMode = false;
+    bool hasKnownMapper = false;
+    bool hasNewFormatHeader = false;
 
-  int imageSize;
-  int imageOffset = 0;
-  int headerLocation;
+    std::string title;
+    std::string mapperName;
+    std::string chipSetInfo;
+    std::string makerCode;
+    std::string gameCode;
+    std::string version;
+    std::string country;
 
-  bool valid = false;
-  bool hasIssues = false;
-  bool hasSevereIssues = false;
+    uint8_t mode = 0;
+    uint8_t mapper = 0;
+    bool fast = false;
+    bool hasRam = false;
 
-  bool hasCopierHeader = false;
-  bool hasCorrectTitle = false;
-  bool hasCorrectRamSize = true;
-  bool hasLegalMode = true;
-  bool hasKnownMapper = true;
-  bool hasNewFormatHeader = false;
+    uint8_t chipset = 0;
+    uint8_t chipsetSubtype = 0;
+    uint8_t romSize = 0;
+    uint8_t ramSize = 0;
+    uint8_t countryCode = 0;
 
-  uint8_t correctedMode = 0;
-  uint8_t correctedRomSize = 0;
-  uint16_t correctedChecksum;
-  uint16_t correctedComplement;
+    uint16_t checksum = 0;
+    uint16_t complement = 0;
 
-  uint8_t mode;
-  uint8_t mapper;
-  bool fast;
-  bool hasRam = false;
+    size_t imageSize = 0;
+    size_t imageOffset = 0;
+    size_t headerLocation = 0;
 
-  uint8_t chipset;
-  uint8_t chipsetSubtype = 0;
-  uint8_t romSize;
-  uint8_t ramSize;
-  uint8_t countryCode;
+    uint8_t correctedMode = 0;
+    uint8_t correctedRomSize = 0;
+    uint16_t correctedChecksum = 0;
+    uint16_t correctedComplement = 0;
 
-  uint16_t checksum;
-  uint16_t complement;
+  private:
+    std::string filepath;
+    std::vector<uint8_t> image;
 
-  std::string title;
-  std::string mapperName;
-  std::string chipSetInfo;
-  std::string makerCode;
-  std::string gameCode;
-  std::string version;
-  std::string country;
+    void getHeaderInfo(const std::vector<uint8_t>& header);
+    int scoreHeaderLocation(size_t location) const;
+    uint16_t calculateChecksum() const;
 };

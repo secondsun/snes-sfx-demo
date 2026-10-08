@@ -1,85 +1,106 @@
-BasedOnStyle: Google
+---
+BasedOnStyle: LLVM
+ColumnLimit: 120
+---
 Language: Cpp
-Standard: Cpp11
-
-ColumnLimit: 0
-IndentWidth: 2
-ContinuationIndentWidth: 2
-UseTab: Never
-
+IndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 130
 MaxEmptyLinesToKeep: 2
-KeepEmptyLinesAtTheStartOfBlocks: false
-
-BinPackArguments: true
-BinPackParameters: true
-
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
-AlignOperands: true
-AlignTrailingComments: true
-AlignEscapedNewlinesLeft: true
-
-ConstructorInitializerAllOnOneLineOrOnePerLine: false
-ConstructorInitializerIndentWidth: 0
-
-BraceWrapping:
-  AfterClass: false
-  AfterStruct: false
-  AfterUnion: false
-  AfterEnum: false
-  AfterFunction: false
-  AfterControlStatement: false
-  AfterNamespace: false
-  AfterObjCDeclaration: false
-  BeforeCatch: false
-  BeforeElse: false
-  IndentBraces: false
-
-BreakBeforeBraces: Custom
-BreakBeforeBinaryOperators: None
-BreakBeforeTernaryOperators: false
-BreakConstructorInitializersBeforeComma: false
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: Right
+AlignEscapedNewlines: DontAlign
+AlignOperands: AlignAfterOperator
+AlignTrailingComments:
+  Kind:            Always
+  OverEmptyLines:  1
+AllowShortBlocksOnASingleLine: Always
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: WithoutElse
 AlwaysBreakBeforeMultilineStrings: true
 AlwaysBreakTemplateDeclarations: true
-Cpp11BracedListStyle: true
-
-IndentCaseLabels: false
-IndentWrappedFunctionNames: true
-IndentFunctionDeclarationAfterType: true
-
-AlignAfterOpenBracket: true
-AccessModifierOffset: -2
+BinPackArguments: true
+BinPackParameters: true
+BraceWrapping:
+  AfterCaseLabel:  false
+  AfterClass:      false
+  AfterControlStatement: Never
+  AfterEnum:       false
+  AfterExternBlock: false
+  AfterFunction:   false
+  AfterNamespace:  false
+  AfterObjCDeclaration: false
+  AfterStruct:     false
+  AfterUnion:      false
+  BeforeCatch:     false
+  BeforeElse:      false
+  BeforeLambdaBody: false
+  BeforeWhile:     false
+  IndentBraces:    false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+BreakBeforeBraces: Attach
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+BreakStringLiterals: true
+CompactNamespaces: true
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+ExperimentalAutoDetectBinPacking: true
 DerivePointerAlignment: false
+FixNamespaceComments: true
+IncludeBlocks: Preserve
+IndentAccessModifiers: false
+IndentCaseBlocks: false
+IndentCaseLabels: false
+IndentExternBlock: AfterExternBlock
+IndentGotoLabels: true
+IndentPPDirectives: BeforeHash
+IndentWrappedFunctionNames: false
+InsertBraces: true
+InsertNewlineAtEOF: true
+InsertTrailingCommas: None
+KeepEmptyLinesAtEOF: false
+KeepEmptyLinesAtTheStartOfBlocks: true
+LambdaBodyIndentation: OuterScope
+LineEnding: LF
+NamespaceIndentation: None
+PackConstructorInitializers: Never
 PointerAlignment: Left
-
-NamespaceIndentation: Inner
-SpaceBeforeAssignmentOperators: true
-SpacesInSquareBrackets: false
-SpaceBeforeParens: ControlStatements
-SpacesInParentheses: false
-SpaceInEmptyParentheses: false
+PPIndentWidth: -1
+QualifierAlignment: Left
+ReferenceAlignment: Pointer
+ReflowComments: true
+RemoveBracesLLVM: false
+RemoveParentheses: Leave
+RemoveSemicolon: false
+SeparateDefinitionBlocks: Always
+ShortNamespaceLines: 5
+SortIncludes: CaseInsensitive
+SortUsingDeclarations: Lexicographic
 SpaceAfterCStyleCast: false
-SpacesInCStyleCastParentheses: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: false
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: false
+SpaceBeforeParens: ControlStatementsExceptControlMacros
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
 SpacesBeforeTrailingComments: 1
-SpacesInAngles: false
-SpacesInContainerLiterals: false
-
-AllowShortBlocksOnASingleLine: true
-AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
-AllowShortCaseLabelsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: Inline
-
-# SortIncludes: false
-# SpaceAfterTemplateKeyword: true
-
-# MacroBlockBegin: "*_MACRO_START"
-# MacroBlockEnd: "*_MACRO_END"
-
-# Allow putting all parameters of a function declaration onto the next line
-# even if BinPackParameters is false.
-# AllowAllParametersOfDeclarationOnNextLine: true
-
-# A regular expression that describes comments with special meaning, which
-# should not be split into lines or otherwise changed.
-# CommentPragmas: ""
+SpacesInAngles: Never
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+SpacesInParens: Never
+SpacesInSquareBrackets: false
+TabWidth: 4
+UseTab: Never
+...

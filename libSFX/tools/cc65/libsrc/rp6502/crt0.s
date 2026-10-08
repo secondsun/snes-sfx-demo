@@ -3,8 +3,8 @@
 ;
 ; crt0.s
 
-.export _exit
-.import callmain
+.export _init, _exit
+.import _main
 
 .export __STARTUP__ : absolute = 1
 .import __RAM_START__, __RAM_SIZE__
@@ -17,7 +17,7 @@
 .segment  "STARTUP"
 
 ; Essential 6502 startup the CPU doesn't do
-init:
+_init:
     ldx #$FF
     txs
     cld
@@ -34,7 +34,7 @@ init:
     jsr initlib   ; Run constructors
 
 ; Call main()
-    jsr callmain
+    jsr _main
 
 ; Back from main() also the _exit entry
 ; Stack the exit value in case destructors call OS

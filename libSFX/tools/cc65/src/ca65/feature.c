@@ -68,7 +68,6 @@ static const char* const FeatureKeys[FEAT_COUNT] = {
     "string_escapes",
     "long_jsr_jmp_rts",
     "line_continuations",
-    "merge_scopes",
 };
 
 
@@ -124,7 +123,6 @@ void SetFeature (feature_t Feature, unsigned char On)
         case FEAT_STRING_ESCAPES:             StringEscapes     = On;    break;
         case FEAT_LONG_JSR_JMP_RTS:           LongJsrJmpRts     = On;    break;
         case FEAT_LINE_CONTINUATIONS:         LineCont          = On;    break;
-        case FEAT_MERGE_SCOPES:               MergeScopes       = On;    break;
         default:                                                         break;
     }
 }

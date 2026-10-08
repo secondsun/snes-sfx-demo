@@ -7,7 +7,7 @@ int __fastcall__ _sysremove (const char* name)
     size_t namelen;
     namelen = strlen (name);
     if (namelen > 255) {
-        errno = EINVAL;
+        RIA.errno_ = EINVAL;
         return -1;
     }
     while (namelen) {

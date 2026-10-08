@@ -65,7 +65,6 @@ unsigned char SmartMode          = 0;   /* Smart mode */
 unsigned char DbgSyms            = 0;   /* Add debug symbols */
 unsigned char LineCont           = 0;   /* Allow line continuation */
 unsigned char LargeAlignment     = 0;   /* Don't warn about large alignments */
-unsigned char MergeScopes        = 0;   /* Allow reopening named .SCOPEs */
 unsigned char RelaxChecks        = 0;   /* Relax a few assembler checks */
 unsigned char StringEscapes      = 0;   /* Allow C-style escapes in strings */
 unsigned char LongJsrJmpRts      = 0;   /* Allow JSR/JMP/RTS as alias for JSL/JML/RTL */

@@ -18,19 +18,15 @@ _cgetc: lda     KEY_COUNT       ; Get number of characters
         ora     FKEY_COUNT      ; Or with number of function key chars
         bne     L2              ; Jump if there are already chars waiting
 
-; Save the character under the cursor, wait for a key, then put it back.  In
-; bitmap mode there is no cursor to show, so the save and restore are
-; effectively a no-op.
+        lda     #%00100000
+        bit     $FF06
+        bne     L2              ; always disable cursor if in bitmap mode
+
+; Switch on the cursor if needed
 
         ldy     CURS_X
         lda     (CRAM_PTR),y    ; Get current char
         pha                     ; And save it
-
-        lda     #%00100000
-        bit     $FF06
-        bne     L1              ; No cursor in bitmap mode
-
-; Switch on the cursor if needed
 
         lda     CHARCOLOR
         sta     (CRAM_PTR),y

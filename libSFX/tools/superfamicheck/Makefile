@@ -1,44 +1,16 @@
-SRC_DIR     := src
-BIN_DIR     := bin
-OBJ_DIR     := .build
-
-CXX_FLAGS   := -std=gnu++11 -Wall
-CC_FLAGS    := -std=gnu99 -Wall
-LD_FLAGS    :=
-
-ifeq ($(DEBUG), 1)
-  CXX_FLAGS += -O0 -g
-  CC_FLAGS += -O0 -g
-else
-  CXX_FLAGS += -O3 -flto
-  CC_FLAGS += -O3 -flto
-endif
-
-OBJ			:= $(OBJ_DIR)/sfcRom.o $(OBJ_DIR)/superfamicheck.o
-HEADERS     := $(wildcard $(SRC_DIR)/*.h)
+BUILD_DIR := build
 
 .PHONY: clean
 
-default: superfamicheck
+release:
+	@cmake -B$(BUILD_DIR)/release -DCMAKE_BUILD_TYPE=Release
+	@cmake --build $(BUILD_DIR)/release --parallel 4
 
-all: clean superfamicheck
+debug:
+	@cmake -B$(BUILD_DIR)/debug -DCMAKE_BUILD_TYPE=Debug
+	@cmake --build $(BUILD_DIR)/debug --parallel 4
 
-superfamicheck: $(BIN_DIR)/superfamicheck
-
-$(BIN_DIR)/superfamicheck : $(OBJ) | $(BIN_DIR)
-	g++ $(LD_FLAGS) $^ -o $@
-
-$(OBJ_DIR)/%.o : ./**/%.cpp $(HEADERS) | $(OBJ_DIR)
-	g++ $(CXX_FLAGS) -c $< -o $@
-
-$(OBJ_DIR)/%.o : ./**/%.c $(HEADERS) | $(OBJ_DIR)
-	gcc $(CC_FLAGS) -c $< -o $@
-
-$(BIN_DIR):
-	@mkdir -pv $@
-
-$(OBJ_DIR):
-	@mkdir -pv $@
+all: clean release
 
 clean:
-	@rm -rf $(OBJ_DIR) $(BIN_DIR)
+	@rm -rf $(BUILD_DIR)

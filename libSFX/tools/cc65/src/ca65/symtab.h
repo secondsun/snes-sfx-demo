@@ -76,7 +76,6 @@ struct SymTable {
     SymTable*           Childs;         /* Pointer to child scopes */
     SymEntry*           Label;          /* Scope label */
     Collection          Spans;          /* Spans for this scope */
-    Collection          OpenSpans;      /* Spans for the current occurrence */
     unsigned            Id;             /* Scope id */
     unsigned short      Flags;          /* Symbol table flags */
     unsigned char       AddrSize;       /* Address size */
@@ -84,7 +83,6 @@ struct SymTable {
     unsigned            Level;          /* Lexical level */
     unsigned            TableSlots;     /* Number of hash table slots */
     unsigned            TableEntries;   /* Number of entries in the table */
-    unsigned long       Size;           /* Total size of all occurrences */
     unsigned            Name;           /* Name of the scope */
     SymEntry*           Table[1];       /* Dynamic allocation */
 };

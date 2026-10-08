@@ -354,13 +354,8 @@ Out:
 
 SER_GET:
         ldx     Index
-        ldy     SendFreeCnt     ; Send data if necessary
-        iny                     ; Y == $FF?
-        beq     :+
-        lda     #$00            ; TryHard = false
-        jsr     TryToSend
 
-:       lda     RecvFreeCnt     ; Check for buffer empty
+        lda     RecvFreeCnt     ; Check for buffer empty
         cmp     #$FF
         bne     :+
         lda     #SER_ERR_NO_DATA

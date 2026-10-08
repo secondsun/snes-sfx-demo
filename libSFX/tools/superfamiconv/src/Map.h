@@ -1,6 +1,6 @@
 // map representation
 //
-// david lindecrantz <optiroc@gmail.com>
+// david lindecrantz <optiroc@me.com>
 
 #pragma once
 
@@ -40,12 +40,15 @@ struct Map final {
   Mapentry entry_at(unsigned x, unsigned y) const;
 
   void add_base_offset(int offset);
+  void add_palette_base_offset(int offset);
 
   byte_vec_t native_data(bool column_order = false, unsigned split_w = 0, unsigned split_h = 0) const;
+  byte_vec_t palette_map(bool column_order = false, unsigned split_w = 0, unsigned split_h = 0) const;
   byte_vec_t snes_mode7_interleaved_data(const Tileset& tileset) const;
   byte_vec_t gbc_banked_data() const;
 
   void save(const std::string& path, bool column_order = false, unsigned split_w = 0, unsigned split_h = 0) const;
+  void save_pal_map(const std::string& path, bool column_order = false, unsigned split_w = 0, unsigned split_h = 0) const;
   const std::string to_json(bool column_order = false, unsigned split_w = 0, unsigned split_h = 0) const;
 
 private:
@@ -77,6 +80,13 @@ inline byte_vec_t pack_native_mapentry(const Mapentry& entry, Mode mode) {
     v.push_back(entry.tile_index & 0xff);
     break;
 
+  case Mode::sms:
+  case Mode::gg:
+    v.push_back(entry.tile_index & 0xff);
+    v.push_back(((entry.tile_index >> 8) & 0x01) | (entry.flip_h << 1) | (entry.flip_v << 2) | ((entry.palette_index << 3) & 0x8));
+    // SMS and GG support depth information per tile in tilemap, instead of per sprite. But superfamiconv doesn't provide that rope?
+    break;
+
   case Mode::gbc:
     v.push_back(entry.tile_index & 0xff);
     v.push_back(((entry.palette_index) & 0x07) | ((entry.tile_index >> 5) & 0x08) | (entry.flip_h << 5) | (entry.flip_v << 6));
@@ -99,6 +109,23 @@ inline byte_vec_t pack_native_mapentry(const Mapentry& entry, Mode mode) {
   case Mode::pce:
     v.push_back(entry.tile_index & 0xff);
     v.push_back(((entry.tile_index >> 8) & 0x0f) | ((entry.palette_index << 4) & 0xf0));
+    break;
+
+  case Mode::ws:
+  case Mode::wsc:
+  case Mode::wsc_packed:
+    v.push_back(entry.tile_index & 0xff);
+    v.push_back(((entry.tile_index >> 8) & 0x01) | ((entry.palette_index << 1) & 0x1e) | ((entry.tile_index >> 4) & 0x20) | (entry.flip_h << 6) | (entry.flip_v << 7));
+    break;
+
+  case Mode::ngp:
+    v.push_back(entry.tile_index & 0xff);
+    v.push_back(((entry.tile_index >> 8) & 0x01) | ((entry.palette_index << 5) & 0x20) | (entry.flip_v << 6) | (entry.flip_h << 7));
+    break;
+
+  case Mode::ngpc:
+    v.push_back(entry.tile_index & 0xff);
+    v.push_back(((entry.tile_index >> 8) & 0x01) | ((entry.palette_index << 1) & 0x1e) | (entry.flip_v << 6) | (entry.flip_h << 7));
     break;
 
   case Mode::pce_sprite:

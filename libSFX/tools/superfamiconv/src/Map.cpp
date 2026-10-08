@@ -2,8 +2,7 @@
 
 namespace sfc {
 
-void Map::add(const sfc::Image& image, const sfc::Tileset& tileset, const sfc::Palette& palette, unsigned bpp, unsigned pos_x,
-              unsigned pos_y) {
+void Map::add(const sfc::Image& image, const sfc::Tileset& tileset, const sfc::Palette& palette, unsigned bpp, unsigned pos_x, unsigned pos_y) {
   if (((pos_y * _map_width) + pos_x) > _entries.size())
     throw std::runtime_error("Map entry out of bounds");
 
@@ -51,7 +50,8 @@ Mapentry Map::entry_at(unsigned x, unsigned y) const {
     Mapentry entry = _entries[(y * _map_width) + x];
     if (_tile_width == 8 && _tile_height == 8)
       return entry;
-    // SNES non-8x8 tilemap
+
+    // snes non-8x8 tilemap
     unsigned tile_col = entry.tile_index % 8;
     unsigned tile_row = entry.tile_index / 8;
     entry.tile_index = tile_col * (_tile_width == 8 ? 1 : 2) + tile_row * (_tile_height == 8 ? 16 : 32);
@@ -65,12 +65,29 @@ void Map::add_base_offset(int offset) {
   }
 }
 
+void Map::add_palette_base_offset(int offset) {
+  for (auto& e : _entries) {
+    e.palette_index = (unsigned)std::max(0, (int)e.palette_index + offset);
+  }
+}
+
 byte_vec_t Map::native_data(bool column_order, unsigned split_w, unsigned split_h) const {
   byte_vec_t data;
   for (const auto& vm : collect_entries(column_order, split_w, split_h)) {
     for (const auto& m : vm) {
       auto nd = sfc::pack_native_mapentry(m, _mode);
       data.insert(data.end(), nd.begin(), nd.end());
+    }
+  }
+  return data;
+}
+
+byte_vec_t Map::palette_map(bool column_order, unsigned split_w, unsigned split_h) const {
+  byte_vec_t data;
+  for (const auto& vm : collect_entries(column_order, split_w, split_h)) {
+    for (const auto& m : vm) {
+      data.push_back(m.palette_index & 0xFF);
+      data.push_back(m.palette_index >> 8);
     }
   }
   return data;
@@ -103,6 +120,10 @@ byte_vec_t Map::gbc_banked_data() const {
 
 void Map::save(const std::string& path, bool column_order, unsigned split_w, unsigned split_h) const {
   sfc::write_file(path, native_data(column_order, split_w, split_h));
+}
+
+void Map::save_pal_map(const std::string& path, bool column_order, unsigned split_w, unsigned split_h) const {
+  sfc::write_file(path, palette_map(column_order, split_w, split_h));
 }
 
 const std::string Map::to_json(bool column_order, unsigned split_w, unsigned split_h) const {

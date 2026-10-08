@@ -81,18 +81,6 @@ labelwithoutcolon
 .feature long_jsr_jmp_rts -
 
 
-.feature merge_scopes
-.scope feature_scope
-first = 1
-.endscope
-.scope feature_scope
-second = 2
-.endscope
-.assert feature_scope::first = 1, error, "merge_scopes failed"
-.assert feature_scope::second = 2, error, "merge_scopes failed"
-.feature merge_scopes -
-
-
 .feature loose_char_term
 .byte 'a'
 .byte "a"

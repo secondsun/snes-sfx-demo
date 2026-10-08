@@ -130,7 +130,6 @@ static void Usage (void)
             "  --listing name\t\tCreate a listing file if assembly was ok\n"
             "  --list-bytes n\t\tMaximum number of bytes per listing line\n"
             "  --memory-model model\t\tSet the memory model\n"
-            "  --merge-scopes\t\tAllow reopening named .SCOPEs\n"
             "  --no-utf8\t\t\tDisable use of UTF-8 in diagnostics\n"
             "  --pagelength n\t\tSet the page length for the listing\n"
             "  --relax-checks\t\tRelax some checks (see docs)\n"
@@ -677,15 +676,6 @@ static void OptMemoryModel (const char* Opt, const char* Arg)
 
 
 
-static void OptMergeScopes (const char* Opt attribute ((unused)),
-                            const char* Arg attribute ((unused)))
-/* Allow reopening named .SCOPEs */
-{
-    MergeScopes = 1;
-}
-
-
-
 static void OptNoUtf8 (const char* Opt attribute ((unused)),
                        const char* Arg attribute ((unused)))
 /* Handle the --no-utf8 option */
@@ -1100,7 +1090,6 @@ int main (int argc, char* argv [])
         { "--list-bytes",          1,      OptListBytes            },
         { "--listing",             1,      OptListing              },
         { "--memory-model",        1,      OptMemoryModel          },
-        { "--merge-scopes",        0,      OptMergeScopes          },
         { "--no-utf8",             0,      OptNoUtf8               },
         { "--pagelength",          1,      OptPageLength           },
         { "--relax-checks",        0,      OptRelaxChecks          },

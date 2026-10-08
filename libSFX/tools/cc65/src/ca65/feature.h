@@ -70,7 +70,6 @@ typedef enum {
     FEAT_STRING_ESCAPES,
     FEAT_LONG_JSR_JMP_RTS,
     FEAT_LINE_CONTINUATIONS,
-    FEAT_MERGE_SCOPES,
 
     /* Special value: Number of features available */
     FEAT_COUNT
