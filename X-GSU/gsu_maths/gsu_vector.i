@@ -81,7 +81,6 @@ endfunction
 function vector3_cross
   
   ;Adjust R0, R1 to (r0+2),(r1+4)
-  with r0
   add #2
   with r1
   add #4
@@ -95,7 +94,6 @@ function vector3_cross
   ; End (r0+2)*(r1+4)
 
   ;Adjust (r0+2),(r1+4) to (r0+4),(r1+2)
-  with r0
   add #2
   with r1
   sub #2
@@ -105,12 +103,12 @@ function vector3_cross
   ldw (r0) ; r5 = r0.z
   to r6
   ldw (r1) ; r6 = r1.y
-  condensed_lmult r5, r2; r2 = this.z*other.y at fixed 8.8
+  condensed_lmult r5, r4; r4 = this.z*other.y at fixed 8.8
   ; End (r0+4)*(r1+2)
   
   ;Begin subtract this.y*other.z - this.z*other.y
   with r3
-  sub r2
+  sub r4
   ;Write out.x
   sm (VECTOR_CROSS_OUT), r3
 
@@ -127,7 +125,6 @@ function vector3_cross
   ; End (r0+4)*(r1)
 
   ;Adjust (r0+4),(r1) to (r0),(r1+4)
-  with r0
   sub #4
   with r1
   add #4
@@ -137,12 +134,12 @@ function vector3_cross
   ldw (r0) ; r5 = this.x
   to r6
   ldw (r1) ; r6 = other.z
-  condensed_lmult r5, r2; r2 = this.x*other.z at fixed 8.8
+  condensed_lmult r5, r4; r4 = this.x*other.z at fixed 8.8
   ; End (r0)*(r1+4)
 
   ;Begin subtract this.z*other.x - this.x*other.z
   with r3
-  sub r2
+  sub r4
   ;Write out.y
   sm (VECTOR_CROSS_OUT+2), r3
 
@@ -159,7 +156,6 @@ function vector3_cross
   ; End (r0)*(r1+2)
 
   ;Adjust (r0)*(r1+2) to (r0+2),(r1)
-  with r0
   add #2
   with r1
   sub #2
@@ -169,12 +165,12 @@ function vector3_cross
   ldw (r0) ; r5 = this.y
   to r6
   ldw (r1) ; r6 = other.x
-  condensed_lmult r5, r2; r2 = this.y*other.x at fixed 8.8
+  condensed_lmult r5, r4; r4 = this.y*other.x at fixed 8.8
   ; End (r0+2)*(r1)
 
   ;Begin subtract this.x*other.y - this.y*other.x
   with r3
-  sub r2
+  sub r4
   ;Write out.z
   sm (VECTOR_CROSS_OUT+4), r3
 
@@ -199,7 +195,6 @@ function vector3_dot
 
   ;r0 = &a.y
   ;r1 = &b.y
-  with r0
   add #2
   with r1
   add #2
@@ -212,7 +207,6 @@ function vector3_dot
 
   ;r0 = &a.z
   ;r1 = &b.z
-  with r0
   add #2
   with r1
   add #2
@@ -221,10 +215,10 @@ function vector3_dot
   ldw (r0)
   to r7 
   ldw (r1)
-  condensed_lmult r7, r5; a.z * b.z
+  condensed_lmult r7, r4; a.z * b.z
 
   from r2
-  add r5 ; r0 = a.x*b.x + a.z*b.z
+  add r4 ; r0 = a.x*b.x + a.z*b.z
   with r3 ; 
   add r0 ; r3 = a.y*b.y + r0
 
@@ -239,7 +233,6 @@ function vector3_add
   move r3, r1
   to r1 
   ldw (r0)
-  with r0
   add #2 ;bump up r0 = in.y
   to r2
   ldw (r3)
@@ -251,7 +244,6 @@ function vector3_add
 
   to r1 
   ldw (r0)
-  with r0
   add #2 ;bump up r0 = in.z
   to r2
   ldw (r3)
@@ -318,7 +310,6 @@ endfunction
 function vector3_subtract
   to r1 
   ldw (r0)
-  with r0
   add #2 ;bump up r0 = in.y
   to r2
   ldw (r3)
@@ -330,7 +321,6 @@ function vector3_subtract
 
   to r1 
   ldw (r0)
-  with r0
   add #2 ;bump up r0 = in.z
   to r2
   ldw (r3)
@@ -516,31 +506,27 @@ endfunction
 ; Clobbers: All
 function vector3_transform
   
-  iwt r2, #VECTOR_TRANSFORM_OUT
-  
-  for 3
+ for 3
     to r6
     ldw (r0) ; r6 = vector.x
     to r3
-    ldw (r1) ; r3 = matrix[row][0]
+    ldw (r1) ; r3 = matrix[0][0]
 
-    condensed_lmult r3, r9 ; r9 = v.x * m[row][0]
+    condensed_lmult r3, r9; r9 = v.x * m[0][0]
 
-    ; setup y* m[row][1]
-    with r0
+    ; setup y* m[0][1]
     add #2
     with r1
     add #2
 
     to r6
-    ldw (r0) ; r6 = vector.y
+    ldw (r0) ; r6 = vector.x
     to r3
-    ldw (r1) ; r3 = matrix[row][1]
+    ldw (r1) ; r3 = matrix[0][0]
 
-    condensed_lmult r3, r5 ; r5 = v.y * m[row][1]
+    condensed_lmult r3, r5; r5 = v.y * m[0][1]
 
-    ; setup z* m[row][2]
-    with r0
+    ; setup z* m[0][2]
     add #2
     with r1
     add #2
@@ -548,11 +534,11 @@ function vector3_transform
     to r6
     ldw (r0) ; r6 = vector.z
     to r3
-    ldw (r1) ; r3 = matrix[row][2]
+    ldw (r1) ; r3 = matrix[0][2]
 
-    condensed_lmult r3, r11 ; r11 = v.z * m[row][2]
+    condensed_lmult r3, r11; r11 = v.z * m[0][2]
     
-    ; sum of x*m[row][0] + y*m[row][1] + z*m[row][2]
+    ;quick sum of x*m00,y*m01,z*m02 to r9
     with r9
     add r5
     with r9
@@ -561,28 +547,32 @@ function vector3_transform
     with r1
     add #2
     to r5
-    ldw (r1) ; r5 = matrix[row][3]
+    ldw(r1) ; 5 = m[0][3]
     with r9 
     add r5
 
-    ; Save component to VECTOR_TRANSFORM_OUT
-    from r9
-    stw (r2)
-    with r2
-    add #2
+    ; Save x*matrix[0][0] +y*matrix[0][1] +z*matrix[0][2] + matrix[0][3];
+    gsu_stack_push r9
 
-    ; advance matrix pointer to next row, reset vector pointer
+    ;reset variables
     with r1
-    add #2 ; r1 = @matrix[row+1]
-    with r0
+    add #2 ; r1 = @matrix[1]
     sub #4 ; r0 = @vector
   endfor
 
-  move r2, r0 ; dest = original vector address
-  iwt r0, #VECTOR_TRANSFORM_OUT ; src
+
+  move r2, r0
+  
+  to r0
+  from r10
+  sub #6
   call vector3_copy
   
-  return
+  ;cleanup temp stack values
+  with r10
+  sub #6
+  
+return
 endfunction
 
 
