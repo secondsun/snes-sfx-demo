@@ -1,6 +1,6 @@
 test_setup = 0x0003
 test_stop  = 0x0021
-INPUT      = 0x0AA0
+INPUT      = 0x0AA6
 NORMAL_OUT = 0x08AE
 
 local input = {

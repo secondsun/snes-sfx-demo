@@ -78,12 +78,29 @@ def sync_labels(sym_path: Path, lua_path: Path) -> bool:
         r"^(\s*(?:local\s+)?([A-Za-z0-9_]+)\s*=\s*)(0x[0-9A-Fa-f]+|\d+)(.*)$"
     )
 
+    test_dir_name = lua_path.parent.name.lower()
+
     for line in lines:
         m = var_pattern.match(line)
         if m:
             prefix, var_name, current_val_str, suffix = m.groups()
-            if var_name in symbols:
-                target_offset = symbols[var_name]["offset"]
+            sym_name = var_name
+            if sym_name not in symbols and sym_name == "OUTPUT":
+                if "subtract" in test_dir_name:
+                    sym_name = "VECTOR_SUBTRACT_OUT"
+                elif "add" in test_dir_name:
+                    sym_name = "VECTOR_ADD_OUT"
+                elif "negate" in test_dir_name:
+                    sym_name = "VECTOR_NEGATE_OUT"
+                elif "cross" in test_dir_name:
+                    sym_name = "VECTOR_CROSS_OUT"
+                elif "transform" in test_dir_name:
+                    sym_name = "VECTOR_TRANSFORM_OUT"
+                elif "normalize" in test_dir_name:
+                    sym_name = "vector_normalize_out"
+
+            if sym_name in symbols:
+                target_offset = symbols[sym_name]["offset"]
                 target_hex = f"0x{target_offset:04X}"
 
                 # Parse current numeric value
@@ -99,7 +116,7 @@ def sync_labels(sym_path: Path, lua_path: Path) -> bool:
                 if current_val != target_offset:
                     updated_lines.append(f"{prefix}{target_hex}{suffix}")
                     updates_made.append(
-                        (var_name, current_val_str, target_hex, symbols[var_name]["bank"])
+                        (var_name, current_val_str, target_hex, symbols[sym_name]["bank"])
                     )
                 else:
                     updated_lines.append(line)
