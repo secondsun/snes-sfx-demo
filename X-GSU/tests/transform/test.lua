@@ -1,7 +1,7 @@
 test_setup = 0x0042
 test_stop  = 0x0098
-POLYGON_LIST = 0x0B20
-LOOKAT_MATRIX = 0x096A
+POLYGON_LIST = 0x0B12
+LOOKAT_MATRIX = 0x095C
 
 local verticies = {
 	{0xc000, 0xc000, 0xc000},

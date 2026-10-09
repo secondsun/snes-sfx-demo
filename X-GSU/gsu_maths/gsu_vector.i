@@ -103,12 +103,12 @@ function vector3_cross
   ldw (r0) ; r5 = r0.z
   to r6
   ldw (r1) ; r6 = r1.y
-  condensed_lmult r5, r4; r4 = this.z*other.y at fixed 8.8
+  condensed_lmult r5, r2; r2 = this.z*other.y at fixed 8.8
   ; End (r0+4)*(r1+2)
   
   ;Begin subtract this.y*other.z - this.z*other.y
   with r3
-  sub r4
+  sub r2
   ;Write out.x
   sm (VECTOR_CROSS_OUT), r3
 
@@ -134,12 +134,12 @@ function vector3_cross
   ldw (r0) ; r5 = this.x
   to r6
   ldw (r1) ; r6 = other.z
-  condensed_lmult r5, r4; r4 = this.x*other.z at fixed 8.8
+  condensed_lmult r5, r2; r2 = this.x*other.z at fixed 8.8
   ; End (r0)*(r1+4)
 
   ;Begin subtract this.z*other.x - this.x*other.z
   with r3
-  sub r4
+  sub r2
   ;Write out.y
   sm (VECTOR_CROSS_OUT+2), r3
 
@@ -165,12 +165,12 @@ function vector3_cross
   ldw (r0) ; r5 = this.y
   to r6
   ldw (r1) ; r6 = other.x
-  condensed_lmult r5, r4; r4 = this.y*other.x at fixed 8.8
+  condensed_lmult r5, r2; r2 = this.y*other.x at fixed 8.8
   ; End (r0+2)*(r1)
 
   ;Begin subtract this.x*other.y - this.y*other.x
   with r3
-  sub r4
+  sub r2
   ;Write out.z
   sm (VECTOR_CROSS_OUT+4), r3
 
@@ -215,10 +215,10 @@ function vector3_dot
   ldw (r0)
   to r7 
   ldw (r1)
-  condensed_lmult r7, r4; a.z * b.z
+  condensed_lmult r7, r5; a.z * b.z
 
   from r2
-  add r4 ; r0 = a.x*b.x + a.z*b.z
+  add r5 ; r0 = a.x*b.x + a.z*b.z
   with r3 ; 
   add r0 ; r3 = a.y*b.y + r0
 

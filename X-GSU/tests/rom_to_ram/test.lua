@@ -1,7 +1,7 @@
 test_setup = 0x0003
 test_start = 0x0005
 test_stop  = 0x0024
-OUTPUT     = 0x041A
+OUTPUT     = 0x0420
 
 function onTestStop(address, value)
 	emu.log(string.format("GSU reached test_stop at 0x%04X", address))
