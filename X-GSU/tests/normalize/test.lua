@@ -1,7 +1,7 @@
 test_setup = 0x0003
 test_stop  = 0x0021
-INPUT      = 0x0AA6
-NORMAL_OUT = 0x08AE
+INPUT      = 0x0AA4
+vector_normalize_out = 0x08AC
 
 local input = {
 	{0x007f, 0x0000, 0x0000},
@@ -99,9 +99,9 @@ end
 function onTestStop(address, value)
 	if stopped then return end
 
-	local rx = emu.readWord(NORMAL_OUT + 0, emu.memType.gsuWorkRam, false)
-	local ry = emu.readWord(NORMAL_OUT + 2, emu.memType.gsuWorkRam, false)
-	local rz = emu.readWord(NORMAL_OUT + 4, emu.memType.gsuWorkRam, false)
+	local rx = emu.readWord(vector_normalize_out + 0, emu.memType.gsuWorkRam, false)
+	local ry = emu.readWord(vector_normalize_out + 2, emu.memType.gsuWorkRam, false)
+	local rz = emu.readWord(vector_normalize_out + 4, emu.memType.gsuWorkRam, false)
 	local exp = expected[index]
 	local vin = input[index]
 

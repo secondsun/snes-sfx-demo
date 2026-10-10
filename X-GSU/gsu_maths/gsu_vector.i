@@ -505,7 +505,10 @@ endfunction
 ; Out:      Vector at R0 overwritten with transformed coordinates
 ; Clobbers: All
 function vector3_transform
-  
+  ; r2 = write cursor into VECTOR_TRANSFORM_OUT. Row results must NOT be pushed
+  ; to the stack inside the loop: endfor's restoreloop pops r13/r12 off the top.
+  iwt r2, #VECTOR_TRANSFORM_OUT
+
  for 3
     to r6
     ldw (r0) ; r6 = vector.x
@@ -552,7 +555,10 @@ function vector3_transform
     add r5
 
     ; Save x*matrix[0][0] +y*matrix[0][1] +z*matrix[0][2] + matrix[0][3];
-    gsu_stack_push r9
+    from r9
+    stw (r2)
+    inc r2
+    inc r2
 
     ;reset variables
     with r1
@@ -560,18 +566,11 @@ function vector3_transform
     sub #4 ; r0 = @vector
   endfor
 
-
+  ; copy VECTOR_TRANSFORM_OUT back over the input vector (in-place result)
   move r2, r0
-  
-  to r0
-  from r10
-  sub #6
+  iwt r0, #VECTOR_TRANSFORM_OUT
   call vector3_copy
-  
-  ;cleanup temp stack values
-  with r10
-  sub #6
-  
+
 return
 endfunction
 
