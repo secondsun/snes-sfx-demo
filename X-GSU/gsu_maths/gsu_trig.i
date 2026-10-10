@@ -18,22 +18,22 @@
         .error "cos_lookup: destination is required"
     .endif
 
-	ibt r14,#$3
-	from r14
-    romb
-
-		iwt dest, #30 ; sin(x) = cos(x-90°)	;the table is in 3 degree incriments.
+		; cos(x) = sin(x + 90°); with 3° increments, 90° = 30 steps
+		iwt dest, #30
 		from arg
-		to dest
-		sub dest
-		bpl :+ ; if arg >= 90, we need to negate the argument
-			nop
-			with dest
-			not
-			with dest
-			add #1
-		:; dest = 90 - arg = sin(90-arg) = cos(arg)
-		
+		add dest
+		move dest, r0
+		iwt r14, #120
+		from dest
+		sub r14
+		bmi :+
+		nop
+		move dest, r0
+	:
+
+		ibt r14, #$4
+		from r14
+		romb
 
 		iwt r14, #sin_table
 		with r14
@@ -62,9 +62,9 @@
         .error "sin_lookup: destination is required"
     .endif
 
-	ibt r14,#$3
+	ibt r14, #$4
 	from r14
-    romb
+	romb
 
 		iwt r14, #sin_table
 		with r14
@@ -80,7 +80,7 @@
 .endmacro
 
 
-		
+.segment "GSUDATA"
 ;Q1.15 format
 ;-1 to 1 range
 ;1 at 23, -1 at 68		
@@ -208,5 +208,7 @@ sin_table:
 .word $F94F
 .word $FCA7
 .word $0
+.export sin_table
 
+.segment "GSUCODE"
 .endif
