@@ -7,3 +7,21 @@
 **/*.log
 **/*.sym
 **/*.dmap
+
+# Tools submodule dotfiles & CI configurations
+**/.git
+**/.git/
+**/.github/
+**/.circleci/
+**/.cirrus.yml
+**/.travis.yml
+**/*.travis
+**/*travisoss*
+**/appveyor.yml
+**/.gitignore
+**/.gitattributes
+**/.clang-format
+**/.clang-tidy
+**/.editorconfig
+**/.lclintrc
+
