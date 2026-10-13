@@ -17,6 +17,7 @@ GSU_Code:
 
 ; Setup stack
 init_stack
+register src, dst
 
 test_setup:
 	iwt r12, #6
@@ -26,9 +27,9 @@ test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
 
-	iwt r0, #INPUT
-	iwt r2, #OUTPUT
-	call vector3_copy
+	iwt src, #INPUT
+	iwt dst, #OUTPUT
+	call vector3_copy src, dst
 
 	; Let memory settle
 	nop

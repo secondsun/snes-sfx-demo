@@ -17,6 +17,7 @@ GSU_Code:
 
 ; Setup stack
 init_stack
+register v1, v2
 
 test_setup:
 	iwt r12, #8
@@ -26,9 +27,9 @@ test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
 
-	iwt r0, #INPUT_A
-	iwt r3, #INPUT_B
-	call vector3_subtract
+	iwt v1, #INPUT_A
+	iwt v2, #INPUT_B
+	call vector3_subtract v1, v2
 
 	; Let memory settle
 	nop

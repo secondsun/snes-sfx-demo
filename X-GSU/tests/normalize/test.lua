@@ -1,7 +1,7 @@
 test_setup = 0x0003
 test_stop  = 0x0021
-INPUT      = 0x0AA4
-vector_normalize_out = 0x08AC
+INPUT      = 0x0ACC
+vector_normalize_out = 0x08D4
 
 local input = {
 	{0x007f, 0x0000, 0x0000},

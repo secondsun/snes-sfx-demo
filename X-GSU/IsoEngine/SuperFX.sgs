@@ -11,18 +11,19 @@ GSU_Code:
 .export GSU_Code
 
 init_stack
+register fb_ptr, model_ptr, mat_ptr, tri_ptr, tri_color, free_size
 
 resetFrameBuffer:
-iwt r0,#0
+iwt r0, #0
 cmode
-iwt r1, #$4000
+iwt fb_ptr, #$4000
 iwt r12, #$1400
 cache
 move r13, r15
-  stw(r1)
-  inc r1
+  stw (fb_ptr)
+  inc fb_ptr
   loop
-  inc r1
+  inc fb_ptr
   nop
   
   
@@ -36,21 +37,20 @@ init_gsu_main:
 	iwt r0, #$8
 	cmode
 
-    move r2, r10
-    rom_to_stack #cube_model,3, 216
+    move model_ptr, r10
+    rom_to_stack #cube_model, 3, 216
 
-	move r1, r10
-    rom_to_stack #transformation_matrix,3, 32
+	move mat_ptr, r10
+    rom_to_stack #transformation_matrix, 3, 32
 
-	move r0, r2
-	call vector3_transform
+	call vector3_transform model_ptr, mat_ptr
 
 
-    iwt r5, #cube_model
-    call draw_triangle
+    iwt tri_color, #cube_model
+    call draw_triangle model_ptr, tri_color
 
-	iwt r3, #216
-	gsu_stack_free_bytes r3
+	iwt free_size, #216
+	gsu_stack_free_bytes free_size
 
 finish:
 

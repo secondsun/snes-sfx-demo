@@ -29,6 +29,7 @@ GSU_Code:
 ;Setup stack
 init_stack
 init_rnc
+register data_addr, bank, size_hi, size_lo, bit_count, out_val
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
@@ -41,13 +42,9 @@ test_call:
 	gsu_stack_push r13
 	iwt r0, #(.hiword( badapple))
 	romb
-	iwt r0, #badapple
+	iwt data_addr, #badapple
 
-	call parseHeader
-	;iwt r0, #(.hiword( badapple))
-	;iwt r1, #OUTPUT
-	;iwt r2, #$156
-	;call decompress
+	call parseHeader data_addr
 	;LET MEMORY SETTLE
  	nop
 	nop
@@ -63,26 +60,24 @@ test_stop_parse:
 	nop
 	nop
 
-	iwt r1, #(.hiword( badapple))
-	iwt r0, #badapple
-	iwt r2, #0
-	iwt r3, #$7b
-	call initialize_buffer
-	loop1 = r12
-	loop2 = r13
+	iwt bank, #(.hiword( badapple))
+	iwt data_addr, #badapple
+	iwt size_hi, #0
+	iwt size_lo, #$7b
+	call initialize_buffer data_addr, bank, size_hi, size_lo
 	for 95
-		gsu_stack_push loop1
-		gsu_stack_push loop2
+		gsu_stack_push r12
+		gsu_stack_push r13
 		nop
 		test_prepare_buffer_read:    ;in lua script write input to #INPUT
 		nop
 		nop
 		nop
 		nop
-		lm r0, (INPUT)
+		lm bit_count, (INPUT)
 		nop
-		call read_buffer
-		sm (OUTPUT),r3
+		call read_buffer bit_count : out_val
+		sm (OUTPUT), out_val
 		nop
 		nop
 		nop
@@ -93,8 +88,8 @@ test_stop_parse:
 		nop
 		test_validate_buffer_read:    
 		nop
-		gsu_stack_pop loop2
-		gsu_stack_pop loop1
+		gsu_stack_pop r13
+		gsu_stack_pop r12
 
 	endfor
 

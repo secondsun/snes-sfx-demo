@@ -21,6 +21,7 @@ GSU_Code:
 
 ;Setup stack
 init_stack
+register v1, out_val
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
@@ -32,9 +33,9 @@ iwt r13, #test_call
 test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
-	iwt r0, #INPUT
-	call vector3_length
-	sm (OUTPUT), r3
+	iwt v1, #INPUT
+	call vector3_length v1 : out_val
+	sm (OUTPUT), out_val
 	;LET MEMORY SETTLE
  	nop
 	nop
@@ -56,8 +57,6 @@ test_stop:
 	stop
 	nop
 
-
-.res 1
 ;Code goes in code segment
 .include "../../gsu_maths/gsu_sqrt.i"
 .include "../../gsu_maths/gsu_vector.i"

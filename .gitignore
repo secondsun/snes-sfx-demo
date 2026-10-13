@@ -24,4 +24,4 @@
 **/.clang-tidy
 **/.editorconfig
 **/.lclintrc
-
+**/*.travis

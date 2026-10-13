@@ -1,7 +1,7 @@
 test_setup = 0x0003
-test_stop  = 0x0024
-INPUT      = 0x0AA8
-OUTPUT     = 0x0AAE
+test_stop  = 0x0028
+INPUT      = 0x0AD2
+OUTPUT     = 0x0AD8
 
 local cases = {
 	{0x0000, 0x0000, 0x0000},

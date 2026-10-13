@@ -19,6 +19,7 @@ GSU_Code:
 
 ; Setup stack
 init_stack
+register in_val, out_val
 
 test_setup:
 	iwt r12, #$400 ; loop 1024 times
@@ -27,9 +28,9 @@ test_setup:
 test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
-	lm r0, (INPUT)
-	call reciprocal
-	sm (OUTPUT), r3
+	lm in_val, (INPUT)
+	call reciprocal in_val : out_val
+	sm (OUTPUT), out_val
 	; LET MEMORY SETTLE
 	nop
 	nop

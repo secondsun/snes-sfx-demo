@@ -11,28 +11,22 @@
 .include "../../common/control.i"
 .include "../constants.i"
 ; Rasterizes a flat-shaded triangle to the GSU framebuffer
-; In:       r3 = points array pointer (6 bytes: x0, y0, x1, y1, x2, y2), r5 = color
+; In:       points = points array pointer (6 bytes: x0, y0, x1, y1, x2, y2), col = color
 ; Out:      Pixels plotted to framebuffer
-; Clobbers: r0, r1, r2, r3, r4, r5, r6, r7, r8, r12, r13
-function draw_triangle
+; Clobbers: All
+function draw_triangle points, col
+    register yMin, yMax, yPoints, xMin, xMax, y0, y1, dy, x0
+    register y = r2, x1 = r6, plot_x = r1
     
-    with r5
+    with col
     color
-
-    register yMin = r5
-    register yMax = r8
-    register points = r3
-    register yPoints = r4
-    register xPoints = r3
 
         to yPoints
         from points
         add #1
 
-        ;move xPoints, points //registers are the same
-
         ;; Find the min and max y values
-        ; xMin = yPoints[0]
+        ; yMax = yPoints[0]
         to yMax
         ldb (yPoints)
         ; yMin = yPoints[0]
@@ -75,16 +69,13 @@ function draw_triangle
         cache
         ;y = yMin
         ;start (y in minY..maxY) {
-        move r2, yMin
+        move y, yMin
         iwt r13, #yLoop
         to r12
         from yMax
         sub yMin
           
             yLoop:
-            ;we are done with yMin and yMax so lets reuse the registers
-            register xMin = yMin
-            register xMax = yMax
             ;var minX = Int.MAX_VALUE
             ;var maxX = Int.MIN_VALUE
             
@@ -95,20 +86,18 @@ function draw_triangle
             ;val j = (i + 1) % nPoints : i == 0 j == 1
             ; y0 = yPoints[0]
             ; y1 = yPoints[1]
-            ; x0 = xPoints[0]
-            ; x1 = xPoints[1]
+            ; x0 = points[0]
+            ; x1 = points[1]
             i_eq_0:
             ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
-            register y0 = r9
-            register y1 = r11
             to y0
             ldb (yPoints) ; y0 = yPoints[0]
 
-            to r1
-            from r2
-            sub y0; r1 = y - y0
+            to dy
+            from y
+            sub y0; dy = y - y0
 
             
             from yPoints
@@ -116,37 +105,32 @@ function draw_triangle
             to y1
             ldb (r0) ; y1 = yPoints[1]
             
-            from r2
-            to r6
-            sub y1; r6 = y - y1
+            from y
+            to x1
+            sub y1; x1 = y - y1
 
-            from r1
-            xor r6 ; r0= (y - y0) ^ (y - y1)
+            from dy
+            xor x1 ; r0 = (y - y0) ^ (y - y1)
 
-            ibt r7, #0 ;we will save r1 for y-y0 in it
-            ;TODO : implement from here
-            if_gte r0, r7, { bra i_eq_1 }
+            ibt x0, #0
+            if_gte r0, x0, { bra i_eq_1 }
             nop
-            register x0 = r7
-            register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
 
             to x0
-            ldb(xPoints) ;x0=xPoints[0]
+            ldb (points) ;x0 = points[0]
             
-            from xPoints
+            from points
             add #2
             to x1
-            ldb(r0) ;x1=xPoints[1]
-            
-
+            ldb (r0) ;x1 = points[1]
             
             ;x1-x0
             with x1
             sub x0
 
-            from r1 ; r1 = (y - y0)
+            from dy ; dy = (y - y0)
             to x1
-            mult x1 ; r6 = (y - y0) * (x1 - x0) 
+            mult x1 ; x1 (r6) = (y - y0) * (x1 - x0) 
             
 
             ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
@@ -157,7 +141,7 @@ function draw_triangle
             beq :+
                 nop
             bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
-                   ; the sign when we get the reciprocol
+                   ; the sign when we get the reciprocal
 
                 nop
                 with x1
@@ -173,16 +157,16 @@ function draw_triangle
             
             
             to x1
-            fmult ;r6 = ((y - y0) * (x1 - x0)  / (y1 - y0))
+            fmult ;x1 (r6) = ((y - y0) * (x1 - x0)  / (y1 - y0))
             to x0
-            from r6
+            from x1
             add x0
 
 ;           if (x < xMin) xMin = x
 ;           if (x > xMax) xMax = x
-            if_lt r7, r5, { move r5, r7 }
+            if_lt x0, xMin, { move xMin, x0 }
             nop
-            if_gt r7, r8, { move r8, r7 }
+            if_gt x0, xMax, { move xMax, x0 }
             nop
 
             ;val j = (i + 1) % nPoints : i == 1  j == 2
@@ -190,57 +174,50 @@ function draw_triangle
             ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
-;            register y0 = r9
-;            register y1 = r11
-            
             
             from yPoints
             add #2
             to y0
             ldb (r0) ; y0 = yPoints[1]
 
-            to r1
-            from r2
-            sub y0; r1 = y - y0
+            to dy
+            from y
+            sub y0; dy = y - y0
 
             from yPoints
             add #4
             to y1
-            ldb (r0) ; r0 = yPoints[2]
+            ldb (r0) ; y1 = yPoints[2]
             
 
-            from r2
-            to r6
-            sub y1; r6 = y - y1
+            from y
+            to x1
+            sub y1; x1 = y - y1
 
-            from r1
-            xor r6 ; r0= (y - y0) ^ (y - y1)
+            from dy
+            xor x1 ; r0 = (y - y0) ^ (y - y1)
 
-            ibt r7, #0 ;we will save r1 for y-y0 in it
-            ;TODO : implement from here
-            if_gte r0, r7, { bra i_eq_2 }
+            ibt x0, #0
+            if_gte r0, x0, { bra i_eq_2 }
             nop
-;            register x0 = r7
-;            register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
 
-            
-            from xPoints
+            from points
             add #2
             to x0
-            ldb(r0) ;x0=xPoints[1]
+            ldb (r0) ;x0 = points[1]
             
-            from xPoints
+            from points
             add #4
             to x1
-            ldb(r0) ;x1=xPoints[2]
+            ldb (r0) ;x1 = points[2]
             
             ;x1-x0
             with x1
             sub x0
 
-            from r1 ; r1 = (y - y0)
+            from dy ; dy = (y - y0)
             to x1
-            mult x1 ; r6(x1) = (y - y0) * (x1 - x0) 
+            mult x1 ; x1 (r6) = (y - y0) * (x1 - x0) 
 
             ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
             ; r0 = 1 / (y1 - y0)
@@ -250,7 +227,7 @@ function draw_triangle
             beq :+
                 nop
             bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
-                   ; the sign when we get the reciprocol
+                   ; the sign when we get the reciprocal
                 nop
                 with x1
                 not
@@ -264,16 +241,16 @@ function draw_triangle
             
             
             to x1
-            fmult ;r6 = ((y - y0) * (x1 - x0)  / (y1 - y0))
+            fmult ;x1 (r6) = ((y - y0) * (x1 - x0)  / (y1 - y0))
             to x0
-            from r6
+            from x1
             add x0
 
 ;               if (x0 < minX) minX = x0
 ;               if (x0 > maxX) maxX = x0
-            if_lt r7, r5, { move r5, r7 }
+            if_lt x0, xMin, { move xMin, x0 }
             nop
-            if_gt r7, r8, { move r8, r7 }
+            if_gt x0, xMax, { move xMax, x0 }
             nop
 
 
@@ -282,52 +259,46 @@ function draw_triangle
             ; if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
-            ;register y0 = x9
-            ;register y1 = x11
             
             to r0
             from yPoints
             add #4
             to y0
-            ldb (r0) ; r1 = yPoints[2]
+            ldb (r0) ; y0 = yPoints[2]
 
-            to r1
-            from r2
-            sub y0; r1 = y - y0
+            to dy
+            from y
+            sub y0; dy = y - y0
 
             to y1
-            ldb (yPoints) ; r0 = yPoints[0]
+            ldb (yPoints) ; y1 = yPoints[0]
             
-            from r2
-            to r6
-            sub y1; r6 = y - y1
+            from y
+            to x1
+            sub y1; x1 = y - y1
 
-            from r1
-            xor r6 ; r0= (y - y0) ^ (y - y1)
+            from dy
+            xor x1 ; r0 = (y - y0) ^ (y - y1)
 
-            ibt r7, #0 ;we will save r1 for y-y0 in it
-            ;TODO : implement from here
-            if_gte r0, r7, {bra plotXLoop}
+            ibt x0, #0
+            if_gte r0, x0, {bra plotXLoop}
             nop
-            ;register x0 = r7
-            ;register x1 = r6 ;x1 has to be r6 because the reister is used later for a multiplication
 
-            
-            from xPoints
+            from points
             add #4
             to x0
-            ldb(r0) ;x0=xPoints[2]
+            ldb (r0) ;x0 = points[2]
             
             to x1
-            ldb(xPoints) ;x1=xPoints[0]
+            ldb (points) ;x1 = points[0]
             
             ;x1-x0
             with x1
             sub x0
 
-            from r1 ; r1 = (y - y0)
+            from dy ; dy = (y - y0)
             to x1
-            mult x1 ; r6 = (y - y0) * (x1 - x0) 
+            mult x1 ; x1 (r6) = (y - y0) * (x1 - x0) 
             
 
             ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
@@ -338,7 +309,7 @@ function draw_triangle
             beq :+
                 nop
             bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
-                   ; the sign when we get the reciprocol. This negation here 
+                   ; the sign when we get the reciprocal. This negation here 
                    ; preserves it
                 nop
                 with x1
@@ -353,21 +324,20 @@ function draw_triangle
             
             
             to x1
-            fmult ;r6 = ((y - y0) * (x1 - x0)  / (y1 - y0))
+            fmult ;x1 (r6) = ((y - y0) * (x1 - x0)  / (y1 - y0))
             to x0
-            from r6
+            from x1
             add x0
 
 ;               if (x < minX) minX = x
 ;               if (x > maxX) maxX = x
-            if_lt r7, r5, { move r5, r7 }
+            if_lt x0, xMin, { move xMin, x0 }
             nop
-            if_gt r7, r8, { move r8, r7 }
+            if_gt x0, xMax, { move xMax, x0 }
             nop
 
             plotXLoop:
             ;end unrolled loop for (i in 0 until nPoints)
-            ; unscope all registers but r2 (y), r12 and r13 (loop control), xMin(r5) and xMax(r8). 
 
             ;if (minX <= maxX) {
             if_gt xMin, xMax, { bra nextY }
@@ -378,17 +348,17 @@ function draw_triangle
             lsr
             bcc startX
             nop
-            move r1, xMin
+            move plot_x, xMin
             plot
             
-            if_gte r1   , xMax, { bra nextY }
+            if_gte plot_x, xMax, { bra nextY }
             nop
             startX:
-            move r1, xMin
+            move plot_x, xMin
 
             nextX:
                 plot
-                if_lt r1, xMax, { bra nextX }
+                if_lt plot_x, xMax, { bra nextX }
                 plot
             ;    for (x in startX..endX) {
             ;        if (!isPixelSet(x, y)) {
@@ -398,11 +368,9 @@ function draw_triangle
             ;    }
             ;}
             
-            
-           
         nextY:
         loop
-        inc r2
+        inc y
         ; //end for (y in minY..maxY) 
     endcache:
     return
