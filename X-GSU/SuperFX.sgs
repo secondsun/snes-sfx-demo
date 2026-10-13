@@ -60,14 +60,16 @@ GSU_Code:
 
 init_stack
 init_camera
+register w_val
 ;init w_axis
-iwt r0, #0
+iwt w_val, #0
 
-sm (__LOOKAT_WAXIS__), r0
-sm (__LOOKAT_WAXIS__ + 2), r0
-sm (__LOOKAT_WAXIS__ + 4), r0
+sm (__LOOKAT_WAXIS__), w_val
+sm (__LOOKAT_WAXIS__ + 2), w_val
+sm (__LOOKAT_WAXIS__ + 4), w_val
+with w_val
 add #1
-sm (__LOOKAT_WAXIS__ + 6), r0
+sm (__LOOKAT_WAXIS__ + 6), w_val
 
 
 cache

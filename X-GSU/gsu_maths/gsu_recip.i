@@ -27,20 +27,18 @@
 .include "../common/function.i"
 
 
-; In : R0 fixed88 the value to return the reciprocal of
-; Out : R3 a fixed016 reciprocal
-; Clobbers : r0, r1, r2, r3, r12, r13
-function reciprocal016
-    register dividend = r1
-	register divisor  = r2
-	register remainder = r3
-	register quotient  = r0
+; In : divisor = fixed88 the value to return the reciprocal of
+; Out : out = a fixed016 reciprocal
+; Clobbers : r0, r12, r13, allocated registers
+function reciprocal016 divisor : out
+	register dividend
+	register remainder
+	register quotient = r0
 
 	
 	iwt dividend, #$1
-	move divisor, r0
-	move remainder, dividend; 
-	iwt quotient, #0 ; r0 =  () 
+	move remainder, dividend
+	iwt quotient, #0 ; r0 = () 
 	
 	iwt r12, #$18; loop 24 times 
 	iwt	r13, #divide_loop
@@ -63,7 +61,7 @@ function reciprocal016
 		cmp divisor
 		bmi lp
 		add quotient
-		add 1 ;quotient++
+		add dividend ;quotient++
 		with remainder
 		sub divisor
 	lp: 	
@@ -74,30 +72,28 @@ function reciprocal016
 		add #0
 		bmi negate
 		    nop
-			move r3, r0
-			return
+			move out, quotient
+			return out
 		negate:
 			not
 			add #$1
-			move r3, r0
-			return 
+			move out, quotient
+			return out
 endfunction
 
 
-; In : R0 fixed88 the value to return the reciprocal of
-; Out : R3 a fixed88 reciprocal
-; Clobbers : r0, r1, r2, r3, r12, r13
-function reciprocal
-    register dividend = r1
-	register divisor  = r2
-	register remainder = r3
-	register quotient  = r0
+; In : divisor = fixed88 the value to return the reciprocal of
+; Out : out = a fixed88 reciprocal
+; Clobbers : r0, r12, r13, allocated registers
+function reciprocal divisor : out
+	register dividend
+	register remainder
+	register quotient = r0
 
 	
 	iwt dividend, #$1
-	move divisor, r0
-	move remainder, dividend; 
-	iwt quotient, #0 ; r0 =  () 
+	move remainder, dividend
+	iwt quotient, #0 ; r0 = () 
 	
 	iwt r12, #$10; loop 16 times 
 	iwt	r13, #divide_loop
@@ -120,7 +116,7 @@ function reciprocal
 		cmp divisor
 		bmi lp
 		add quotient
-		add 1 ;quotient++
+		add dividend ;quotient++
 		with remainder
 		sub divisor
 	lp: 	
@@ -131,13 +127,13 @@ function reciprocal
 		add #0
 		bmi negate
 		    nop
-			move r3, r0
-			return
+			move out, quotient
+			return out
 		negate:
 			not
 			add #$1
-			move r3, r0
-			return 
+			move out, quotient
+			return out
 endfunction
 
 ; Looks up 1/arg in Q0.16 format from ROM reciprocal table (0 - 255)

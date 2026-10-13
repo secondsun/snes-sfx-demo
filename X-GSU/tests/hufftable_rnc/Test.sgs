@@ -23,16 +23,13 @@ GSU_Code:
 
 ;Setup stack
 init_stack
+register data_addr, bank, size_hi, size_lo, bit_count, table_addr
 
 	iwt r0, #(.hiword( badapple))
 	romb
-	iwt r0, #badapple
+	iwt data_addr, #badapple
 
-	call parseHeader
-	;iwt r0, #(.hiword( badapple))
-	;iwt r1, #OUTPUT
-	;iwt r2, #$156
-	;call decompress
+	call parseHeader data_addr
 	;LET MEMORY SETTLE
  	nop
 	nop
@@ -47,25 +44,25 @@ init_stack
 	nop
 	nop
 
-	iwt r1, #(.hiword( badapple))
-	iwt r0, #badapple
-	iwt r2, #0
-	iwt r3, #$7b
+	iwt bank, #(.hiword( badapple))
+	iwt data_addr, #badapple
+	iwt size_hi, #0
+	iwt size_lo, #$7b
 	;twoWordBuffer.inputBytes = bytes
 	;also hard coding values from test header
-	call initialize_buffer
+	call initialize_buffer data_addr, bank, size_hi, size_lo
 
 	;twoWordBuffer.read(2)
-	iwt r0, #2
-	call read_buffer
+	iwt bit_count, #2
+	call read_buffer bit_count
 	
 	startTable:
-	iwt r0, #(literalTable)
-	call init_hufftree
-	iwt r0, #(lengthTable)
-	call init_hufftree
-	iwt r0, #(positionTable)
-	call init_hufftree
+	iwt table_addr, #(literalTable)
+	call init_hufftree table_addr
+	iwt table_addr, #(lengthTable)
+	call init_hufftree table_addr
+	iwt table_addr, #(positionTable)
+	call init_hufftree table_addr
 	nop
 	nop
 	nop

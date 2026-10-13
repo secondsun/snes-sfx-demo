@@ -23,27 +23,27 @@ GSU_Code:
 
 ;Setup stack
 init_stack
+register data_addr, bank, size_hi, size_lo, out_buf, byte_count
 
+	; data_addr = start of compressed rnc file
+	; bank = bank of compressed rnc file
+	; size_hi = hiword size of compressed rnc file
+	; size_lo = loword size of compressed rnc file
+	iwt data_addr, #(.loword(badapple))
+	iwt bank, #(.hiword(badapple))
+	iwt size_hi, #$0
+	iwt size_lo, #$7B
+	call initialize_buffer data_addr, bank, size_hi, size_lo
 
-	; r0 = start of compressed rnc file
-    ; r1 = bank of compressed rnc file
-    ; r2 = hiword size of compressed rnc file
-    ; r3 = loword size of compressed rnc file
-	iwt r0, #(.loword(badapple))
-	iwt r1, #(.hiword(badapple))
-	iwt r2, #$0
-	iwt r3, #$7B
-	call initialize_buffer
-
-    ; r0 = start of compressed data
-    ; r1 = bank of compressed data
-    ; r2 = start of uncompressed data; must be preallocated
-    ; r3 = bytes to decompress
-	iwt r0, #(.loword(badapple))
-	iwt r1, #(.hiword(badapple))
-	iwt r2, #OUTPUT
-	iwt r3, #$7B
-	call decompress
+	; data_addr = start of compressed data
+	; bank = bank of compressed data
+	; out_buf = start of uncompressed data; must be preallocated
+	; byte_count = bytes to decompress
+	iwt data_addr, #(.loword(badapple))
+	iwt bank, #(.hiword(badapple))
+	iwt out_buf, #OUTPUT
+	iwt byte_count, #$7B
+	call decompress data_addr, bank, out_buf, byte_count
 	
 	nop
 	nop

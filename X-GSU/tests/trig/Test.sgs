@@ -20,6 +20,7 @@ OUTPUT:
 GSU_Code:
 ;Setup stack
 init_stack
+register sin_out, cos_out
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
@@ -31,12 +32,12 @@ test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
 
-	sin_lookup_rom r12, r3
+	sin_lookup_rom r12, sin_out
 	nop
-	sm (OUTPUT), r3
-	cos_lookup_rom r12, r4
+	sm (OUTPUT), sin_out
+	cos_lookup_rom r12, cos_out
 	nop
-	sm (OUTPUT+2), r4
+	sm (OUTPUT+2), cos_out
 
 	; Let memory settle
 	nop

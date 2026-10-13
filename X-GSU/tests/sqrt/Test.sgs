@@ -19,6 +19,7 @@ GSU_Code:
 
 ;Setup stack
 init_stack
+register in_hi, in_lo, out_val
 
 ;This label represents the memory address that begins test setup
 ; The lua script will execute setup here
@@ -28,11 +29,11 @@ nop
 test_call:
 	nop
 	nop
-	lm r1, (INPUT+2)
-	lm r0, (INPUT)
-	call gsu_sqrt32
+	lm in_lo, (INPUT+2)
+	lm in_hi, (INPUT)
+	call gsu_sqrt32 in_hi, in_lo : out_val
  	nop
-	sm (OUTPUT), r3
+	sm (OUTPUT), out_val
 	nop
 	nop
 	nop

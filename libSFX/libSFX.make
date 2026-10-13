@@ -29,6 +29,9 @@ superfamiconv	:= $(libsfx_bin)/superfamiconv/bin/superfamiconv
 brr_enc		:= $(libsfx_bin)/brrtools/bin/brr_encoder
 lz4_compress	:= $(libsfx_bin)/lz4/programs/lz4
 make_bp		:= $(libsfx_bin)/make_breakpoints
+ifndef sfx_opt
+sfx_opt		:= java -jar $(libsfx_dir)/../../sfx-optimizer/target/sfx-optimizer-0.3.jar
+endif
 
 rwildcard = $(strip $(filter $(if $2,$2,%),$(foreach f,$(wildcard $1*),$(eval t = $(call rwildcard,$f/)) $(if $t,$t,$f))))
 
@@ -193,7 +196,8 @@ $(obj_dir)/%.o700 : %.s700
 
 $(obj_dir)/%.ogs : %.sgs
 	@mkdir -pv $(dir $@)
-	$(as) $(asflags) $(pkg_asflags) -D TARGET_GSU -o $@ $<
+	$(sfx_opt) -c $< -o $(obj_dir)/$*.opt.sgs -I $(dir $<) -I ./ -I $(libsfx_inc)
+	$(as) $(asflags) $(pkg_asflags) -I $(dir $<) -D TARGET_GSU -o $@ $(obj_dir)/$*.opt.sgs
 
 # libSFX obj : src
 $(obj_dir_sfx)/%.o : $(libsfx_inc)/%.s
