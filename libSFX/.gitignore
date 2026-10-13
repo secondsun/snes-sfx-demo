@@ -1,5 +1,11 @@
 **/.o
+**/*.o
+**/*.d
+tools/lz4/programs/lz4
+**/bin
+**/wrk
 **/.build
+**/build
 **/.build_libsfx
 examples/**/*.sfc
 examples/**/*.sym
