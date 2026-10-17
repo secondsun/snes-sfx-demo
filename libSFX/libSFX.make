@@ -30,7 +30,7 @@ brr_enc		:= $(libsfx_bin)/brrtools/bin/brr_encoder
 lz4_compress	:= $(libsfx_bin)/lz4/programs/lz4
 make_bp		:= $(libsfx_bin)/make_breakpoints
 ifndef sfx_opt
-sfx_opt		:= java -jar $(libsfx_dir)/../../sfx-optimizer/target/sfx-optimizer-0.3.jar
+sfx_opt		:= java -jar $(libsfx_dir)/../../sfx-optimizer/target/sfx-optimizer.jar
 endif
 
 rwildcard = $(strip $(filter $(if $2,$2,%),$(foreach f,$(wildcard $1*),$(eval t = $(call rwildcard,$f/)) $(if $t,$t,$f))))
