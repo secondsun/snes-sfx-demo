@@ -1,80 +1,325 @@
-.debuginfo + 
+.debuginfo +
 .include "libSFX.i"
 .include "../common/stack.i"
 .include "../common/function.i"
+.include "../common/structs.i"
+.include "../common/var.i"
 .include "./macros/geometry.i"
 .include "./constants.i"
+
 .segment "GSUCODE"
 .include "../gsu_maths/gsu_recip.i"
-.include "../gsu_maths/gsu_vector.i"
+.include "../gsu_maths/gsu_iso_camera.i"
+
+.segment "GSUCODE"
 GSU_Code:
 .export GSU_Code
 
-init_stack
-register fb_ptr, model_ptr, mat_ptr, tri_ptr, tri_color, free_size
+    init_stack
+    register fb_ptr, cam_ptr, v3_ptr, v2_ptr, cnt, yaw_val, tri_ptr, tri_color, tmp
 
 resetFrameBuffer:
-iwt r0, #0
-cmode
-iwt fb_ptr, #$4000
-iwt r12, #$1400
-cache
-move r13, r15
-  stw (fb_ptr)
-  inc fb_ptr
-  loop
-  inc fb_ptr
-  nop
-  
-  
+    iwt r0, #0
+    cmode
+    iwt fb_ptr, #$4000
+    iwt r12, #$1400
+    cache
+    move r13, r15
+        stw (fb_ptr)
+        inc fb_ptr
+        loop
+        inc fb_ptr
+    nop
 
 init_gsu_main:
-	;set plot register options
-	; bit 0 = 0 Transparency On
-	; bit 1 = 0 dither off
-	; bit 2 = 0 upper 4 bit color off
-	; bit 3 = 1 sprite mode on
-	iwt r0, #$8
-	cmode
+    ; Set plot register options:
+    ; bit 0 = 0 Transparency On (color 0 transparent)
+    ; bit 1 = 0 dither off
+    ; bit 2 = 0 upper 4 bit color off
+    ; bit 3 = 1 sprite mode on
+    iwt r0, #$8
+    cmode
 
-    move model_ptr, r10
-    rom_to_stack #cube_model, 3, 216
+    ; One-time scene initialization check
+    lm tmp, (GSU_INIT_FLAG)
+    with tmp
+    add #0
+    bne scene_initialized
+    nop
+    call init_iso_scene
+scene_initialized:
 
-	move mat_ptr, r10
-    rom_to_stack #transformation_matrix, 3, 32
+    ; Check GSU_FRAME_HALF:
+    ; Pass 0 (left half, X in 0..127): update camera yaw, project 8 cube vertices, cull faces, cache 2D triangles
+    ; Pass 1 (right half, X in 128..255): reuse cached 2D triangles directly
+    iwt tmp, #GSU_FRAME_HALF
+    ldb (tmp)
+    with r0
+    add #0
+    bne rasterize_cached_tris
+    nop
 
-	call vector3_transform model_ptr, mat_ptr
+    ; --- Pass 0: Update yaw angle (1..120, 3 degrees per frame) ---
+    lm yaw_val, (ISO_CAM)
+    inc yaw_val
+    iwt tmp, #121
+    from yaw_val
+    sub tmp
+    bmi yaw_in_range
+    nop
+    iwt yaw_val, #1
+yaw_in_range:
+    iwt cam_ptr, #ISO_CAM
+    call iso_camera_set_yaw cam_ptr, yaw_val
 
+    ; --- Pass 0: Project 8 unique cube vertices to 2D screen coordinates ---
+    iwt cam_ptr, #ISO_CAM
+    iwt v3_ptr, #CUBE_V3
+    iwt v2_ptr, #CUBE_V2
+    iwt cnt, #8
+    call iso_camera_project_mesh cam_ptr, v3_ptr, v2_ptr, cnt
 
-    iwt tri_color, #cube_model
-    call draw_triangle model_ptr, tri_color
+    ; --- Pass 0: Backface-cull the 5 quad faces and populate CACHED_TRIS ---
+    call build_visible_triangles
 
-	iwt free_size, #216
-	gsu_stack_free_bytes free_size
+rasterize_cached_tris:
+    lm cnt, (CACHED_TRI_COUNT)
+    with cnt
+    add #0
+    beq finish
+    nop
+    iwt tri_ptr, #CACHED_TRIS
+    forR cnt
+        from tri_ptr
+        to tmp
+        add #6
+        to tri_color
+        ldw (tmp)
+        call draw_triangle tri_ptr, tri_color
+        with tri_ptr
+        add #8
+    endfor
 
 finish:
+shutdown:
+    rpix
+    rpix
+    stop
+    nop
+    nop
+    nop
 
-	shutdown:
-	rpix
-	rpix
-	stop
-	nop
-	nop
-	nop
+; Initializes CUBE_V3, CUBE_FACES, and ISO_CAM once on boot.
+function init_iso_scene
+    register dst_ptr, cam_ptr, val
+
+    ; Copy 98 bytes (48 bytes CUBE_V3 + 50 bytes CUBE_FACES) from ROM bank 3 to GSURAM
+    ibt r0, #3
+    romb
+    iwt r14, #cube_vertices_rom
+    iwt dst_ptr, #CUBE_V3
+    iwt r12, #98
+    move r13, r15
+        getb
+        inc r14
+        from r0
+        stb (dst_ptr)
+        nop
+        loop
+        inc dst_ptr
+
+    ; Initialize ISO_CAM: yaw = 0, center_x = 128, center_y = 80
+    iwt cam_ptr, #ISO_CAM
+    iwt val, #0
+    from val
+    stw (cam_ptr) ; yaw = 0
+
+    with cam_ptr
+    add #6
+    iwt val, #128
+    from val
+    stw (cam_ptr) ; center_x = 128
+
+    inc cam_ptr
+    inc cam_ptr
+    iwt val, #80
+    from val
+    stw (cam_ptr) ; center_y = 80
+
+    iwt val, #1
+    sm (GSU_INIT_FLAG), val
+
+    return
+endfunction
+
+; Backface-culls the 5 cube quad faces using a 2D screen-space cross product
+; and writes visible triangle pairs into CACHED_TRIS.
+function build_visible_triangles
+    register face_ptr, cache_ptr, v_ptr, x0, y0, dx1, dy1, dx2
+
+    iwt face_ptr, #CUBE_FACES
+    iwt cache_ptr, #CACHED_TRIS
+
+    for 5
+        ; Load v0 -> (x0, y0)
+        iwt v_ptr, #CUBE_V2
+        ldw (face_ptr)
+        with v_ptr
+        add r0
+        to x0
+        ldw (v_ptr)
+        inc v_ptr
+        inc v_ptr
+        to y0
+        ldw (v_ptr)
+
+        ; Load v1 -> dx1 = x1 - x0, dy1 = y1 - y0
+        inc face_ptr
+        inc face_ptr
+        iwt v_ptr, #CUBE_V2
+        ldw (face_ptr)
+        with v_ptr
+        add r0
+        ldw (v_ptr)
+        to dx1
+        sub x0
+        inc v_ptr
+        inc v_ptr
+        ldw (v_ptr)
+        to dy1
+        sub y0
+
+        ; Load v2 -> dx2 = x2 - x0, r0 = y2 - y0
+        inc face_ptr
+        inc face_ptr
+        iwt v_ptr, #CUBE_V2
+        ldw (face_ptr)
+        with v_ptr
+        add r0
+        ldw (v_ptr)
+        to dx2
+        sub x0
+        inc v_ptr
+        inc v_ptr
+        ldw (v_ptr)
+        sub y0
+
+        ; 2D cross product: cross = dx1 * (y2 - y0) - dy1 * dx2
+        to dx1
+        mult dx1
+        from dy1
+        mult dx2
+        from dx1
+        sub r0
+
+        beq skip_face
+        nop
+        bmi skip_face
+        nop
+
+        ; Face is front-facing (cross > 0): rewind face_ptr to +0 and pack 4 vertices + color
+        with face_ptr
+        sub #4
+        _load_packed_xy face_ptr, v_ptr, x0  ; x0  = packed v0
+        inc face_ptr
+        inc face_ptr
+        _load_packed_xy face_ptr, v_ptr, y0  ; y0  = packed v1
+        inc face_ptr
+        inc face_ptr
+        _load_packed_xy face_ptr, v_ptr, dx1 ; dx1 = packed v2
+        inc face_ptr
+        inc face_ptr
+        _load_packed_xy face_ptr, v_ptr, dy1 ; dy1 = packed v3
+        inc face_ptr
+        inc face_ptr
+        to dx2
+        ldw (face_ptr)                       ; dx2 = face color
+        inc face_ptr
+        inc face_ptr
+
+        ; Emit Triangle 1: (v0, v1, v2, color)
+        from x0
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        from y0
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        from dx1
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        from dx2
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+
+        ; Emit Triangle 2: (v0, v2, v3, color)
+        from x0
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        from dx1
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        from dy1
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        from dx2
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+
+        bra face_done
+        nop
+
+skip_face:
+        with face_ptr
+        add #6
+
+face_done:
+    endfor
+
+    ; CACHED_TRI_COUNT = (cache_ptr - #CACHED_TRIS) >> 3
+    iwt r0, #CACHED_TRIS
+    from cache_ptr
+    sub r0
+    lsr
+    lsr
+    lsr
+    move cache_ptr, r0
+    sm (CACHED_TRI_COUNT), cache_ptr
+
+    return
+endfunction
 
 .align 2
-cube_model:
- cube $e000, $e000, $e000, $4000
-transformation_matrix:
-.word $0100, $0000, $0000, $4000
-.word $0000, $0100, $0000, $4000
-.word $0000, $0000, $0100, $0000
-.word $0000, $0000, $0000, $0100
-
+cube_vertices_rom:
+    indexed_cube_vertices $2000
+cube_faces_rom:
+    indexed_cube_faces 1, 2, 3, 4, 5
 
 .include "./triangle/drawTriangle.i"
 
 .segment "GSURAM"
-POLYGON_OUT:
-.res .sizeof(vector3)
-
+GSU_INIT_FLAG:
+    .res 2
+.export GSU_INIT_FLAG
+GSU_FRAME_HALF:
+    .res 2
+.export GSU_FRAME_HALF
+ISO_CAM:
+    .tag iso_camera
+CUBE_V3:
+    .res 8 * .sizeof(vector3)
+CUBE_FACES:
+    .res 50
+CUBE_V2:
+    .res 8 * .sizeof(vector2)
+CACHED_TRI_COUNT:
+    .res 2
+CACHED_TRIS:
+    .res 10 * 8

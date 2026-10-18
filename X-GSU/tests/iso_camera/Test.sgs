@@ -1,0 +1,65 @@
+; SuperFX iso_camera unit test
+; Summers Pittman <secondsun@gmail.com>
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+.segment "GSURAM"
+
+YAW_INPUT:
+    .res 2
+ISO_CAM:
+    .tag iso_camera
+CUBE_V3:
+    .res 8 * .sizeof(vector3)
+CUBE_V2:
+    .res 8 * .sizeof(vector2)
+
+.segment "GSUCODE"
+GSU_Code:
+    init_stack
+    register cam_ptr, yaw_val, v3_ptr, v2_ptr, cnt
+
+test_setup:
+    iwt r12, #6
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    lm yaw_val, (YAW_INPUT)
+    iwt cam_ptr, #ISO_CAM
+    call iso_camera_set_yaw cam_ptr, yaw_val
+
+    iwt cam_ptr, #ISO_CAM
+    iwt v3_ptr, #CUBE_V3
+    iwt v2_ptr, #CUBE_V2
+    iwt cnt, #8
+    call iso_camera_project_mesh cam_ptr, v3_ptr, v2_ptr, cnt
+
+    ; Let memory settle (8 NOPs)
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    stop
+    nop
+
+.include "../../gsu_maths/gsu_iso_camera.i"
+

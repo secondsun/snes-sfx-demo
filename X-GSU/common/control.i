@@ -167,13 +167,13 @@
     bge check_eq
     nop
     instruction
-    bra Skip_end
+    bra skip_end
     nop
-    :check_eq
-    bne Skip_end
+    check_eq:
+    bne skip_end
     nop
     instruction
-    Skip_end
+    skip_end:
 .endmacro
 
 .endif

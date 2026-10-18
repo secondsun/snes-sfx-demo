@@ -173,8 +173,8 @@ endfunction
 
 reciprocal_table:
 .word $0000 ; (1/0)
-.word $FFFF ; (1/1)
-.word $8000 ; (1/2)
+.word $7FFF ; (1/1, clamped to max positive signed Q0.15/Q0.16 for signed fmult)
+.word $7FFF ; (1/2, clamped to $7FFF so signed fmult does not negate bit 15)
 .word $5555 ; (1/3)
 .word $4000 ; (1/4)
 .word $3333 ; (1/5)

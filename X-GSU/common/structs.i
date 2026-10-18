@@ -1,6 +1,11 @@
 .ifndef ::__STRUCTS_DEFINED__
 ::__STRUCTS_DEFINED__ = 1   
 
+.struct vector2
+      xPos  .word
+      yPos  .word
+   .endstruct
+
 .struct vector3
       xPos  .word
       yPos  .word
@@ -31,6 +36,14 @@
       eye .tag vector3
       lookAt .tag vector3
       up .tag vector3
+   .endstruct
+
+   .struct iso_camera
+      yaw      .word
+      sin_yaw  .word
+      cos_yaw  .word
+      center_x .word
+      center_y .word
    .endstruct
 .struct gsu_stack
 	entries  .res $200 ; 512 Bytes of stack

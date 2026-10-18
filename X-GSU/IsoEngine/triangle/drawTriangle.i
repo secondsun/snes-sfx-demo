@@ -55,17 +55,18 @@ function draw_triangle points, col
         nop
         ;clamp yMin and yMax to 0-172
         ;   yMin = Math.max(0, yMin)
-        sub r0
-        if_gt r0, yMin, {move yMin, r0}
+        ibt r0, #0
+        if_lt yMin, r0, {move yMin, r0}
         nop
         ;   yMax = Math.min(172, yMax)
         iwt r0, #172
         if_lt r0, yMax, {move yMax, r0}
         nop
-        if_lt yMax, yMin, { return }
+        if_lte yMax, yMin, { return }
         nop
         ;cache the loop
         startCache:
+        backuploop
         cache
         ;y = yMin
         ;start (y in minY..maxY) {
@@ -124,36 +125,30 @@ function draw_triangle points, col
             to x1
             ldb (r0) ;x1 = points[1]
             
-            ;x1-x0
-            with x1
-            sub x0
-
-            from dy ; dy = (y - y0)
-            to x1
-            mult x1 ; x1 (r6) = (y - y0) * (x1 - x0) 
-            
-
-            ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
-            ; r0 = 1 / (y1 - y0)
             from y1
             sub y0
-            
-            beq :+
+            bpl :+
                 nop
-            bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
-                   ; the sign when we get the reciprocal
-
+                from x0
+                sub x1
+                move x0, x1
+                move x1, r0
+                from y
+                to dy
+                sub y1
+                from y0
+                sub y1
+                bra :++
                 nop
-                with x1
-                not
-                with x1
-                add #1
-                not
-                add #1
-
             :
+                with x1
+                sub x0
+            :
+            from dy ; dy = (y - top_Y)
+            to x1
+            mult x1 ; x1 (r6) = (y - top_Y) * (bottom_X - top_X)
             
-            reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
+            reciprocal_lookup_rom r0, r0 ; r0 = 1 / |y1 - y0| in Q0.16
             
             
             to x1
@@ -211,33 +206,30 @@ function draw_triangle points, col
             to x1
             ldb (r0) ;x1 = points[2]
             
-            ;x1-x0
-            with x1
-            sub x0
-
-            from dy ; dy = (y - y0)
-            to x1
-            mult x1 ; x1 (r6) = (y - y0) * (x1 - x0) 
-
-            ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
-            ; r0 = 1 / (y1 - y0)
             from y1
             sub y0
-            
-            beq :+
+            bpl :+
                 nop
-            bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
-                   ; the sign when we get the reciprocal
+                from x0
+                sub x1
+                move x0, x1
+                move x1, r0
+                from y
+                to dy
+                sub y1
+                from y0
+                sub y1
+                bra :++
                 nop
-                with x1
-                not
-                with x1
-                add #1
-                not
-                add #1
             :
+                with x1
+                sub x0
+            :
+            from dy ; dy = (y - top_Y)
+            to x1
+            mult x1 ; x1 (r6) = (y - top_Y) * (bottom_X - top_X)
             
-            reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
+            reciprocal_lookup_rom r0, r0 ; r0 = 1 / |y1 - y0| in Q0.16
             
             
             to x1
@@ -292,35 +284,30 @@ function draw_triangle points, col
             to x1
             ldb (points) ;x1 = points[0]
             
-            ;x1-x0
-            with x1
-            sub x0
-
-            from dy ; dy = (y - y0)
-            to x1
-            mult x1 ; x1 (r6) = (y - y0) * (x1 - x0) 
-            
-
-            ;val x = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
-            ; r0 = 1 / (y1 - y0)
             from y1
             sub y0
-            
-            beq :+
+            bpl :+
                 nop
-            bpl :+ ;if y1-y0 is negative, we need to negate (x1-x0) because we lose
-                   ; the sign when we get the reciprocal. This negation here 
-                   ; preserves it
+                from x0
+                sub x1
+                move x0, x1
+                move x1, r0
+                from y
+                to dy
+                sub y1
+                from y0
+                sub y1
+                bra :++
                 nop
-                with x1
-                not
-                with x1
-                add #1
-                not
-                add #1
             :
+                with x1
+                sub x0
+            :
+            from dy ; dy = (y - top_Y)
+            to x1
+            mult x1 ; x1 (r6) = (y - top_Y) * (bottom_X - top_X)
             
-            reciprocal_lookup_rom r0, r0 ; r0 = 1 / (y1 - y0) in Q0.16
+            reciprocal_lookup_rom r0, r0 ; r0 = 1 / |y1 - y0| in Q0.16
             
             
             to x1
@@ -339,22 +326,44 @@ function draw_triangle points, col
             plotXLoop:
             ;end unrolled loop for (i in 0 until nPoints)
 
-            ;if (minX <= maxX) {
+            iwt r0, #GSU_FRAME_HALF
+            ldb (r0)
+            with r0
+            add #0
+            beq :+
+            nop
+            iwt r0, #128
+            with xMin
+            sub r0
+            with xMax
+            sub r0
+            :
+
+            ; Clamp xMin to 0
+            ibt r0, #0
+            if_lt xMin, r0, { move xMin, r0 }
+            nop
+
+            ; Clamp xMax to 127
+            iwt r0, #127
+            if_gt xMax, r0, { move xMax, r0 }
+            nop
+
+            ; If xMin > xMax, span is outside the current buffer (or empty)
             if_gt xMin, xMax, { bra nextY }
             nop
 
+            move plot_x, xMin
             from xMin 
             xor xMax
             lsr
-            bcc startX
+            bcs startX
             nop
-            move plot_x, xMin
             plot
             
-            if_gte plot_x, xMax, { bra nextY }
+            if_gt plot_x, xMax, { bra nextY }
             nop
             startX:
-            move plot_x, xMin
 
             nextX:
                 plot
@@ -373,6 +382,7 @@ function draw_triangle points, col
         inc y
         ; //end for (y in minY..maxY) 
     endcache:
+    restoreloop
     return
 endfunction
 

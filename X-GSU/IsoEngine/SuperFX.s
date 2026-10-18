@@ -1,6 +1,8 @@
 .include "libSFX.i"
 .include "pointers.s"
 .include "CpuMacros.s"
+.import GSU_FRAME_HALF
+.import GSU_INIT_FLAG
 
 
 ;This is the main vector of the Super NES code. it runs from cartidge with the 
@@ -67,6 +69,10 @@ Main2:
         ;setup super fx vram buffer positions
         stz z:SFX_buffer_position ;sfx reads from start of work ram
         stz z:VRAM_screen_select ; write to the other screen
+        lda #$00
+        sta f:GSU_FRAME_HALF
+        sta f:GSU_INIT_FLAG
+        sta f:GSU_INIT_FLAG+1
         
         VBL_set Vblank
         VBL_on
@@ -140,6 +146,8 @@ drawScreen2:
         ;copyFromHalf:
                 VRAM_memcpy (VRAM_screen_2 + screenbuffer_len), (screenbuffer ), screenbuffer_len
                 stz z:SFX_buffer_position ;sfx reads from start of work ram
+                lda #$00
+                sta f:GSU_FRAME_HALF
                 stz z:VRAM_screen_select ; write to the other screen
                 ldx     #bg12nba(VRAM_screen_2, 0)
                 stx     BG12NBA
@@ -149,7 +157,8 @@ drawScreen2:
         :;copyFromStart:        
                 VRAM_memcpy VRAM_screen_2, screenbuffer, screenbuffer_len
                 lda #$01;sfx reads from middle of work ram
-                sta z:SFX_buffer_position        
+                sta z:SFX_buffer_position
+                sta f:GSU_FRAME_HALF
                 stz FRAME_READY
                 gsuOn
                 endVBlank
@@ -161,6 +170,8 @@ drawScreen1:
         copyFromHalf:
                 VRAM_memcpy (VRAM_screen_1 + screenbuffer_len), (screenbuffer ), screenbuffer_len
                 stz z:SFX_buffer_position ;sfx reads from start of work ram
+                lda #$00
+                sta f:GSU_FRAME_HALF
                 lda #$01
                 sta z:VRAM_screen_select ; write to the other screen
                 ldx #bg12nba(VRAM_screen_1, 0)
@@ -172,6 +183,7 @@ drawScreen1:
                 VRAM_memcpy VRAM_screen_1, screenbuffer, screenbuffer_len
                 lda #$01 ;sfx reads from middle of work ram
                 sta z:SFX_buffer_position
+                sta f:GSU_FRAME_HALF
                 stz FRAME_READY
                 gsuOn
                 endVBlank
