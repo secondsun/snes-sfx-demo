@@ -3,6 +3,7 @@
 .include "CpuMacros.s"
 .import GSU_FRAME_HALF
 .import GSU_INIT_FLAG
+.import GSU_JOYPAD
 
 
 ;This is the main vector of the Super NES code. it runs from cartidge with the 
@@ -73,6 +74,8 @@ Main2:
         sta f:GSU_FRAME_HALF
         sta f:GSU_INIT_FLAG
         sta f:GSU_INIT_FLAG+1
+        sta f:GSU_JOYPAD
+        sta f:GSU_JOYPAD+1
         
         VBL_set Vblank
         VBL_on
@@ -135,7 +138,11 @@ transfer:
         beq :+
         endVBlank
         ;Which VRAM bank do we draw to
-:       lda z:VRAM_screen_select
+:       RW_push set:a16
+        lda z:SFX_joy1cont
+        sta f:GSU_JOYPAD
+        RW_pull
+        lda z:VRAM_screen_select
         bne drawScreen2
         jmp drawScreen1
         

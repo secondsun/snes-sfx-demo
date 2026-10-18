@@ -11,6 +11,7 @@
 .include "../common/var.i"
 .include "../common/function.i"
 .include "../common/structs.i"
+.include "../common/control.i"
 .include "./gsu_trig.i"
 
 .segment "GSUCODE"
@@ -171,6 +172,151 @@ function iso_camera_project_mesh cam_ptr, v3_list_ptr, v2_out_list_ptr, vertex_c
         with v2_out_list_ptr
         add #.sizeof(vector2)
     endfor
+    return
+endfunction
+
+; Updates an iso_camera struct based on controller inputs:
+;   - L / R buttons rotate yaw continuously (1 yaw index = 3 degrees per frame)
+;     R increments yaw (clockwise), L decrements yaw (counter-clockwise)
+;     Wraps yaw in range 1..120
+;   - D-pad translates camera around screen plane at 2 pixels/frame:
+;     Up:    Scene moves down (center_y += 2)
+;     Down:  Scene moves up   (center_y -= 2)
+;     Left:  Scene moves right(center_x += 2)
+;     Right: Scene moves left (center_x -= 2)
+;   - Clamps lookAt/center to a bounding box (+/-128 pixels from model center 128, 80):
+;     center_x in [0, 256]
+;     center_y in [-48, 208]
+; In:       cam_ptr = address of iso_camera struct
+;           pad_val = 16-bit joypad mask (e.g. from SFX_joy1cont)
+; Out:      Updates ISO_CAM yaw, sin_yaw, cos_yaw, center_x, center_y
+; Clobbers: r0, r6, r14, allocated registers
+function iso_camera_update_controls cam_ptr, pad_val
+    register yaw, cx, cy, tmp, mask, ptr, yaw_changed
+
+    iwt yaw_changed, #0
+
+    ; --- 1. Rotation (L / R) ---
+    to yaw
+    ldw (cam_ptr)
+
+    ; Check R button ($0010) -> Clockwise (yaw++)
+    iwt mask, #$0010
+    from pad_val
+    and mask
+    beq check_l
+    nop
+    inc yaw
+    iwt tmp, #121
+    from yaw
+    sub tmp
+    bmi r_in_range
+    nop
+    iwt yaw, #1
+r_in_range:
+    iwt yaw_changed, #1
+    bra check_yaw_done
+    nop
+
+check_l:
+    ; Check L button ($0020) -> Counter-Clockwise (yaw--)
+    iwt mask, #$0020
+    from pad_val
+    and mask
+    beq check_yaw_done
+    nop
+    dec yaw
+    with yaw
+    add #0
+    bne l_in_range
+    nop
+    iwt yaw, #120
+l_in_range:
+    iwt yaw_changed, #1
+
+check_yaw_done:
+    with yaw_changed
+    add #0
+    beq no_yaw_update
+    nop
+    call iso_camera_set_yaw cam_ptr, yaw
+no_yaw_update:
+
+    ; --- 2. Translation (D-pad) ---
+    ; Load center_x (+6) and center_y (+8)
+    move ptr, cam_ptr
+    with ptr
+    add #6
+    to cx
+    ldw (ptr)
+    inc ptr
+    inc ptr
+    to cy
+    ldw (ptr)
+
+    ; D-pad UP ($0800): Move up -> cy -= 2
+    iwt mask, #$0800
+    from pad_val
+    and mask
+    beq check_down
+    nop
+    with cy
+    sub #2
+
+check_down:
+    ; D-pad DOWN ($0400): Move down -> cy += 2
+    iwt mask, #$0400
+    from pad_val
+    and mask
+    beq check_left
+    nop
+    with cy
+    add #2
+
+check_left:
+    ; D-pad LEFT ($0200): Move left -> cx -= 2
+    iwt mask, #$0200
+    from pad_val
+    and mask
+    beq check_right
+    nop
+    with cx
+    sub #2
+
+check_right:
+    ; D-pad RIGHT ($0100): Move right -> cx += 2
+    iwt mask, #$0100
+    from pad_val
+    and mask
+    beq clamp_bounds
+    nop
+    with cx
+    add #2
+
+clamp_bounds:
+    ; Clamp center_x: [0, 256] (128 +/- 128)
+    iwt tmp, #0
+    if_lt cx, tmp, { move cx, tmp }
+    iwt tmp, #256
+    if_gt cx, tmp, { move cx, tmp }
+
+    ; Clamp center_y: [-48, 208] (80 +/- 128)
+    iwt tmp, #$FFD0 ; -48 in 16-bit signed
+    if_lt cy, tmp, { move cy, tmp }
+    iwt tmp, #208
+    if_gt cy, tmp, { move cy, tmp }
+
+    ; Store center_x and center_y back to ISO_CAM
+    move ptr, cam_ptr
+    with ptr
+    add #6
+    from cx
+    stw (ptr)
+    inc ptr
+    inc ptr
+    from cy
+    stw (ptr)
+
     return
 endfunction
 

@@ -59,18 +59,10 @@ scene_initialized:
     bne rasterize_cached_tris
     nop
 
-    ; --- Pass 0: Update yaw angle (1..120, 3 degrees per frame) ---
-    lm yaw_val, (ISO_CAM)
-    inc yaw_val
-    iwt tmp, #121
-    from yaw_val
-    sub tmp
-    bmi yaw_in_range
-    nop
-    iwt yaw_val, #1
-yaw_in_range:
+    ; --- Pass 0: Update camera yaw (L/R) and translation (D-pad) from controller ---
+    lm tmp, (GSU_JOYPAD)
     iwt cam_ptr, #ISO_CAM
-    call iso_camera_set_yaw cam_ptr, yaw_val
+    call iso_camera_update_controls cam_ptr, tmp
 
     ; --- Pass 0: Project 8 unique cube vertices to 2D screen coordinates ---
     iwt cam_ptr, #ISO_CAM
@@ -92,10 +84,12 @@ rasterize_cached_tris:
     forR cnt
         from tri_ptr
         to tmp
-        add #6
+        add #12
         to tri_color
         ldw (tmp)
         call draw_triangle tri_ptr, tri_color
+        with tri_ptr
+        add #8
         with tri_ptr
         add #8
     endfor
@@ -128,11 +122,10 @@ function init_iso_scene
         loop
         inc dst_ptr
 
-    ; Initialize ISO_CAM: yaw = 0, center_x = 128, center_y = 80
+    ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80
     iwt cam_ptr, #ISO_CAM
-    iwt val, #0
-    from val
-    stw (cam_ptr) ; yaw = 0
+    iwt val, #1
+    call iso_camera_set_yaw cam_ptr, val
 
     with cam_ptr
     add #6
@@ -162,10 +155,8 @@ function build_visible_triangles
 
     for 5
         ; Load v0 -> (x0, y0)
-        iwt v_ptr, #CUBE_V2
         ldw (face_ptr)
-        with v_ptr
-        add r0
+        move v_ptr, r0
         to x0
         ldw (v_ptr)
         inc v_ptr
@@ -176,10 +167,8 @@ function build_visible_triangles
         ; Load v1 -> dx1 = x1 - x0, dy1 = y1 - y0
         inc face_ptr
         inc face_ptr
-        iwt v_ptr, #CUBE_V2
         ldw (face_ptr)
-        with v_ptr
-        add r0
+        move v_ptr, r0
         ldw (v_ptr)
         to dx1
         sub x0
@@ -192,10 +181,8 @@ function build_visible_triangles
         ; Load v2 -> dx2 = x2 - x0, r0 = y2 - y0
         inc face_ptr
         inc face_ptr
-        iwt v_ptr, #CUBE_V2
         ldw (face_ptr)
-        with v_ptr
-        add r0
+        move v_ptr, r0
         ldw (v_ptr)
         to dx2
         sub x0
@@ -212,81 +199,77 @@ function build_visible_triangles
         from dx1
         sub r0
 
-        beq skip_face
+        beq do_skip_face
         nop
-        bmi skip_face
+        bmi do_skip_face
+        nop
+        bra emit_face
         nop
 
-        ; Face is front-facing (cross > 0): rewind face_ptr to +0 and pack 4 vertices + color
+do_skip_face:
         with face_ptr
-        sub #4
-        _load_packed_xy face_ptr, v_ptr, x0  ; x0  = packed v0
-        inc face_ptr
-        inc face_ptr
-        _load_packed_xy face_ptr, v_ptr, y0  ; y0  = packed v1
-        inc face_ptr
-        inc face_ptr
-        _load_packed_xy face_ptr, v_ptr, dx1 ; dx1 = packed v2
-        inc face_ptr
-        inc face_ptr
-        _load_packed_xy face_ptr, v_ptr, dy1 ; dy1 = packed v3
-        inc face_ptr
-        inc face_ptr
-        to dx2
-        ldw (face_ptr)                       ; dx2 = face color
-        inc face_ptr
-        inc face_ptr
-
-        ; Emit Triangle 1: (v0, v1, v2, color)
-        from x0
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        from y0
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        from dx1
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        from dx2
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-
-        ; Emit Triangle 2: (v0, v2, v3, color)
-        from x0
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        from dx1
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        from dy1
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        from dx2
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-
+        add #6
         bra face_done
         nop
 
-skip_face:
+emit_face:
+        ; Face is front-facing (cross > 0): rewind face_ptr to +0 and load color into dx2
         with face_ptr
-        add #6
+        sub #4
+        from face_ptr
+        add #8
+        move v_ptr, r0
+        to dx2
+        ldw (v_ptr)
+
+        ; Emit Triangle 1: (v0, v1, v2, color, pad)
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v0
+        inc face_ptr
+        inc face_ptr
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v1
+        inc face_ptr
+        inc face_ptr
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v2
+        from dx2
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        iwt r0, #0
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+
+        ; Emit Triangle 2: (v0, v2, v3, color, pad)
+        with face_ptr
+        sub #4
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v0
+        with face_ptr
+        add #4
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v2
+        inc face_ptr
+        inc face_ptr
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v3
+        from dx2
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+        iwt r0, #0
+        stw (cache_ptr)
+        inc cache_ptr
+        inc cache_ptr
+
+        ; Advance face_ptr past color (+8) to start of next face (+10)
+        with face_ptr
+        add #4
 
 face_done:
     endfor
 
-    ; CACHED_TRI_COUNT = (cache_ptr - #CACHED_TRIS) >> 3
+    ; CACHED_TRI_COUNT = (cache_ptr - #CACHED_TRIS) >> 4
     iwt r0, #CACHED_TRIS
     from cache_ptr
     sub r0
+    lsr
     lsr
     lsr
     lsr
@@ -311,6 +294,9 @@ GSU_INIT_FLAG:
 GSU_FRAME_HALF:
     .res 2
 .export GSU_FRAME_HALF
+GSU_JOYPAD:
+    .res 2
+.export GSU_JOYPAD
 ISO_CAM:
     .tag iso_camera
 CUBE_V3:
@@ -322,4 +308,4 @@ CUBE_V2:
 CACHED_TRI_COUNT:
     .res 2
 CACHED_TRIS:
-    .res 10 * 8
+    .res 10 * 16

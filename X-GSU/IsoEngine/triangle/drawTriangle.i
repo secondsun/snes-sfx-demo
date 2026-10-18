@@ -23,19 +23,19 @@ function draw_triangle points, col
 
         to yPoints
         from points
-        add #1
+        add #2
 
         ;; Find the min and max y values
         ; yMax = yPoints[0]
         to yMax
-        ldb (yPoints)
+        ldw (yPoints)
         ; yMin = yPoints[0]
         move yMin, yMax
 
         ;    if (yPoints[1] < yMin) yMin = yPoints[1]
         from yPoints 
-        add #2
-        ldb (r0)
+        add #4
+        ldw (r0)
         if_lt r0, yMin, {move yMin, r0}
         nop
         
@@ -45,24 +45,55 @@ function draw_triangle points, col
         nop
         ;    if (yPoints[2] < yMin) yMin = yPoints[2]
         from yPoints 
-        add #4
-        ldb (r0)
+        add #8
+        ldw (r0)
         if_lt r0, yMin, {move yMin, r0}
         nop
         
         ;    if (yPoints[2] > yMax) yMax = yPoints[2]
         if_gt r0, yMax, {move yMax, r0}
         nop
-        ;clamp yMin and yMax to 0-172
+        ;clamp yMin and yMax to 0-160
         ;   yMin = Math.max(0, yMin)
         ibt r0, #0
         if_lt yMin, r0, {move yMin, r0}
         nop
-        ;   yMax = Math.min(172, yMax)
-        iwt r0, #172
+        ;   yMax = Math.min(160, yMax)
+        iwt r0, #160
         if_lt r0, yMax, {move yMax, r0}
         nop
         if_lte yMax, yMin, { return }
+        nop
+
+        ;; Bounding box culling in X
+        to xMax
+        ldw (points)
+        move xMin, xMax
+
+        from points
+        add #4
+        ldw (r0)
+        if_lt r0, xMin, {move xMin, r0}
+        nop
+        if_gt r0, xMax, {move xMax, r0}
+        nop
+
+        from points
+        add #8
+        ldw (r0)
+        if_lt r0, xMin, {move xMin, r0}
+        nop
+        if_gt r0, xMax, {move xMax, r0}
+        nop
+
+        ; If all vertices have X < 0, entirely off-screen to the left
+        ibt r0, #0
+        if_lt xMax, r0, { return }
+        nop
+
+        ; If all vertices have X >= 256, entirely off-screen to the right
+        iwt r0, #256
+        if_gte xMin, r0, { return }
         nop
         ;cache the loop
         startCache:
@@ -80,8 +111,8 @@ function draw_triangle points, col
             ;var minX = Int.MAX_VALUE
             ;var maxX = Int.MIN_VALUE
             
-            iwt xMin, #$7FFF
-            iwt xMax, #$8000
+            iwt xMin, #$0FFF
+            iwt xMax, #$F000
             
             ;We're unrolling  for (i in 0 until nPoints) since nPoints is always 3 for a triangle
             ;val j = (i + 1) % nPoints : i == 0 j == 1
@@ -94,7 +125,7 @@ function draw_triangle points, col
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
             to y0
-            ldb (yPoints) ; y0 = yPoints[0]
+            ldw (yPoints) ; y0 = yPoints[0]
 
             to dy
             from y
@@ -102,9 +133,9 @@ function draw_triangle points, col
 
             
             from yPoints
-            add #2
+            add #4
             to y1
-            ldb (r0) ; y1 = yPoints[1]
+            ldw (r0) ; y1 = yPoints[1]
             
             from y
             to x1
@@ -118,12 +149,12 @@ function draw_triangle points, col
             nop
 
             to x0
-            ldb (points) ;x0 = points[0]
+            ldw (points) ;x0 = points[0]
             
             from points
-            add #2
+            add #4
             to x1
-            ldb (r0) ;x1 = points[1]
+            ldw (r0) ;x1 = points[1]
             
             from y1
             sub y0
@@ -171,18 +202,18 @@ function draw_triangle points, col
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
             
             from yPoints
-            add #2
+            add #4
             to y0
-            ldb (r0) ; y0 = yPoints[1]
+            ldw (r0) ; y0 = yPoints[1]
 
             to dy
             from y
             sub y0; dy = y - y0
 
             from yPoints
-            add #4
+            add #8
             to y1
-            ldb (r0) ; y1 = yPoints[2]
+            ldw (r0) ; y1 = yPoints[2]
             
 
             from y
@@ -197,14 +228,14 @@ function draw_triangle points, col
             nop
 
             from points
-            add #2
+            add #4
             to x0
-            ldb (r0) ;x0 = points[1]
+            ldw (r0) ;x0 = points[1]
             
             from points
-            add #4
+            add #8
             to x1
-            ldb (r0) ;x1 = points[2]
+            ldw (r0) ;x1 = points[2]
             
             from y1
             sub y0
@@ -252,18 +283,17 @@ function draw_triangle points, col
             ; this is a range check that y is between y0 and y1, exclusive of the max value. 
             ; simplified logic ((y - y0) ^ (y - y1)) < 0
             
-            to r0
             from yPoints
-            add #4
+            add #8
             to y0
-            ldb (r0) ; y0 = yPoints[2]
+            ldw (r0) ; y0 = yPoints[2]
 
             to dy
             from y
             sub y0; dy = y - y0
 
             to y1
-            ldb (yPoints) ; y1 = yPoints[0]
+            ldw (yPoints) ; y1 = yPoints[0]
             
             from y
             to x1
@@ -277,12 +307,12 @@ function draw_triangle points, col
             nop
 
             from points
-            add #4
+            add #8
             to x0
-            ldb (r0) ;x0 = points[2]
+            ldw (r0) ;x0 = points[2]
             
             to x1
-            ldb (points) ;x1 = points[0]
+            ldw (points) ;x1 = points[0]
             
             from y1
             sub y0
