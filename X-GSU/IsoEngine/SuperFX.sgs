@@ -64,14 +64,14 @@ scene_initialized:
     iwt cam_ptr, #ISO_CAM
     call iso_camera_update_controls cam_ptr, tmp
 
-    ; --- Pass 0: Project 8 unique cube vertices to 2D screen coordinates ---
+    ; --- Pass 0: Project 72 unique model vertices to 2D screen coordinates ---
     iwt cam_ptr, #ISO_CAM
-    iwt v3_ptr, #CUBE_V3
-    iwt v2_ptr, #CUBE_V2
-    iwt cnt, #8
+    iwt v3_ptr, #MODEL_V3
+    iwt v2_ptr, #MODEL_V2
+    iwt cnt, #72
     call iso_camera_project_mesh cam_ptr, v3_ptr, v2_ptr, cnt
 
-    ; --- Pass 0: Backface-cull the 5 quad faces and populate CACHED_TRIS ---
+    ; --- Pass 0: Backface-cull and depth-sort scene faces into CACHED_TRIS ---
     call build_visible_triangles
 
 rasterize_cached_tris:
@@ -103,16 +103,16 @@ shutdown:
     nop
     nop
 
-; Initializes CUBE_V3, CUBE_FACES, and ISO_CAM once on boot.
+; Initializes MODEL_V3, MODEL_FACES, and ISO_CAM once on boot.
 function init_iso_scene
     register dst_ptr, cam_ptr, val
 
-    ; Copy 98 bytes (48 bytes CUBE_V3 + 50 bytes CUBE_FACES) from ROM bank 3 to GSURAM
+    ; Copy 872 bytes (432 bytes MODEL_V3 + 440 bytes MODEL_FACES) from ROM bank 3 to GSURAM
     ibt r0, #3
     romb
-    iwt r14, #cube_vertices_rom
-    iwt dst_ptr, #CUBE_V3
-    iwt r12, #98
+    iwt r14, #scene_vertices_rom
+    iwt dst_ptr, #MODEL_V3
+    iwt r12, #872
     move r13, r15
         getb
         inc r14
@@ -145,15 +145,16 @@ function init_iso_scene
     return
 endfunction
 
-; Backface-culls the 5 cube quad faces using a 2D screen-space cross product
-; and writes visible triangle pairs into CACHED_TRIS.
-function build_visible_triangles
-    register face_ptr, cache_ptr, v_ptr, x0, y0, dx1, dy1, dx2
+; Backface-culls a contiguous slice of faces and writes visible triangles into CACHED_TRIS.
+function cull_and_emit_faces face_list_ptr, face_count
+    register face_ptr, cache_ptr, v_ptr, x0, y0, dx1, dy1, dx2, tmp, cnt
 
-    iwt face_ptr, #CUBE_FACES
-    iwt cache_ptr, #CACHED_TRIS
+    move face_ptr, face_list_ptr
+    move cnt, face_count
 
-    for 5
+    lm cache_ptr, (CACHED_TRI_WRITE_PTR)
+
+    forR cnt
         ; Load v0 -> (x0, y0)
         ldw (face_ptr)
         move v_ptr, r0
@@ -209,7 +210,7 @@ function build_visible_triangles
 do_skip_face:
         with face_ptr
         add #6
-        bra face_done
+        iwt r15, #face_done
         nop
 
 emit_face:
@@ -239,16 +240,29 @@ emit_face:
         inc cache_ptr
         inc cache_ptr
 
+        ; Check if this face is a triangle (v3 == v2):
+        ; Currently face_ptr is at +4 (pointing to v2).
+        ldw (face_ptr)
+        move tmp, r0
+        inc face_ptr
+        inc face_ptr
+        ldw (face_ptr)
+        with r0
+        sub tmp
+        beq skip_triangle_2
+        nop
+
         ; Emit Triangle 2: (v0, v2, v3, color, pad)
+        ; face_ptr is currently at +6 (pointing to v3).
         with face_ptr
-        sub #4
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v0
+        sub #6
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v0 (+0)
         with face_ptr
         add #4
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v2
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v2 (+4)
         inc face_ptr
         inc face_ptr
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v3
+        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v3 (+6)
         from dx2
         stw (cache_ptr)
         inc cache_ptr
@@ -258,32 +272,306 @@ emit_face:
         inc cache_ptr
         inc cache_ptr
 
-        ; Advance face_ptr past color (+8) to start of next face (+10)
+        ; Advance face_ptr from +6 past color (+8) to start of next face (+10)
+        with face_ptr
+        add #4
+        iwt r15, #face_done
+        nop
+
+skip_triangle_2:
+        ; Advance face_ptr from +6 past color (+8) to start of next face (+10)
         with face_ptr
         add #4
 
 face_done:
     endfor
 
-    ; CACHED_TRI_COUNT = (cache_ptr - #CACHED_TRIS) >> 4
+    sm (CACHED_TRI_WRITE_PTR), cache_ptr
+    return
+endfunction
+
+; Dispatches face pointer and face count for an object ID (0..4) and culls/emits its faces
+function emit_object_by_id obj_id
+    register face_ptr, face_count, tmp
+
+    ; obj_id == 0: House (offset 130, count 14)
+    iwt tmp, #0
+    from obj_id
+    cmp tmp
+    bne not_house
+    nop
+    iwt face_ptr, #(MODEL_FACES + 130)
+    iwt face_count, #14
+    bra do_emit
+    nop
+
+not_house:
+    ; obj_id == 1: Tree 1 (offset 270, count 4)
+    iwt tmp, #1
+    from obj_id
+    cmp tmp
+    bne not_tree1
+    nop
+    iwt face_ptr, #(MODEL_FACES + 270)
+    iwt face_count, #4
+    bra do_emit
+    nop
+
+not_tree1:
+    ; obj_id == 2: Tree 2 (offset 310, count 4)
+    iwt tmp, #2
+    from obj_id
+    cmp tmp
+    bne not_tree2
+    nop
+    iwt face_ptr, #(MODEL_FACES + 310)
+    iwt face_count, #4
+    bra do_emit
+    nop
+
+not_tree2:
+    ; obj_id == 3: Tree 3 (offset 350, count 4)
+    iwt tmp, #3
+    from obj_id
+    cmp tmp
+    bne not_tree3
+    nop
+    iwt face_ptr, #(MODEL_FACES + 350)
+    iwt face_count, #4
+    bra do_emit
+    nop
+
+not_tree3:
+    ; obj_id == 4: Well (offset 390, count 5)
+    iwt face_ptr, #(MODEL_FACES + 390)
+    iwt face_count, #5
+
+do_emit:
+    call cull_and_emit_faces face_ptr, face_count
+    return
+endfunction
+
+; Depth-sorts scene objects and populates CACHED_TRIS with visible triangles.
+function build_visible_triangles
+    register cam_ptr, face_ptr, face_count, s_yaw, c_yaw, mul_b = r6
+    register depth0, depth1, depth2, depth3, depth4
+    register pass_cnt, pair_idx, order_ptr, obj_a, obj_b, depth_a, depth_b
+    register dptr, tmp, obj_id
+
+    ; Reset cache write pointer to start of CACHED_TRIS
+    iwt tmp, #CACHED_TRIS
+    sm (CACHED_TRI_WRITE_PTR), tmp
+
+    ; 1. Always emit terrain first (13 faces at MODEL_FACES + 0)
+    iwt face_ptr, #MODEL_FACES
+    iwt face_count, #13
+    call cull_and_emit_faces face_ptr, face_count
+
+    ; 2. Load sin_yaw and cos_yaw from ISO_CAM
+    iwt cam_ptr, #(ISO_CAM + 2)
+    to s_yaw
+    ldw (cam_ptr)
+    inc cam_ptr
+    inc cam_ptr
+    to c_yaw
+    ldw (cam_ptr)
+
+    ; Obj 0 (House) is at (0, 0), depth = 0
+    iwt depth0, #0
+
+    ; For Objects 1..4: depth = cx * sin_yaw + cz * cos_yaw
+    ; Obj 1 (Tree 1): cx = -58 ($C600), cz = 42 ($2A00)
+    ; Obj 2 (Tree 2): cx =  58 ($3A00), cz = -44 ($D400)
+    ; Obj 3 (Tree 3): cx = -58 ($C600), cz = -44 ($D400)
+    ; Obj 4 (Well):   cx =  50 ($3200), cz =  38 ($2600)
+
+    ; Multiply with sin_yaw (r6 = s_yaw)
+    move mul_b, s_yaw
+    iwt r0, #$C600
+    fmult
+    move depth1, r0
+
+    iwt r0, #$3A00
+    fmult
+    move depth2, r0
+
+    iwt r0, #$C600
+    fmult
+    move depth3, r0
+
+    iwt r0, #$3200
+    fmult
+    move depth4, r0
+
+    ; Multiply with cos_yaw (r6 = c_yaw) and add
+    move mul_b, c_yaw
+    iwt r0, #$2A00
+    fmult
+    with depth1
+    add r0
+
+    iwt r0, #$D400
+    fmult
+    with depth2
+    add r0
+
+    iwt r0, #$D400
+    fmult
+    with depth3
+    add r0
+
+    iwt r0, #$2600
+    fmult
+    with depth4
+    add r0
+
+    ; Store depths into OBJ_DEPTHS[0..4]
+    iwt dptr, #OBJ_DEPTHS
+    from depth0
+    stw (dptr)
+    inc dptr
+    inc dptr
+    from depth1
+    stw (dptr)
+    inc dptr
+    inc dptr
+    from depth2
+    stw (dptr)
+    inc dptr
+    inc dptr
+    from depth3
+    stw (dptr)
+    inc dptr
+    inc dptr
+    from depth4
+    stw (dptr)
+
+    ; Initialize OBJ_ORDER = [0, 1, 2, 3, 4]
+    iwt order_ptr, #OBJ_ORDER
+    iwt tmp, #0
+    from tmp
+    stw (order_ptr)
+    inc order_ptr
+    inc order_ptr
+    iwt tmp, #1
+    from tmp
+    stw (order_ptr)
+    inc order_ptr
+    inc order_ptr
+    iwt tmp, #2
+    from tmp
+    stw (order_ptr)
+    inc order_ptr
+    inc order_ptr
+    iwt tmp, #3
+    from tmp
+    stw (order_ptr)
+    inc order_ptr
+    inc order_ptr
+    iwt tmp, #4
+    from tmp
+    stw (order_ptr)
+
+    ; Bubble sort OBJ_ORDER (5 elements) by OBJ_DEPTHS
+    iwt pass_cnt, #4
+sort_outer_loop:
+    iwt order_ptr, #OBJ_ORDER
+    iwt pair_idx, #4
+sort_inner_loop:
+    ; Load obj_a and obj_b
+    ldw (order_ptr)
+    move obj_a, r0
+    inc order_ptr
+    inc order_ptr
+    ldw (order_ptr)
+    move obj_b, r0
+
+    ; Load depth_a = OBJ_DEPTHS[obj_a * 2]
+    from obj_a
+    to dptr
+    add obj_a
+    iwt tmp, #OBJ_DEPTHS
+    with dptr
+    add tmp
+    ldw (dptr)
+    move depth_a, r0
+
+    ; Load depth_b = OBJ_DEPTHS[obj_b * 2]
+    from obj_b
+    to dptr
+    add obj_b
+    with dptr
+    add tmp
+    ldw (dptr)
+    move depth_b, r0
+
+    ; Compare: if depth_b >= depth_a, no swap
+    from depth_b
+    cmp depth_a
+    bge sort_no_swap
+    nop
+
+    ; Swap in OBJ_ORDER:
+    from obj_a
+    stw (order_ptr)
+    dec order_ptr
+    dec order_ptr
+    from obj_b
+    stw (order_ptr)
+    inc order_ptr
+    inc order_ptr
+
+sort_no_swap:
+    with pair_idx
+    dec pair_idx
+    bne sort_inner_loop
+    nop
+
+    with pass_cnt
+    dec pass_cnt
+    bne sort_outer_loop
+    nop
+
+    ; 3. Emit the 5 scene objects in depth-sorted order
+    lm obj_id, (OBJ_ORDER + 0)
+    call emit_object_by_id obj_id
+
+    lm obj_id, (OBJ_ORDER + 2)
+    call emit_object_by_id obj_id
+
+    lm obj_id, (OBJ_ORDER + 4)
+    call emit_object_by_id obj_id
+
+    lm obj_id, (OBJ_ORDER + 6)
+    call emit_object_by_id obj_id
+
+    lm obj_id, (OBJ_ORDER + 8)
+    call emit_object_by_id obj_id
+
+    ; Compute total cached triangles: CACHED_TRI_COUNT = (CACHED_TRI_WRITE_PTR - CACHED_TRIS) >> 4
+    lm tmp, (CACHED_TRI_WRITE_PTR)
     iwt r0, #CACHED_TRIS
-    from cache_ptr
+    from tmp
     sub r0
     lsr
     lsr
     lsr
     lsr
-    move cache_ptr, r0
-    sm (CACHED_TRI_COUNT), cache_ptr
+    move tmp, r0
+    sm (CACHED_TRI_COUNT), tmp
 
     return
 endfunction
 
 .align 2
-cube_vertices_rom:
-    indexed_cube_vertices $2000
-cube_faces_rom:
-    indexed_cube_faces 1, 2, 3, 4, 5
+scene_vertices_rom:
+    scene_vertices
+scene_faces_rom:
+    scene_faces
+house_vertices_rom = scene_vertices_rom
+house_faces_rom = scene_faces_rom
+cube_vertices_rom = scene_vertices_rom
+cube_faces_rom = scene_faces_rom
 
 .include "./triangle/drawTriangle.i"
 
@@ -299,13 +587,26 @@ GSU_JOYPAD:
 .export GSU_JOYPAD
 ISO_CAM:
     .tag iso_camera
-CUBE_V3:
-    .res 8 * .sizeof(vector3)
-CUBE_FACES:
-    .res 50
-CUBE_V2:
-    .res 8 * .sizeof(vector2)
+MODEL_V3:
+    .res 72 * .sizeof(vector3)
+MODEL_FACES:
+    .res 44 * 10
+MODEL_V2:
+    .res 72 * .sizeof(vector2)
 CACHED_TRI_COUNT:
     .res 2
+CACHED_TRI_WRITE_PTR:
+    .res 2
+OBJ_DEPTHS:
+    .res 5 * 2
+OBJ_ORDER:
+    .res 5 * 2
 CACHED_TRIS:
-    .res 10 * 16
+    .res 48 * 16
+
+CUBE_V3 = MODEL_V3
+CUBE_FACES = MODEL_FACES
+CUBE_V2 = MODEL_V2
+HOUSE_V3 = MODEL_V3
+HOUSE_FACES = MODEL_FACES
+HOUSE_V2 = MODEL_V2
