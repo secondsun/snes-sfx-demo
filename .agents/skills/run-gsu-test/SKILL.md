@@ -111,7 +111,37 @@ Before launching the emulator, verify that `test.lua` includes explicit terminat
 
 ---
 
-### Step 5: Headless Mesen Execution
+### Step 5: Mesen Execution
+
+#### Primary Method: retro-superfx_mesen MCP Server
+Agents should prioritize calling the `retro-superfx_mesen` MCP server via `call_mcp_tool`:
+
+```json
+{
+  "ServerName": "retro-superfx_mesen",
+  "ToolName": "run_sfx_test",
+  "Arguments": {
+    "test_name": "<test_name>",
+    "timeout_seconds": 15
+  }
+}
+```
+
+For parameterized mathematical assertions with register/memory injection:
+```json
+{
+  "ServerName": "retro-superfx_mesen",
+  "ToolName": "assert_sfx_math",
+  "Arguments": {
+    "test_name": "<test_name>",
+    "input_overrides": { "INPUT_LABEL": 100 },
+    "expected_outputs": { "OUTPUT_LABEL": 10 },
+    "timeout_seconds": 15
+  }
+}
+```
+
+#### Fallback CLI Method
 Ensure `Mesen` is on the system PATH (`which Mesen`).
 
 Execute the test using the runner script:

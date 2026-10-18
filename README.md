@@ -261,7 +261,7 @@ snes-sfx-demo/
 
 ## Hardware Target: SuperFX 3 (FX3)
 
-The project targets the **SuperFX 3 (FX3)**, a 21.47 MHz RISC coprocessor revision:
+The project targets the **SuperFX 3 (FX3)**, a 21.47*4 MHz RISC coprocessor revision:
 
 ### Register Calling Conventions
 

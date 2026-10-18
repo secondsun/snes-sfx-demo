@@ -19,10 +19,11 @@ This skill guides the creation of automated unit tests for SuperFX (GSU) assembl
 2. **Configure Title**: Update `ROM_TITLE` in `libSFX.cfg` (exactly 21 characters).
 3. **SNES Harness (`Test.s`)**: Define test input data in `.segment "GSUDATA"` (ROM Bank `$04`) if needed.
 4. **GSU Harness (`Test.sgs`)**: Allocate buffers in `.segment "GSURAM"`, invoke the code under test in `GSUCODE`, let memory settle with NOPs, and halt at `test_stop:`.
-5. **Build**: Run `make clean all` in `tests/<test_name>/`.
-6. **Extract Symbols**: Parse `Test.cpu.sym` to check word alignment and get 16-bit RAM offsets.
-7. **Write Lua Assertions (`test.lua`)**: Hook `test_stop` execution callback on GSU (`cpuType = 4`), inspect RAM, validate against expectations, and call `emu.stop(0)` or `emu.stop(1)`.
-8. **Execute**: Run `Mesen --testrunner test.lua Test.sfc`.
+5. **Audit Invariants**: Invoke `retro-superfx_lsp:sfx_audit_invariants` to verify 8 NOPs before stop, word alignment, and FX3 validity.
+6. **Build**: Run `make clean all` in `tests/<test_name>/`.
+7. **Extract Symbols**: Parse `Test.cpu.sym` to check word alignment and get 16-bit RAM offsets.
+8. **Write Lua Assertions (`test.lua`)**: Hook `test_stop` execution callback on GSU (`cpuType = 4`), inspect RAM, validate against expectations, and call `emu.stop(0)` or `emu.stop(1)`.
+9. **Execute**: Run `retro-superfx_mesen:run_sfx_test` headlessly via `call_mcp_tool` (or fallback to `run_test.sh`).
 
 ---
 
@@ -82,7 +83,23 @@ Modify `Test.sgs`:
 
 ---
 
-### Step 4: Build Test
+### Step 4: Audit Assembly Invariants (retro-superfx_lsp MCP Tool)
+Before building, validate that `Test.sgs` satisfies hardware invariants using the `retro-superfx_lsp` MCP tool `sfx_audit_invariants`:
+
+```json
+{
+  "ServerName": "retro-superfx_lsp",
+  "ToolName": "sfx_audit_invariants",
+  "Arguments": {
+    "uri": "file:///path/to/tests/<test_name>/Test.sgs"
+  }
+}
+```
+This catches missing 8-NOP pipeline settling before `stop`, word alignment issues, hardware `MERGE` instructions (unsupported on FX3), and modal lifetime bugs before linking.
+
+---
+
+### Step 5: Build Test
 Compile the test ROM:
 
 ```bash
@@ -92,7 +109,7 @@ Ensure build succeeds with exit code 0.
 
 ---
 
-### Step 5: Extract Symbols & Check Word Alignment
+### Step 6: Extract Symbols & Check Word Alignment
 Use [extract_syms.py](./scripts/extract_syms.py) to inspect `Test.cpu.sym` and update `test.lua`:
 
 ```bash
@@ -103,7 +120,7 @@ Verify that all data buffers (`INPUT`, `OUTPUT`) are reported as **word-aligned*
 
 ---
 
-### Step 6: Configure Lua Test Assertions (`test.lua`)
+### Step 7: Configure Lua Test Assertions (`test.lua`)
 Edit `tests/<test_name>/test.lua`:
 - Intercept `test_stop`:
   ```lua
@@ -116,7 +133,37 @@ Edit `tests/<test_name>/test.lua`:
 
 ---
 
-### Step 7: Run and Verify Test
+### Step 8: Run and Verify Test
+
+#### Primary Method: retro-superfx_mesen MCP Server
+Agents should execute tests headlessly using the `retro-superfx_mesen` MCP server:
+
+```json
+{
+  "ServerName": "retro-superfx_mesen",
+  "ToolName": "run_sfx_test",
+  "Arguments": {
+    "test_name": "<test_name>",
+    "timeout_seconds": 15
+  }
+}
+```
+
+For parameterized test vectors:
+```json
+{
+  "ServerName": "retro-superfx_mesen",
+  "ToolName": "assert_sfx_math",
+  "Arguments": {
+    "test_name": "<test_name>",
+    "input_overrides": { "INPUT_LABEL": 100 },
+    "expected_outputs": { "OUTPUT_LABEL": 10 },
+    "timeout_seconds": 15
+  }
+}
+```
+
+#### Fallback CLI Execution
 Run using [run_test.sh](./scripts/run_test.sh) or directly with Mesen:
 
 ```bash
