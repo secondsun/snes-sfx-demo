@@ -12,13 +12,14 @@ INPUT:
 .res .sizeof(vector3)
 OUTPUT:
 .res .sizeof(vector3)
+TEST_OUTPUT = OUTPUT
 
 .segment "GSUCODE"
 GSU_Code:
 
 ; Setup stack
 init_stack
-register v1
+register v1, dst
 
 test_setup:
 	iwt r12, #33
@@ -28,7 +29,8 @@ test_call:
 	gsu_stack_push r12
 	gsu_stack_push r13
 	iwt v1, #INPUT
-	call vector3_normalize v1
+	iwt dst, #OUTPUT
+	call vector3_normalize v1, dst
 	; LET MEMORY SETTLE
 	nop
 	nop

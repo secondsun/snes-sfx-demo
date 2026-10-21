@@ -9,13 +9,16 @@
 .segment "GSURAM"
 INPUT:
 .res .sizeof(vector3)
+TEST_OUTPUT:
+.res .sizeof(vector3)
+OUTPUT = TEST_OUTPUT
 
 .segment "GSUCODE"
 GSU_Code:
 
 ; Setup stack
 init_stack
-register v1
+register v1, dst
 
 test_setup:
 	iwt r12, #8
@@ -26,7 +29,8 @@ test_call:
 	gsu_stack_push r13
 
 	iwt v1, #INPUT
-	call vector3_negate v1
+	iwt dst, #TEST_OUTPUT
+	call vector3_negate v1, dst
 
 	; Let memory settle
 	nop

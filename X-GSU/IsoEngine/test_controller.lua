@@ -1,9 +1,37 @@
 -- Automated controller integration test for IsoEngine in Mesen CE
-local ADDR_JOYPAD   = 0x03FC
-local ADDR_ISO_CAM  = 0x03FE
-local ADDR_YAW      = 0x03FE
-local ADDR_CENTER_X = 0x0404
-local ADDR_CENTER_Y = 0x0406
+local ADDR_JOYPAD   = 0x09D6
+local ADDR_ISO_CAM  = 0x09D8
+local ADDR_YAW      = 0x09D8
+local ADDR_CENTER_X = 0x09DE
+local ADDR_CENTER_Y = 0x09E0
+
+-- Dynamically resolve symbols from SuperFX.cpu.sym if available
+local function load_symbols()
+    local paths = { "SuperFX.cpu.sym", "snes-sfx-demo/X-GSU/IsoEngine/SuperFX.cpu.sym" }
+    for _, path in ipairs(paths) do
+        local f = io.open(path, "r")
+        if f then
+            for line in f:lines() do
+                local addr, sym = line:match("^al (%x+) %.(%w+)")
+                if addr and sym then
+                    local num = tonumber(addr, 16) & 0xFFFF
+                    if sym == "GSU_JOYPAD" then
+                        ADDR_JOYPAD = num
+                    elseif sym == "ISO_CAM" then
+                        ADDR_ISO_CAM = num
+                        ADDR_YAW = num
+                        ADDR_CENTER_X = num + 6
+                        ADDR_CENTER_Y = num + 8
+                    end
+                end
+            end
+            f:close()
+            print(string.format("Loaded symbols: GSU_JOYPAD=0x%04X, ISO_CAM=0x%04X", ADDR_JOYPAD, ADDR_ISO_CAM))
+            return
+        end
+    end
+end
+load_symbols()
 
 local frame_count = 0
 local current_inputs = {}

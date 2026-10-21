@@ -21,6 +21,12 @@ The per-frame collection of 2D screen-space vertex coordinates computed during t
 ### Target Cell
 The focal coordinate on the isometric game board around which the camera orbits and at which scene geometry is anchored.
 
+### Destination Parameter Seam
+An interface convention for vector and arithmetic operations where callers supply an explicit memory address (`dst`) to receive results, enabling zero-copy pipelines, in-place mutation, and call-chaining without hidden global buffers.
+
+### Stack-Allocated Frame
+Temporary data storage dynamically allocated on `gsu_stack_ram` via `gsu_stack_alloc` / `gsu_stack_free` using register `R10` (`stackPointer`), replacing singleton global RAM variables.
+
 ### Winding Order
 The clockwise or counter-clockwise sequence of a face's projected 2D vertices on screen, whose signed area indicates whether the face is front-facing or back-facing relative to the camera.
 

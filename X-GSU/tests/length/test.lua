@@ -1,7 +1,7 @@
 test_setup = 0x0003
 test_stop  = 0x0026
-INPUT      = 0x0AD0
-OUTPUT     = 0x0AD6
+INPUT      = 0x10D8
+OUTPUT     = 0x10DE
 
 local input = {
 	{0x0015, 0x0000, 0x0000},   -- Vector v1

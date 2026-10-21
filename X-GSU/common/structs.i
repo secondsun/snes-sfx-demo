@@ -46,7 +46,7 @@
       center_y .word
    .endstruct
 .struct gsu_stack
-	entries  .res $200 ; 512 Bytes of stack
+	entries  .res $800 ; 2048 Bytes of stack
 	.endstruct
 
 .struct rnc_header

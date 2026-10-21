@@ -1,8 +1,8 @@
 test_setup = 0x0003
-test_stop  = 0x0028
-INPUT_A    = 0x0AD2
-INPUT_B    = 0x0AD8
-OUTPUT     = 0x08F4
+test_stop  = 0x002D
+INPUT_A    = 0x10E0
+INPUT_B    = 0x10E6
+OUTPUT     = 0x10EC
 
 local cases = {
 	{

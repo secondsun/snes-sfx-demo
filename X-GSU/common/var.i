@@ -8,20 +8,6 @@ __VARS_DEFINED__ = 1
 gsu_stack_ram:
 	.res .sizeof(gsu_stack)
 	
-vector_normalize_out:
-  .res .sizeof(vector3)
-_normalize_small_big_reciprocal_temp:
-  .res 2
-VECTOR_SUBTRACT_OUT:
-  .res .sizeof(vector3)
-VECTOR_ADD_OUT:
-  .res .sizeof(vector3)
-VECTOR_NEGATE_OUT:
-  .res .sizeof(vector3)
-VECTOR_CROSS_OUT:
-  .res .sizeof(vector3)
-VECTOR_TRANSFORM_OUT:
-  .res .sizeof(vector3)
 RNC_HEADER:
   .res .sizeof(rnc_header)
 ;Global Camera   

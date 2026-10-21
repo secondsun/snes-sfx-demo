@@ -11,13 +11,16 @@ INPUT_A:
 .res .sizeof(vector3)
 INPUT_B:
 .res .sizeof(vector3)
+TEST_OUTPUT:
+.res .sizeof(vector3)
+OUTPUT = TEST_OUTPUT
 
 .segment "GSUCODE"
 GSU_Code:
 
 ; Setup stack
 init_stack
-register v1, v2
+register v1, v2, dst
 
 test_setup:
 	iwt r12, #8
@@ -29,7 +32,8 @@ test_call:
 
 	iwt v1, #INPUT_A
 	iwt v2, #INPUT_B
-	call vector3_add v1, v2
+	iwt dst, #TEST_OUTPUT
+	call vector3_add v1, v2, dst
 
 	; Let memory settle
 	nop

@@ -86,7 +86,9 @@ def sync_labels(sym_path: Path, lua_path: Path) -> bool:
             prefix, var_name, current_val_str, suffix = m.groups()
             sym_name = var_name
             if sym_name not in symbols and sym_name == "OUTPUT":
-                if "subtract" in test_dir_name:
+                if "TEST_OUTPUT" in symbols:
+                    sym_name = "TEST_OUTPUT"
+                elif "subtract" in test_dir_name:
                     sym_name = "VECTOR_SUBTRACT_OUT"
                 elif "add" in test_dir_name:
                     sym_name = "VECTOR_ADD_OUT"

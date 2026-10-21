@@ -1,9 +1,9 @@
 test_setup = 0x0003
 test_stop  = 0x0042
-YAW_INPUT  = 0x05FA
-ISO_CAM    = 0x05FC
-CUBE_V3    = 0x0606
-CUBE_V2    = 0x0636
+YAW_INPUT  = 0x0BD4
+ISO_CAM    = 0x0BD6
+CUBE_V3    = 0x0BE0
+CUBE_V2    = 0x0C10
 
 local CENTER_X = 128
 local CENTER_Y = 80

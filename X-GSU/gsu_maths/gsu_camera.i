@@ -37,37 +37,25 @@
 ; Out:      out = address of LOOKAT_MATRIX
 ; Clobbers: All
 function camera_lookAt : out
-    register p1, p2, res, dot_val
+    register p1, p2, p_z, p_x, p_y, dot_val
 
-    ;zaxis = Math.normalize(lookAt.subtract(eye));    
+    ; zaxis = Math.normalize(lookAt.subtract(eye));
     iwt p1, #(CAMERA + camera::eye)
     iwt p2, #(CAMERA + camera::lookAt)
-    call vector3_subtract p1, p2 : res
-    call vector3_normalize res : res
-    
-    iwt p2, #(__LOOKAT_ZAXIS__)
-    ;copy the normalized vector to ZAXIS
-    call vector3_copy res, p2
-camera_lookAt_XAXIS:
-    ;xaxis = Math.normalize(up.cross(zaxis));
-    iwt p1, #(CAMERA + camera::up)
-    iwt p2, #(__LOOKAT_ZAXIS__)
-    call vector3_cross p1, p2 : res
-    call vector3_normalize res : res
-    
-    iwt p2, #(__LOOKAT_XAXIS__)
-    ;copy the normalized vector to XAXIS
-    call vector3_copy res, p2
+    iwt p_z, #(__LOOKAT_ZAXIS__)
+    call vector3_subtract p1, p2, p_z
+    call vector3_normalize p_z, p_z
 
-    ;yaxis = xaxis.cross(zaxis);
-    
-    iwt p1, #(__LOOKAT_ZAXIS__)
-    iwt p2, #(__LOOKAT_XAXIS__)
-    call vector3_cross p1, p2 : res
-    
-    iwt p2, #(__LOOKAT_YAXIS__)
-    ;copy the cross vector to YAXIS
-    call vector3_copy res, p2
+camera_lookAt_XAXIS:
+    ; xaxis = Math.normalize(up.cross(zaxis));
+    iwt p1, #(CAMERA + camera::up)
+    iwt p_x, #(__LOOKAT_XAXIS__)
+    call vector3_cross p1, p_z, p_x
+    call vector3_normalize p_x, p_x
+
+    ; yaxis = xaxis.cross(zaxis);
+    iwt p_y, #(__LOOKAT_YAXIS__)
+    call vector3_cross p_z, p_x, p_y
 
     iwt p1, #(__LOOKAT_XAXIS__)
     iwt p2, #(CAMERA + camera::eye)
@@ -87,7 +75,6 @@ camera_lookAt_XAXIS:
     iwt p1, #(__LOOKAT_ZAXIS__)
     call vector3_dot p1, p2 : dot_val
 
-    
     fixed88_negate dot_val
     sm (LOOKAT_MATRIX + 22), dot_val
 

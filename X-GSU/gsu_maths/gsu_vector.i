@@ -72,11 +72,11 @@ function vector3_copy src, dst : out
     return out
 endfunction
 
-; Calculates cross product of two 3D vectors (v1 x v2)
-; In:       v1 = address of first vector, v2 = address of second vector
-; Out:      out = address of result vector (VECTOR_CROSS_OUT)
+; Calculates cross product of two 3D vectors (v1 x v2) into dst
+; In:       v1 = address of first vector, v2 = address of second vector, dst = destination vector address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function vector3_cross v1, v2 : out
+function vector3_cross v1, v2, dst : out
   register mul_a, mul_b = r6, prod1, prod2
 
   ;Adjust v1, v2 to (v1+2),(v2+4)
@@ -110,8 +110,7 @@ function vector3_cross v1, v2 : out
   ;Begin subtract this.y*other.z - this.z*other.y
   with prod1
   sub prod2
-  ;Write out.x
-  sm (VECTOR_CROSS_OUT), prod1
+  gsu_stack_push prod1 ; Stage out.x on stack
 
   ;Adjust (v1+4),(v2+2) to (v1+4),(v2)
   with v2
@@ -142,8 +141,7 @@ function vector3_cross v1, v2 : out
   ;Begin subtract this.z*other.x - this.x*other.z
   with prod1
   sub prod2
-  ;Write out.y
-  sm (VECTOR_CROSS_OUT+2), prod1
+  gsu_stack_push prod1 ; Stage out.y on stack
 
   ;Adjust (v1),(v2+4) to (v1)*(v2+2)
   with v2
@@ -173,11 +171,29 @@ function vector3_cross v1, v2 : out
 
   ;Begin subtract this.x*other.y - this.y*other.x
   with prod1
-  sub prod2
-  ;Write out.z
-  sm (VECTOR_CROSS_OUT+4), prod1
+  sub prod2 ; prod1 = out.z
 
-  iwt out, #VECTOR_CROSS_OUT
+  ; Write out.z to dst + 4
+  with dst
+  add #4
+  from prod1
+  stw (dst)
+
+  ; Pop out.y and write to dst + 2
+  dec dst
+  dec dst
+  gsu_stack_pop prod1
+  from prod1
+  stw (dst)
+
+  ; Pop out.x and write to dst + 0
+  dec dst
+  dec dst
+  gsu_stack_pop prod1
+  from prod1
+  stw (dst)
+
+  move out, dst
   return out
 endfunction
 
@@ -231,12 +247,14 @@ function vector3_dot v1, v2 : dot
   return dot
 endfunction
 
-; Calculates sum of two 3D vectors (v1 + v2)
-; In:       v1 = address of first vector, v2 = address of second vector
-; Out:      out = address of sum vector (VECTOR_ADD_OUT)
+; Calculates sum of two 3D vectors (v1 + v2) into dst
+; In:       v1 = address of first vector, v2 = address of second vector, dst = destination vector address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function vector3_add v1, v2 : out
-  register comp1, comp2
+function vector3_add v1, v2, dst : out
+  register comp1, comp2, dptr
+
+  move dptr, dst
 
   to comp1
   ldw (v1)
@@ -248,7 +266,10 @@ function vector3_add v1, v2 : out
   add #2
   with comp1
   add comp2
-  sm (VECTOR_ADD_OUT), comp1
+  from comp1
+  stw (dptr)
+  inc dptr
+  inc dptr
 
   to comp1
   ldw (v1)
@@ -260,7 +281,10 @@ function vector3_add v1, v2 : out
   add #2
   with comp1
   add comp2
-  sm (VECTOR_ADD_OUT+2), comp1
+  from comp1
+  stw (dptr)
+  inc dptr
+  inc dptr
 
   to comp1
   ldw (v1)
@@ -268,55 +292,58 @@ function vector3_add v1, v2 : out
   ldw (v2)
   with comp1
   add comp2
-  sm (VECTOR_ADD_OUT + 4), comp1
+  from comp1
+  stw (dptr)
 
-  iwt out, #VECTOR_ADD_OUT
-
+  move out, dst
   return out
 endfunction
 
 
-; Negates each component of a 3D vector
-; In:       v1 = address of vector to negate
-; Out:      out = address of negated vector (VECTOR_NEGATE_OUT)
+; Negates each component of a 3D vector into dst
+; In:       v1 = address of vector to negate, dst = destination vector address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function vector3_negate v1 : out
-  register val = r0
+function vector3_negate v1, dst : out
+  register val = r0, dptr
+
+  move dptr, dst
 
   ldw (v1) ; val = vector.x
   with v1
   add #2 ; v1 = &vector.y
   not
   add #1 ; val = negated.x
-  
-  sm (VECTOR_NEGATE_OUT), val ; Write negate.x
+  stw (dptr)
+  inc dptr
+  inc dptr
 
   ldw (v1) ; val = vector.y
   with v1
   add #2 ; v1 = &vector.z
   not
   add #1 ; val = negated.y
-  
-  sm (VECTOR_NEGATE_OUT + 2), val ; Write negate.y
-
+  stw (dptr)
+  inc dptr
+  inc dptr
 
   ldw (v1) ; val = vector.z
   not
   add #1 ; val = negated.z
-  
-  sm (VECTOR_NEGATE_OUT + 4), val ; Write negate.z
-  iwt out, #VECTOR_NEGATE_OUT
+  stw (dptr)
 
+  move out, dst
   return out
-
 endfunction
 
-; Calculates difference of two 3D vectors (v1 - v2)
-; In:       v1 = address of vector to subtract from, v2 = address of vector to subtract
-; Out:      out = address of result vector (VECTOR_SUBTRACT_OUT)
+; Calculates difference of two 3D vectors (v1 - v2) into dst
+; In:       v1 = address of vector to subtract from, v2 = address of vector to subtract, dst = destination vector address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function vector3_subtract v1, v2 : out
-  register comp1, comp2
+function vector3_subtract v1, v2, dst : out
+  register comp1, comp2, dptr
+
+  move dptr, dst
 
   to comp1
   ldw (v1)
@@ -328,7 +355,10 @@ function vector3_subtract v1, v2 : out
   add #2
   with comp1
   sub comp2
-  sm (VECTOR_SUBTRACT_OUT), comp1
+  from comp1
+  stw (dptr)
+  inc dptr
+  inc dptr
 
   to comp1
   ldw (v1)
@@ -340,7 +370,10 @@ function vector3_subtract v1, v2 : out
   add #2
   with comp1
   sub comp2
-  sm (VECTOR_SUBTRACT_OUT+2), comp1
+  from comp1
+  stw (dptr)
+  inc dptr
+  inc dptr
 
   to comp1
   ldw (v1)
@@ -348,21 +381,19 @@ function vector3_subtract v1, v2 : out
   ldw (v2)
   with comp1
   sub comp2
-  sm (VECTOR_SUBTRACT_OUT + 4), comp1
+  from comp1
+  stw (dptr)
 
-  iwt out, #VECTOR_SUBTRACT_OUT
-
+  move out, dst
   return out
 endfunction
 
-; Normalizes a 3D vector to unit length
-; In:       v1 = address of vector to normalize
-; Out:      out = address of normalized vector (vector_normalize_out)
+; Normalizes a 3D vector to unit length into dst
+; In:       v1 = address of vector to normalize, dst = destination vector address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function vector3_normalize v1 : out
+function vector3_normalize v1, dst : out
   register len, one, len_hi = r0
-  ;store reference to in
-  sm (_normalize_small_big_reciprocal_temp), v1
   ;get length
   call vector3_length v1 : len
   
@@ -377,25 +408,24 @@ function vector3_normalize v1 : out
   bmi small
   nop
 big:  ;calculate using 16 fractional bits and no int bit
-  call _normalize_big len : out
+  call _normalize_big v1, len, dst : out
   return out
 small:  ;calculate using 8 fractional bits and 8 int bits
-  call _normalize_small len : out
+  call _normalize_small v1, len, dst : out
   return out
 endfunction
 
 ; Normalizes vector using 16 fractional bits (private helper)
-; In:       len = length of vector, _normalize_small_big_reciprocal_temp = address of vector
-; Out:      out = address of normalized vector (vector_normalize_out)
+; In:       v1 = address of vector, len = length of vector, dst = destination address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function _normalize_big len : out
+function _normalize_big v1, len, dst : out
   register inv_len = r6, in_ptr, out_ptr
   call reciprocal016 len : inv_len
-  ; Get in from temp
-  lm in_ptr, (_normalize_small_big_reciprocal_temp) ; addr of vector to get value of
-  iwt out_ptr, #vector_normalize_out
+  move in_ptr, v1
+  move out_ptr, dst
 
-  ;(vector_normalize_out.x) = (in_ptr.x * inv_len)
+  ;(dst.x) = (in_ptr.x * inv_len)
   ldw (in_ptr) ;r0 = in.x
   lmult ; r4 = decimal bits
   stw (out_ptr)
@@ -416,22 +446,21 @@ function _normalize_big len : out
   lmult ; r4 = decimal bits
   stw (out_ptr)
   
-  iwt out, #vector_normalize_out
+  move out, dst
   return out
 endfunction
 
 ; Normalizes vector using 8 fractional bits (private helper)
-; In:       len = length of vector, _normalize_small_big_reciprocal_temp = address of vector
-; Out:      out = address of normalized vector (vector_normalize_out)
+; In:       v1 = address of vector, len = length of vector, dst = destination address
+; Out:      out = destination vector address (dst)
 ; Clobbers: All
-function _normalize_small len : out
+function _normalize_small v1, len, dst : out
   register inv_len = r6, in_ptr, out_ptr, comp = r0
   call reciprocal len : inv_len
-  ; Get in from temp
-  lm in_ptr, (_normalize_small_big_reciprocal_temp) ; addr of vector to get value of
-  iwt out_ptr, #vector_normalize_out
+  move in_ptr, v1
+  move out_ptr, dst
 
-  ;(vector_normalize_out.x) = (in_ptr.x * inv_len)
+  ;(dst.x) = (in_ptr.x * inv_len)
   ldw (in_ptr) ;comp = in.x
   condensed_lmult comp, comp; fixed 88 of this.x*1/len
   
@@ -455,8 +484,7 @@ function _normalize_small len : out
 
   stw (out_ptr)
   
-  iwt out, #vector_normalize_out
-
+  move out, dst
   return out
 endfunction
 
@@ -511,15 +539,17 @@ function vector3_length v1 : len
   return len
 endfunction
 
-; Transforms a 3D vector by multiplying with a 4x4 matrix (in-place)
-; In:       v1 = address of vector to transform, mat = address of matrix to transform by
-; Out:      Vector at v1 overwritten with transformed coordinates
+; Transforms a 3D vector by multiplying with a 4x4 matrix into dst
+; In:       v1 = address of vector to transform, mat = address of matrix to transform by, dst = destination address
+; Out:      out = destination address (dst)
 ; Clobbers: All
-function vector3_transform v1, mat
-  register out_ptr, mul_vec = r6, mul_mat, sum, prod_y, prod_z, tmp_ptr
-  ; out_ptr = write cursor into VECTOR_TRANSFORM_OUT. Row results must NOT be pushed
-  ; to the stack inside the loop: endfor's restoreloop pops r13/r12 off the top.
-  iwt out_ptr, #VECTOR_TRANSFORM_OUT
+function vector3_transform v1, mat, dst : out
+  register out_ptr, mul_vec = r6, mul_mat, sum, term
+  ; Allocate 6 bytes on stack for intermediate row results (in-place safe when dst == v1)
+  gsu_stack_alloc_bytes 6
+  move out_ptr, r10
+  with out_ptr
+  sub #6
 
  for 3
     to mul_vec
@@ -540,7 +570,9 @@ function vector3_transform v1, mat
     to mul_mat
     ldw (mat) ; mul_mat = matrix[0][1]
 
-    condensed_lmult mul_mat, prod_y; prod_y = v.y * m[0][1]
+    condensed_lmult mul_mat, term; term = v.y * m[0][1]
+    with sum
+    add term
 
     ; setup z* m[0][2]
     with v1
@@ -553,20 +585,16 @@ function vector3_transform v1, mat
     to mul_mat
     ldw (mat) ; mul_mat = matrix[0][2]
 
-    condensed_lmult mul_mat, prod_z; prod_z = v.z * m[0][2]
-    
-    ;quick sum of x*m00,y*m01,z*m02 to sum
+    condensed_lmult mul_mat, term; term = v.z * m[0][2]
     with sum
-    add prod_y
-    with sum
-    add prod_z
+    add term
 
     with mat
     add #2
-    to prod_y
-    ldw (mat) ; prod_y = m[0][3]
+    to term
+    ldw (mat) ; term = m[0][3]
     with sum
-    add prod_y
+    add term
 
     ; Save x*matrix[0][0] +y*matrix[0][1] +z*matrix[0][2] + matrix[0][3];
     from sum
@@ -581,11 +609,14 @@ function vector3_transform v1, mat
     sub #4 ; v1 = @vector
   endfor
 
-  ; copy VECTOR_TRANSFORM_OUT back over the input vector (in-place result)
-  iwt tmp_ptr, #VECTOR_TRANSFORM_OUT
-  call vector3_copy tmp_ptr, v1
+  ; rewind out_ptr back to start of allocated 6 bytes on stack
+  with out_ptr
+  sub #6
+  ; copy row results from stack buffer to dst
+  call vector3_copy out_ptr, dst : out
+  gsu_stack_free_bytes 6
 
-return
+  return out
 endfunction
 
 

@@ -63,7 +63,7 @@
 				.error "gsu_stack_alloc_bytes: S is blank"
 		.endif
 		with r10
-		adds S
+		add #S
 	.endmacro
 
 	; Frees S bytes from the stack
@@ -75,7 +75,7 @@
 				.error "gsu_stack_free_bytes: S is blank"
 		.endif
 		with r10
-		sub S
+		sub #S
 	.endmacro
 	
 	; Frees a struct from the stack

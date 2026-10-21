@@ -124,7 +124,7 @@ test_call:
 	
 
 	for 36
-		call vector3_transform poly_ptr, mat_ptr ;we're testing the camera's lookAt matrix against test polygons
+		call vector3_transform poly_ptr, mat_ptr, poly_ptr ;we're testing the camera's lookAt matrix against test polygons in-place
 		with poly_ptr
 		add #.sizeof(vector3)
 	endfor
