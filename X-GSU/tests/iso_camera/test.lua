@@ -1,13 +1,13 @@
 test_setup = 0x0003
 test_stop  = 0x0042
-YAW_INPUT  = 0x0BD4
-ISO_CAM    = 0x0BD6
-CUBE_V3    = 0x0BE0
-CUBE_V2    = 0x0C10
+YAW_INPUT  = 0x0CC0
+ISO_CAM    = 0x0CC2
+CUBE_V3    = 0x0CD0
+CUBE_V2    = 0x0D00
 
-local CENTER_X = 128
-local CENTER_Y = 80
-local COS_30   = 0x376D
+local SCREEN_CENTER_X = 128
+local SCREEN_CENTER_Y = 80
+local COS_30          = 0x376D
 
 -- 8 unique cube vertices in Q8.8 (R = 32.0 = 0x2000, -R = -32.0 = 0xE000)
 local cube_vertices = {
@@ -56,8 +56,8 @@ local function expected_project(v, sin_yaw, cos_yaw)
     local y_rot = to_signed16((fmult(vx, sin_yaw) + fmult(vz, cos_yaw)) & 0xFFFF)
     local y_acc = to_signed16((math.floor(y_rot / 2) - fmult(vy, COS_30)) & 0xFFFF)
 
-    local sx = CENTER_X + q10_6_to_int(x_acc)
-    local sy = CENTER_Y + q10_6_to_int(y_acc)
+    local sx = SCREEN_CENTER_X + q10_6_to_int(x_acc)
+    local sy = SCREEN_CENTER_Y + q10_6_to_int(y_acc)
     return sx, sy
 end
 
@@ -67,8 +67,8 @@ local fail_count = 0
 function onTestSetup(address, value)
     print("Starting iso_camera test suite (6 yaw angles x 8 vertices)...")
     -- Initialize center_x (+6) and center_y (+8)
-    emu.writeWord(ISO_CAM + 6, CENTER_X, emu.memType.gsuWorkRam)
-    emu.writeWord(ISO_CAM + 8, CENTER_Y, emu.memType.gsuWorkRam)
+    emu.writeWord(ISO_CAM + 6, SCREEN_CENTER_X, emu.memType.gsuWorkRam)
+    emu.writeWord(ISO_CAM + 8, SCREEN_CENTER_Y, emu.memType.gsuWorkRam)
 
     -- Write 8 cube vertices to CUBE_V3
     for i, v in ipairs(cube_vertices) do

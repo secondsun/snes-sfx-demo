@@ -4,6 +4,7 @@
 .include "../common/function.i"
 .include "../common/structs.i"
 .include "../common/var.i"
+.include "../common/util.i"
 .include "./macros/geometry.i"
 .include "./constants.i"
 
@@ -105,24 +106,12 @@ shutdown:
 
 ; Initializes MODEL_V3, MODEL_FACES, and ISO_CAM once on boot.
 function init_iso_scene
-    register dst_ptr, cam_ptr, val
+    register cam_ptr, val
 
     ; Copy 872 bytes (432 bytes MODEL_V3 + 440 bytes MODEL_FACES) from ROM bank 3 to GSURAM
-    ibt r0, #3
-    romb
-    iwt r14, #scene_vertices_rom
-    iwt dst_ptr, #MODEL_V3
-    iwt r12, #872
-    move r13, r15
-        getb
-        inc r14
-        from r0
-        stb (dst_ptr)
-        nop
-        loop
-        inc dst_ptr
+    rom_to_ram scene_vertices_rom, #3, MODEL_V3, 872
 
-    ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80
+    ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80, cam_x = 0, cam_z = 0
     iwt cam_ptr, #ISO_CAM
     iwt val, #1
     call iso_camera_set_yaw cam_ptr, val
@@ -138,6 +127,17 @@ function init_iso_scene
     iwt val, #80
     from val
     stw (cam_ptr) ; center_y = 80
+
+    inc cam_ptr
+    inc cam_ptr
+    iwt val, #0
+    from val
+    stw (cam_ptr) ; cam_x = 0
+
+    inc cam_ptr
+    inc cam_ptr
+    from val
+    stw (cam_ptr) ; cam_z = 0
 
     iwt val, #1
     sm (GSU_INIT_FLAG), val

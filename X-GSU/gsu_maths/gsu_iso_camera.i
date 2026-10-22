@@ -175,10 +175,234 @@ function iso_camera_project_mesh cam_ptr, v3_list_ptr, v2_out_list_ptr, vertex_c
     return
 endfunction
 
+; Updates center_x and center_y in iso_camera by rotating cam_x and cam_z around screen center (128, 80).
+; In:       cam_ptr = address of iso_camera struct
+; Out:      Writes updated center_x (+6) and center_y (+8)
+; Clobbers: r0, r6, allocated registers
+function iso_camera_sync_cam_to_screen cam_ptr
+    register mul_b = r6, sin_val, cos_val, val1, val2, term, ptr
+
+    ; Load sin_yaw (+2) and cos_yaw (+4)
+    move ptr, cam_ptr
+    inc ptr
+    inc ptr
+    to sin_val
+    ldw (ptr)
+    inc ptr
+    inc ptr
+    to cos_val
+    ldw (ptr)
+
+    ; Load cam_x (+10) into val1 and cam_z (+12) into val2
+    move ptr, cam_ptr
+    with ptr
+    add #10
+    to val1
+    ldw (ptr)
+    inc ptr
+    inc ptr
+    to val2
+    ldw (ptr)
+
+    ; dx_q4 = fmult(cam_x, cos) - fmult(cam_z, sin)
+    move mul_b, cos_val
+    from val1
+    to term
+    fmult
+
+    move mul_b, sin_val
+    from val2
+    fmult
+
+    with term
+    sub r0
+
+    ; Convert Q12.4 to integer pixel with +8 rounding and >> 4
+    with term
+    add #8
+    with term
+    asr
+    with term
+    asr
+    with term
+    asr
+    with term
+    asr
+
+    ; cx = 128 + dx
+    iwt r0, #128
+    with term
+    add r0
+
+    ; Store center_x (+6)
+    move ptr, cam_ptr
+    with ptr
+    add #6
+    from term
+    stw (ptr)
+
+    ; dz_q4 = fmult(cam_x, sin) + fmult(cam_z, cos)
+    move mul_b, sin_val
+    from val1
+    to term
+    fmult
+
+    move mul_b, cos_val
+    from val2
+    fmult
+
+    with term
+    add r0
+
+    ; Convert Q12.4 to integer pixel with +8 rounding and >> 4
+    with term
+    add #8
+    with term
+    asr
+    with term
+    asr
+    with term
+    asr
+    with term
+    asr
+
+    ; dy = dz >> 1
+    with term
+    asr
+
+    ; cy = 80 + dy
+    iwt r0, #80
+    with term
+    add r0
+
+    ; Store center_y (+8)
+    inc ptr
+    inc ptr
+    from term
+    stw (ptr)
+
+    return
+endfunction
+
+; Updates cam_x and cam_z in iso_camera from center_x and center_y relative to screen center (128, 80).
+; In:       cam_ptr = address of iso_camera struct
+; Out:      Writes updated cam_x (+10) and cam_z (+12)
+; Clobbers: r0, r6, allocated registers
+function iso_camera_sync_screen_to_cam cam_ptr
+    register mul_b = r6, sin_val, cos_val, val1, val2, term, ptr
+
+    ; Load sin_yaw (+2) and cos_yaw (+4)
+    move ptr, cam_ptr
+    inc ptr
+    inc ptr
+    to sin_val
+    ldw (ptr)
+    inc ptr
+    inc ptr
+    to cos_val
+    ldw (ptr)
+
+    ; Load center_x (+6) and center_y (+8)
+    inc ptr
+    inc ptr
+    to val1
+    ldw (ptr)
+    inc ptr
+    inc ptr
+    to val2
+    ldw (ptr)
+
+    ; val1 = dx_q6 = (cx - 128) << 6
+    iwt r0, #128
+    with val1
+    sub r0
+    with val1
+    add val1
+    with val1
+    add val1
+    with val1
+    add val1
+    with val1
+    add val1
+    with val1
+    add val1
+    with val1
+    add val1
+
+    ; val2 = dz_q6 = ((cy - 80) * 2) << 6 = (cy - 80) << 7
+    iwt r0, #80
+    with val2
+    sub r0
+    with val2
+    add val2
+    with val2
+    add val2
+    with val2
+    add val2
+    with val2
+    add val2
+    with val2
+    add val2
+    with val2
+    add val2
+    with val2
+    add val2
+
+    ; cam_x = (fmult(dx, cos) + fmult(dz, sin)) << 2
+    move mul_b, cos_val
+    from val1
+    to term
+    fmult
+
+    move mul_b, sin_val
+    from val2
+    fmult
+
+    with term
+    add r0
+    with term
+    add term
+    with term
+    add term
+
+    ; Store cam_x (+10)
+    move ptr, cam_ptr
+    with ptr
+    add #10
+    from term
+    stw (ptr)
+
+    ; cam_z = (fmult(dz, cos) - fmult(dx, sin)) << 2
+    move mul_b, cos_val
+    from val2
+    to term
+    fmult
+
+    move mul_b, sin_val
+    from val1
+    fmult
+
+    with term
+    sub r0
+    with term
+    add term
+    with term
+    add term
+
+    ; Store cam_z (+12)
+    inc ptr
+    inc ptr
+    from term
+    stw (ptr)
+
+    return
+endfunction
+
 ; Updates an iso_camera struct based on controller inputs:
 ;   - L / R buttons rotate yaw continuously (1 yaw index = 3 degrees per frame)
 ;     R increments yaw (clockwise), L decrements yaw (counter-clockwise)
 ;     Wraps yaw in range 1..120
+;     Rotates scene around the center of the screen (128, 80)
 ;   - D-pad translates camera around screen plane at 2 pixels/frame:
 ;     Up:    Scene moves down (center_y += 2)
 ;     Down:  Scene moves up   (center_y -= 2)
@@ -189,10 +413,10 @@ endfunction
 ;     center_y in [-48, 208]
 ; In:       cam_ptr = address of iso_camera struct
 ;           pad_val = 16-bit joypad mask (e.g. from SFX_joy1cont)
-; Out:      Updates ISO_CAM yaw, sin_yaw, cos_yaw, center_x, center_y
+; Out:      Updates ISO_CAM yaw, sin_yaw, cos_yaw, center_x, center_y, cam_x, cam_z
 ; Clobbers: r0, r6, r14, allocated registers
 function iso_camera_update_controls cam_ptr, pad_val
-    register yaw, cx, cy, tmp, mask, ptr, yaw_changed
+    register yaw, cx, cy, tmp, mask, ptr, yaw_changed, dpad_changed
 
     iwt yaw_changed, #0
 
@@ -240,6 +464,7 @@ check_yaw_done:
     beq no_yaw_update
     nop
     call iso_camera_set_yaw cam_ptr, yaw
+    call iso_camera_sync_cam_to_screen cam_ptr
 no_yaw_update:
 
     ; --- 2. Translation (D-pad) ---
@@ -254,6 +479,8 @@ no_yaw_update:
     to cy
     ldw (ptr)
 
+    iwt dpad_changed, #0
+
     ; D-pad UP ($0800): Move up -> cy -= 2
     iwt mask, #$0800
     from pad_val
@@ -262,6 +489,7 @@ no_yaw_update:
     nop
     with cy
     sub #2
+    iwt dpad_changed, #1
 
 check_down:
     ; D-pad DOWN ($0400): Move down -> cy += 2
@@ -272,6 +500,7 @@ check_down:
     nop
     with cy
     add #2
+    iwt dpad_changed, #1
 
 check_left:
     ; D-pad LEFT ($0200): Move left -> cx -= 2
@@ -282,6 +511,7 @@ check_left:
     nop
     with cx
     sub #2
+    iwt dpad_changed, #1
 
 check_right:
     ; D-pad RIGHT ($0100): Move right -> cx += 2
@@ -292,6 +522,7 @@ check_right:
     nop
     with cx
     add #2
+    iwt dpad_changed, #1
 
 clamp_bounds:
     ; Clamp center_x: [0, 256] (128 +/- 128)
@@ -316,6 +547,13 @@ clamp_bounds:
     inc ptr
     from cy
     stw (ptr)
+
+    with dpad_changed
+    add #0
+    beq no_dpad_sync
+    nop
+    call iso_camera_sync_screen_to_cam cam_ptr
+no_dpad_sync:
 
     return
 endfunction

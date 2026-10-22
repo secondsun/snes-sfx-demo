@@ -143,12 +143,25 @@ local function onEndFrame()
             return
         end
         print("  [Phase 6] PASSED: Moved right (cx increased) on D-pad RIGHT.")
+        -- Start Phase 6b: Hold R for 20 frames while panned to verify orbit around screen center (128, 80)
+        current_inputs = { r = true }
+    end
+
+    -- Phase 6b check at frame 170: R was held while panned
+    if frame_count == 170 then
+        print(string.format("  [Phase 6b] Orbit check while panned: yaw=%d, cx=%d, cy=%d", yaw, cx, cy))
+        if cx == 138 and cy == 90 then
+            print("FAIL: Model did not orbit around screen center! cx and cy remained static during rotation.")
+            emu.stop(1)
+            return
+        end
+        print("  [Phase 6b] PASSED: Model center orbited around screen center during rotation.")
         -- Start Phase 7: Hold LEFT for 200 frames to hit min clamp (cx = 0)
         current_inputs = { left = true }
     end
 
-    -- Phase 7 check at frame 350: Clamping
-    if frame_count == 350 then
+    -- Phase 7 check at frame 370: Clamping
+    if frame_count == 370 then
         print(string.format("  [Phase 7] Clamping check: cx=%d (expected 0)", cx))
         if cx ~= 0 then
             print(string.format("FAIL: Center X not clamped to 0! cx=%d", cx))

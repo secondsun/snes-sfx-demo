@@ -44,6 +44,8 @@
       cos_yaw  .word
       center_x .word
       center_y .word
+      cam_x    .word
+      cam_z    .word
    .endstruct
 .struct gsu_stack
 	entries  .res $800 ; 2048 Bytes of stack
