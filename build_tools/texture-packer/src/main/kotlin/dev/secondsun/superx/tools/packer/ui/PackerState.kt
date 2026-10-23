@@ -81,8 +81,20 @@ class PackerState {
         prefs?.get("lastImportDirectory", null)?.takeIf { File(it).isDirectory }
     )
 
+    var lastExportDirectory: String? by mutableStateOf(
+        prefs?.get("lastExportDirectory", null)?.takeIf { File(it).isDirectory }
+    )
+
+    fun updateLastExportDirectory(dir: String) {
+        lastExportDirectory = dir
+        try {
+            prefs?.put("lastExportDirectory", dir)
+        } catch (_: Throwable) {}
+    }
+
     // Modals
     var showAboutModal by mutableStateOf(false)
+    var showExportModal by mutableStateOf(false)
     var showExitConfirmationModal by mutableStateOf(false)
     var editingTextureIndex by mutableStateOf<Int?>(null)
     var pendingImport by mutableStateOf<ImportResult.NeedsRemapping?>(null)
@@ -142,11 +154,126 @@ class PackerState {
             currentProjectFile = file
             _projectName.value = file.nameWithoutExtension
             hasUnsavedChanges = false
-            statusMessage = "Saved project '${file.name}' and companion .bin, .pal, .i"
+            statusMessage = "Saved project '${file.name}' and companion assets (.bin, .pal, .i, .png)"
             true
         } catch (e: Exception) {
             errorMessage = "Failed to save project: ${e.message}"
             false
+        }
+    }
+
+    fun exportAllAssets(
+        destinationDir: File,
+        baseName: String,
+        graphicsBinFileName: String = "${baseName}_graphics.bin",
+        paletteBinFileName: String = "${baseName}_palette.bin",
+        indexFileName: String = "${baseName}.i",
+        pngFileName: String = "${baseName}_atlas.png",
+        includeGraphicsBin: Boolean = true,
+        includePaletteBin: Boolean = true,
+        includeIndexFile: Boolean = true,
+        includePng: Boolean = true
+    ): Boolean {
+        return try {
+            ProjectService.exportAssets(
+                destinationDir = destinationDir,
+                baseName = baseName,
+                atlas = atlas,
+                palette = palette,
+                graphicsBinFileName = graphicsBinFileName,
+                paletteBinFileName = paletteBinFileName,
+                indexFileName = indexFileName,
+                pngFileName = pngFileName,
+                includeGraphicsBin = includeGraphicsBin,
+                includePaletteBin = includePaletteBin,
+                includeIndexFile = includeIndexFile,
+                includePng = includePng
+            )
+            updateLastExportDirectory(destinationDir.absolutePath)
+            statusMessage = "Exported assets to '${destinationDir.name}/'"
+            true
+        } catch (e: Exception) {
+            errorMessage = "Failed to export assets: ${e.message}"
+            false
+        }
+    }
+
+    fun promptExportPng(parent: Frame? = null) {
+        val dialog = FileDialog(parent, "Export Atlas PNG", FileDialog.SAVE)
+        dialog.file = "${projectName}_atlas.png"
+        (lastExportDirectory ?: lastImportDirectory)?.let { dir ->
+            if (File(dir).isDirectory) dialog.directory = dir
+        }
+        dialog.isVisible = true
+        val file = dialog.file?.let { File(dialog.directory, it) }
+        if (file != null) {
+            try {
+                TextureRenderer.writeAtlasPng(atlas, palette, file)
+                updateLastExportDirectory(file.parentFile.absolutePath)
+                statusMessage = "Exported PNG to '${file.name}'"
+            } catch (e: Exception) {
+                errorMessage = "Failed to export PNG: ${e.message}"
+            }
+        }
+    }
+
+    fun promptExportPaletteBin(parent: Frame? = null) {
+        val dialog = FileDialog(parent, "Export Palette Binary", FileDialog.SAVE)
+        dialog.file = "${projectName}_palette.bin"
+        (lastExportDirectory ?: lastImportDirectory)?.let { dir ->
+            if (File(dir).isDirectory) dialog.directory = dir
+        }
+        dialog.isVisible = true
+        val file = dialog.file?.let { File(dialog.directory, it) }
+        if (file != null) {
+            try {
+                file.parentFile?.mkdirs()
+                file.writeBytes(palette.toBgr555Binary())
+                updateLastExportDirectory(file.parentFile.absolutePath)
+                statusMessage = "Exported palette binary to '${file.name}'"
+            } catch (e: Exception) {
+                errorMessage = "Failed to export palette: ${e.message}"
+            }
+        }
+    }
+
+    fun promptExportGraphicsBin(parent: Frame? = null) {
+        val dialog = FileDialog(parent, "Export Graphics Binary", FileDialog.SAVE)
+        dialog.file = "${projectName}_graphics.bin"
+        (lastExportDirectory ?: lastImportDirectory)?.let { dir ->
+            if (File(dir).isDirectory) dialog.directory = dir
+        }
+        dialog.isVisible = true
+        val file = dialog.file?.let { File(dialog.directory, it) }
+        if (file != null) {
+            try {
+                file.parentFile?.mkdirs()
+                file.writeBytes(atlas.generateBinary())
+                updateLastExportDirectory(file.parentFile.absolutePath)
+                statusMessage = "Exported graphics binary to '${file.name}'"
+            } catch (e: Exception) {
+                errorMessage = "Failed to export graphics: ${e.message}"
+            }
+        }
+    }
+
+    fun promptExportIndexFile(parent: Frame? = null) {
+        val dialog = FileDialog(parent, "Export ca65 Index File", FileDialog.SAVE)
+        dialog.file = "${projectName}.i"
+        (lastExportDirectory ?: lastImportDirectory)?.let { dir ->
+            if (File(dir).isDirectory) dialog.directory = dir
+        }
+        dialog.isVisible = true
+        val file = dialog.file?.let { File(dialog.directory, it) }
+        if (file != null) {
+            try {
+                file.parentFile?.mkdirs()
+                file.writeText(AtlasIndexGenerator.generate(atlas, projectName))
+                updateLastExportDirectory(file.parentFile.absolutePath)
+                statusMessage = "Exported ca65 index file to '${file.name}'"
+            } catch (e: Exception) {
+                errorMessage = "Failed to export .i file: ${e.message}"
+            }
         }
     }
 

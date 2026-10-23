@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -45,11 +47,26 @@ fun HexPreviewTab(state: PackerState, modifier: Modifier = Modifier) {
             .padding(12.dp)
     ) {
         // --- Palette Binary Header ---
-        Text(
-            text = "SNES BGR555 Palette Binary (${palBytes.size} bytes / 16 words)",
-            style = MaterialTheme.typography.subtitle2,
-            color = Color.White
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "SNES BGR555 Palette Binary (${palBytes.size} bytes / 16 words)",
+                style = MaterialTheme.typography.subtitle2,
+                color = Color.White
+            )
+
+            Button(
+                onClick = { state.promptExportPaletteBin() },
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF059669)),
+                modifier = Modifier.height(26.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text("Export Palette (.bin)...", color = Color.White, fontSize = 11.sp)
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Row(
             modifier = Modifier
@@ -81,11 +98,26 @@ fun HexPreviewTab(state: PackerState, modifier: Modifier = Modifier) {
         // --- Atlas Binary Dump ---
         val selectedTexName = state.selectedTexture?.name
         val highlightInfo = if (selectedTexName != null) " (Highlighting '$selectedTexName')" else ""
-        Text(
-            text = "Texture Atlas Binary (${binBytes.size} bytes)$highlightInfo",
-            style = MaterialTheme.typography.subtitle2,
-            color = Color.White
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Texture Atlas Binary (${binBytes.size} bytes)$highlightInfo",
+                style = MaterialTheme.typography.subtitle2,
+                color = Color.White
+            )
+
+            Button(
+                onClick = { state.promptExportGraphicsBin() },
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF059669)),
+                modifier = Modifier.height(26.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text("Export Graphics (.bin)...", color = Color.White, fontSize = 11.sp)
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
 
         val rowCount = (binBytes.size + 15) / 16

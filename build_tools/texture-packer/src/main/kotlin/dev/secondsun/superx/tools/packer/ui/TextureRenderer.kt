@@ -6,6 +6,7 @@ import dev.secondsun.superx.tools.packer.model.SnesPalette
 import dev.secondsun.superx.tools.packer.model.SourceTexture
 import dev.secondsun.superx.tools.packer.model.TextureAtlas
 import java.awt.image.BufferedImage
+import java.io.File
 
 object TextureRenderer {
 
@@ -62,6 +63,15 @@ object TextureRenderer {
      */
     fun renderAtlasToImageBitmap(atlas: TextureAtlas, palette: SnesPalette): ImageBitmap {
         return renderAtlasToBufferedImage(atlas, palette).toComposeImageBitmap()
+    }
+
+    /**
+     * Exports the entire TextureAtlas to a PNG file with transparency on slot 0.
+     */
+    fun writeAtlasPng(atlas: TextureAtlas, palette: SnesPalette, destinationFile: File) {
+        val image = renderAtlasToBufferedImage(atlas, palette)
+        destinationFile.parentFile?.mkdirs()
+        javax.imageio.ImageIO.write(image, "PNG", destinationFile)
     }
 }
 

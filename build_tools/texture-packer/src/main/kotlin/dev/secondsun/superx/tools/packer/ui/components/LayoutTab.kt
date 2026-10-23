@@ -120,6 +120,17 @@ private fun LayoutToolbar(state: PackerState) {
                 }
             }
         }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Button(
+            onClick = { state.promptExportPng() },
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF059669)),
+            modifier = Modifier.height(26.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp)
+        ) {
+            Text("Export PNG...", color = Color.White, fontSize = 11.sp)
+        }
     }
 }
 

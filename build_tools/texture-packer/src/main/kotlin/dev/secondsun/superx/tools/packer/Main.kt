@@ -117,6 +117,12 @@ fun main() {
 
                 Separator()
 
+                Item("Export Assets...", shortcut = KeyShortcut(Key.E, ctrl = true)) {
+                    state.showExportModal = true
+                }
+
+                Separator()
+
                 Item("Import Bitmap...", shortcut = KeyShortcut(Key.I, ctrl = true)) {
                     state.promptImportFile()
                 }
@@ -183,27 +189,43 @@ fun main() {
                         LeftPane(state = state)
 
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            // Right Tab Selector
-                            TabRow(
-                                selectedTabIndex = state.activeTab.ordinal,
-                                backgroundColor = Color(0xFF22242B),
-                                contentColor = Color(0xFF60A5FA)
+                            // Right Tab Selector & Export Button
+                            Row(
+                                modifier = Modifier.fillMaxWidth().background(Color(0xFF22242B)),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Tab(
-                                    selected = state.activeTab == PackerTab.LAYOUT,
-                                    onClick = { state.activeTab = PackerTab.LAYOUT },
-                                    text = { Text("Layout Editor") }
-                                )
-                                Tab(
-                                    selected = state.activeTab == PackerTab.HEX_PREVIEW,
-                                    onClick = { state.activeTab = PackerTab.HEX_PREVIEW },
-                                    text = { Text("Hex Preview") }
-                                )
-                                Tab(
-                                    selected = state.activeTab == PackerTab.INDEX_PREVIEW,
-                                    onClick = { state.activeTab = PackerTab.INDEX_PREVIEW },
-                                    text = { Text("Index File Preview (.i)") }
-                                )
+                                TabRow(
+                                    selectedTabIndex = state.activeTab.ordinal,
+                                    modifier = Modifier.weight(1f),
+                                    backgroundColor = Color(0xFF22242B),
+                                    contentColor = Color(0xFF60A5FA)
+                                ) {
+                                    Tab(
+                                        selected = state.activeTab == PackerTab.LAYOUT,
+                                        onClick = { state.activeTab = PackerTab.LAYOUT },
+                                        text = { Text("Layout Editor") }
+                                    )
+                                    Tab(
+                                        selected = state.activeTab == PackerTab.HEX_PREVIEW,
+                                        onClick = { state.activeTab = PackerTab.HEX_PREVIEW },
+                                        text = { Text("Hex Preview") }
+                                    )
+                                    Tab(
+                                        selected = state.activeTab == PackerTab.INDEX_PREVIEW,
+                                        onClick = { state.activeTab = PackerTab.INDEX_PREVIEW },
+                                        text = { Text("Index File Preview (.i)") }
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { state.showExportModal = true },
+                                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF059669)),
+                                    modifier = Modifier.padding(end = 12.dp).height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp)
+                                ) {
+                                    Text("Export Assets...", color = Color.White, fontSize = 12.sp)
+                                }
                             }
 
                             // Tab Content
@@ -259,6 +281,7 @@ fun main() {
                 PaletteRemappingModal(state)
                 UnassignPromptModal(state)
                 AboutModal(state)
+                ExportModal(state)
                 ExitConfirmationModal(state, onConfirmExit = ::exitApplication)
 
                 // Error Dialog

@@ -43,15 +43,28 @@ fun IndexPreviewTab(state: PackerState, modifier: Modifier = Modifier) {
                 color = Color.White
             )
 
-            Button(
-                onClick = {
-                    val selection = StringSelection(indexContent)
-                    Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
-                    state.statusMessage = "Copied ca65 .i index to clipboard"
-                },
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF3B82F6))
-            ) {
-                Text("Copy to Clipboard", color = Color.White, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { state.promptExportIndexFile() },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF059669)),
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("Export .i File...", color = Color.White, fontSize = 12.sp)
+                }
+
+                Button(
+                    onClick = {
+                        val selection = StringSelection(indexContent)
+                        Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
+                        state.statusMessage = "Copied ca65 .i index to clipboard"
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF3B82F6)),
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("Copy to Clipboard", color = Color.White, fontSize = 12.sp)
+                }
             }
         }
 

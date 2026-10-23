@@ -1,9 +1,11 @@
 package dev.secondsun.superx.tools.packer.model
 
+import dev.secondsun.superx.tools.packer.ui.TextureRenderer
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import javax.imageio.ImageIO
 
 class ModelTest {
 
@@ -117,7 +119,10 @@ class ModelTest {
         assertTrue(projFile.exists())
         assertTrue(File(tempDir, "test.bin").exists())
         assertTrue(File(tempDir, "test.pal").exists())
+        assertTrue(File(tempDir, "test_graphics.bin").exists())
+        assertTrue(File(tempDir, "test_palette.bin").exists())
         assertTrue(File(tempDir, "test.i").exists())
+        assertTrue(File(tempDir, "test_atlas.png").exists())
 
         val (loadedAtlas, loadedPalette, gridSnap) = ProjectService.loadProject(projFile)
         assertEquals(64, loadedAtlas.width)
@@ -182,6 +187,82 @@ class ModelTest {
         val filled = tex.floodFill(0, 0, 0)
         for (i in 0 until 16 * 16) {
             assertEquals(0, filled.indexedPixels[i].toInt() and 0x0F)
+        }
+    }
+
+    @Test
+    fun testProjectServiceExportAssets(@TempDir tempDir: File) {
+        val pixels = ByteArray(16 * 16) { 5 }
+        val tex = SourceTexture("gem", 16, 16, 0, 0, pixels)
+        val atlas = TextureAtlas(32, 32, listOf(tex))
+        val palette = SnesPalette().withSlot(5, SnesColor(0, 31, 31), assigned = true)
+
+        val exported = ProjectService.exportAssets(
+            destinationDir = tempDir,
+            baseName = "LEVEL1",
+            atlas = atlas,
+            palette = palette
+        )
+
+        assertTrue(exported.graphicsBinFile.exists())
+        assertEquals("LEVEL1_graphics.bin", exported.graphicsBinFile.name)
+        assertEquals(32 * 32, exported.graphicsBinFile.length().toInt())
+        assertArrayEquals(atlas.generateBinary(), exported.graphicsBinFile.readBytes())
+
+        assertTrue(exported.paletteBinFile.exists())
+        assertEquals("LEVEL1_palette.bin", exported.paletteBinFile.name)
+        assertEquals(32, exported.paletteBinFile.length().toInt())
+        assertArrayEquals(palette.toBgr555Binary(), exported.paletteBinFile.readBytes())
+
+        assertTrue(exported.indexFile.exists())
+        assertEquals("LEVEL1.i", exported.indexFile.name)
+        val indexText = exported.indexFile.readText()
+        assertTrue(indexText.contains("TEXTURE_ID_GEM = 0"))
+        assertTrue(indexText.contains("TEXTURE_TABLE:"))
+
+        assertTrue(exported.pngFile.exists())
+        assertEquals("LEVEL1_atlas.png", exported.pngFile.name)
+        val img = ImageIO.read(exported.pngFile)
+        assertNotNull(img)
+        assertEquals(32, img.width)
+        assertEquals(32, img.height)
+    }
+
+    @Test
+    fun testTextureRendererWriteAtlasPng(@TempDir tempDir: File) {
+        val pixels = ByteArray(16 * 16) { 2 }
+        val tex = SourceTexture("box", 16, 16, 16, 16, pixels)
+        val atlas = TextureAtlas(32, 32, listOf(tex))
+        val palette = SnesPalette().withSlot(2, SnesColor(31, 0, 0), assigned = true)
+
+        val pngFile = File(tempDir, "atlas.png")
+        TextureRenderer.writeAtlasPng(atlas, palette, pngFile)
+
+        assertTrue(pngFile.exists())
+        val img = ImageIO.read(pngFile)
+        assertNotNull(img)
+        assertEquals(32, img.width)
+        assertEquals(32, img.height)
+
+        // Top-left (0,0) is unoccupied (slot 0) -> alpha must be 0 (transparent)
+        val transparentRgb = img.getRGB(0, 0)
+        assertEquals(0, (transparentRgb ushr 24) and 0xFF, "Unoccupied texel should be transparent")
+
+        // Pixel at (16, 16) is slot 2 (red) -> alpha must be 255 (opaque)
+        val texelRgb = img.getRGB(16, 16)
+        assertEquals(255, (texelRgb ushr 24) and 0xFF, "Texture texel should be opaque")
+    }
+
+    @Test
+    fun testSampleTexturesProjectIfPresent() {
+        val sampleProj = File("TEXTURES.sfxproj")
+        if (sampleProj.exists()) {
+            val (atlas, palette, gridSnap) = ProjectService.loadProject(sampleProj)
+            ProjectService.saveProject(sampleProj, "TEXTURES", atlas, palette, gridSnap)
+            assertTrue(File("TEXTURES_graphics.bin").exists())
+            assertTrue(File("TEXTURES_palette.bin").exists())
+            assertTrue(File("TEXTURES.i").exists())
+            assertTrue(File("TEXTURES_atlas.png").exists())
         }
     }
 }

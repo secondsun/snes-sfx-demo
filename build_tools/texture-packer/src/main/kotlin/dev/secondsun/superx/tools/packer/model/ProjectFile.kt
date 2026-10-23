@@ -30,8 +30,54 @@ data class ProjectDto(
     val textures: List<ProjectTextureDto>
 )
 
+data class ExportedAssets(
+    val graphicsBinFile: File,
+    val paletteBinFile: File,
+    val indexFile: File,
+    val pngFile: File
+)
+
 object ProjectService {
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
+
+    fun exportAssets(
+        destinationDir: File,
+        baseName: String,
+        atlas: TextureAtlas,
+        palette: SnesPalette,
+        graphicsBinFileName: String = "${baseName}_graphics.bin",
+        paletteBinFileName: String = "${baseName}_palette.bin",
+        indexFileName: String = "${baseName}.i",
+        pngFileName: String = "${baseName}_atlas.png",
+        includeGraphicsBin: Boolean = true,
+        includePaletteBin: Boolean = true,
+        includeIndexFile: Boolean = true,
+        includePng: Boolean = true
+    ): ExportedAssets {
+        destinationDir.mkdirs()
+
+        val gBin = File(destinationDir, graphicsBinFileName)
+        if (includeGraphicsBin) {
+            gBin.writeBytes(atlas.generateBinary())
+        }
+
+        val pBin = File(destinationDir, paletteBinFileName)
+        if (includePaletteBin) {
+            pBin.writeBytes(palette.toBgr555Binary())
+        }
+
+        val idx = File(destinationDir, indexFileName)
+        if (includeIndexFile) {
+            idx.writeText(AtlasIndexGenerator.generate(atlas, baseName))
+        }
+
+        val png = File(destinationDir, pngFileName)
+        if (includePng) {
+            dev.secondsun.superx.tools.packer.ui.TextureRenderer.writeAtlasPng(atlas, palette, png)
+        }
+
+        return ExportedAssets(gBin, pBin, idx, png)
+    }
 
     fun saveProject(
         projectFile: File,
@@ -75,20 +121,32 @@ object ProjectService {
         )
 
         // Write .sfxproj JSON
+        projectFile.parentFile?.mkdirs()
         projectFile.writeText(gson.toJson(dto))
 
-        // Write companion files: .bin, .pal, .i
+        // Write companion files:
         val parentDir = projectFile.parentFile ?: File(".")
         val baseName = projectFile.nameWithoutExtension
 
+        // Graphics binaries
         val binFile = File(parentDir, "$baseName.bin")
         binFile.writeBytes(atlas.generateBinary())
+        val graphicsBinFile = File(parentDir, "${baseName}_graphics.bin")
+        graphicsBinFile.writeBytes(atlas.generateBinary())
 
+        // Palette binaries
         val palFile = File(parentDir, "$baseName.pal")
         palFile.writeBytes(palette.toBgr555Binary())
+        val paletteBinFile = File(parentDir, "${baseName}_palette.bin")
+        paletteBinFile.writeBytes(palette.toBgr555Binary())
 
+        // ca65 assembly index
         val indexFile = File(parentDir, "$baseName.i")
         indexFile.writeText(AtlasIndexGenerator.generate(atlas, baseName))
+
+        // Layout PNG
+        val pngFile = File(parentDir, "${baseName}_atlas.png")
+        dev.secondsun.superx.tools.packer.ui.TextureRenderer.writeAtlasPng(atlas, palette, pngFile)
     }
 
     fun loadProject(projectFile: File): Triple<TextureAtlas, SnesPalette, Int> {
