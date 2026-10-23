@@ -1,7 +1,8 @@
 package dev.secondsun.superx.tools.packer.ui.components
 
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
@@ -11,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -22,6 +24,33 @@ private enum class EditTool {
     PENCIL,
     FLOOD_FILL,
     EYEDROPPER
+}
+
+private fun drawLine(x0: Int, y0: Int, x1: Int, y1: Int, slot: Int, buffer: ByteArray, w: Int, h: Int) {
+    var x = x0
+    var y = y0
+    val dx = kotlin.math.abs(x1 - x0)
+    val dy = -kotlin.math.abs(y1 - y0)
+    val sx = if (x0 < x1) 1 else -1
+    val sy = if (y0 < y1) 1 else -1
+    var err = dx + dy
+    val byteVal = (slot and 0x0F).toByte()
+
+    while (true) {
+        if (x in 0 until w && y in 0 until h) {
+            buffer[y * w + x] = byteVal
+        }
+        if (x == x1 && y == y1) break
+        val e2 = 2 * err
+        if (e2 >= dy) {
+            err += dy
+            x += sx
+        }
+        if (e2 <= dx) {
+            err += dx
+            y += sy
+        }
+    }
 }
 
 @Composable
@@ -38,6 +67,9 @@ fun TextureEditModal(state: PackerState) {
     var activeTool by remember { mutableStateOf(EditTool.PENCIL) }
     var nameError by remember { mutableStateOf<String?>(null) }
 
+    val currentTool by rememberUpdatedState(activeTool)
+    val currentSlot by rememberUpdatedState(activeSlot)
+
     // Undo / Redo history
     val undoStack = remember { ArrayDeque<ByteArray>() }
     val redoStack = remember { ArrayDeque<ByteArray>() }
@@ -45,29 +77,6 @@ fun TextureEditModal(state: PackerState) {
     fun pushUndo(current: ByteArray) {
         undoStack.push(current.copyOf())
         redoStack.clear()
-    }
-
-    fun floodFill(startX: Int, startY: Int, targetSlot: Int, fillSlot: Int) {
-        if (targetSlot == fillSlot) return
-        val w = originalTex.width
-        val h = originalTex.height
-        val queue = ArrayDeque<Pair<Int, Int>>()
-        queue.add(Pair(startX, startY))
-
-        val workingPixels = pixels.copyOf()
-        while (queue.isNotEmpty()) {
-            val (cx, cy) = queue.removeFirst()
-            val idx = cy * w + cx
-            if ((workingPixels[idx].toInt() and 0x0F) == targetSlot) {
-                workingPixels[idx] = (fillSlot and 0x0F).toByte()
-                if (cx > 0) queue.add(Pair(cx - 1, cy))
-                if (cx < w - 1) queue.add(Pair(cx + 1, cy))
-                if (cy > 0) queue.add(Pair(cx, cy - 1))
-                if (cy < h - 1) queue.add(Pair(cx, cy + 1))
-            }
-        }
-        pushUndo(pixels)
-        pixels = workingPixels
     }
 
     Dialog(onDismissRequest = { state.editingTextureIndex = null }) {
@@ -173,6 +182,39 @@ fun TextureEditModal(state: PackerState) {
                     ) {
                         Text("Redo", color = Color.White, fontSize = 11.sp)
                     }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Active Color Indicator
+                    val curColor = state.palette[activeSlot]
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF1E2026))
+                            .border(1.dp, Color(0xFF4B5563), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("Active:", color = Color.LightGray, fontSize = 11.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    if (activeSlot == 0) Color.Transparent else Color(curColor.rgb888 or (0xFF shl 24))
+                                )
+                                .border(1.dp, Color.White, RoundedCornerShape(2.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (activeSlot == 0) Text("T", color = Color.Gray, fontSize = 9.sp)
+                        }
+                        Text(
+                            text = if (activeSlot == 0) "Slot 0 (Transparent)" else "Slot $activeSlot (${curColor.hexString})",
+                            color = Color.White,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -185,23 +227,38 @@ fun TextureEditModal(state: PackerState) {
                     for (slot in 0..15) {
                         val isSelected = activeSlot == slot
                         val color = state.palette[slot]
+                        val isAssigned = state.palette.isAssigned(slot)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(24.dp)
-                                .clip(RoundedCornerShape(2.dp))
+                                .height(26.dp)
+                                .clip(RoundedCornerShape(3.dp))
                                 .background(
                                     if (slot == 0) Color.Transparent else Color(color.rgb888 or (0xFF shl 24))
                                 )
                                 .border(
-                                    width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) Color.Yellow else Color(0xFF6B7280),
-                                    shape = RoundedCornerShape(2.dp)
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) Color(0xFFFBBF24) else if (isAssigned) Color(0xFF9CA3AF) else Color(0xFF4B5563),
+                                    shape = RoundedCornerShape(3.dp)
                                 )
-                                .clickable { activeSlot = slot },
+                                .clickable {
+                                    activeSlot = slot
+                                    state.selectedPaletteSlot = slot
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (slot == 0) Text("T", color = Color.Gray, fontSize = 9.sp)
+                            val textColor = if (slot == 0) {
+                                Color.LightGray
+                            } else {
+                                val lum = (color.r * 299 + color.g * 587 + color.b * 114) / 1000
+                                if (lum > 15) Color.Black else Color.White
+                            }
+                            Text(
+                                text = if (slot == 0) "T" else "$slot",
+                                color = textColor,
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
                     }
                 }
@@ -225,42 +282,69 @@ fun TextureEditModal(state: PackerState) {
                         modifier = Modifier
                             .size((w * pixelSize).dp, (h * pixelSize).dp)
                             .border(1.dp, Color.Gray)
-                            .pointerInput(w, h, activeTool, activeSlot) {
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        val px = (offset.x / (pixelSize * density)).toInt().coerceIn(0, w - 1)
-                                        val py = (offset.y / (pixelSize * density)).toInt().coerceIn(0, h - 1)
-                                        val idx = py * w + px
-                                        when (activeTool) {
-                                            EditTool.PENCIL -> {
-                                                pushUndo(pixels)
-                                                val copy = pixels.copyOf()
-                                                copy[idx] = (activeSlot and 0x0F).toByte()
-                                                pixels = copy
-                                            }
-                                            EditTool.FLOOD_FILL -> {
-                                                val target = pixels[idx].toInt() and 0x0F
-                                                floodFill(px, py, target, activeSlot)
-                                            }
-                                            EditTool.EYEDROPPER -> {
-                                                activeSlot = pixels[idx].toInt() and 0x0F
+                            .pointerInput(w, h) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    down.consume()
+                                    val densityVal = density
+                                    var lastPx = (down.position.x / (pixelSize * densityVal)).toInt().coerceIn(0, w - 1)
+                                    var lastPy = (down.position.y / (pixelSize * densityVal)).toInt().coerceIn(0, h - 1)
+                                    val startIdx = lastPy * w + lastPx
+
+                                    when (currentTool) {
+                                        EditTool.PENCIL -> {
+                                            pushUndo(pixels)
+                                            val working = pixels.copyOf()
+                                            working[startIdx] = (currentSlot and 0x0F).toByte()
+                                            pixels = working
+
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.firstOrNull() ?: break
+                                                if (!change.pressed) break
+                                                change.consume()
+                                                val curPx = (change.position.x / (pixelSize * densityVal)).toInt().coerceIn(0, w - 1)
+                                                val curPy = (change.position.y / (pixelSize * densityVal)).toInt().coerceIn(0, h - 1)
+                                                if (curPx != lastPx || curPy != lastPy) {
+                                                    val stroke = pixels.copyOf()
+                                                    drawLine(lastPx, lastPy, curPx, curPy, currentSlot, stroke, w, h)
+                                                    pixels = stroke
+                                                    lastPx = curPx
+                                                    lastPy = curPy
+                                                }
                                             }
                                         }
-                                    },
-                                    onDrag = { change, _ ->
-                                        change.consume()
-                                        if (activeTool == EditTool.PENCIL) {
-                                            val px = (change.position.x / (pixelSize * density)).toInt().coerceIn(0, w - 1)
-                                            val py = (change.position.y / (pixelSize * density)).toInt().coerceIn(0, h - 1)
-                                            val idx = py * w + px
-                                            if ((pixels[idx].toInt() and 0x0F) != activeSlot) {
-                                                val copy = pixels.copyOf()
-                                                copy[idx] = (activeSlot and 0x0F).toByte()
-                                                pixels = copy
+                                        EditTool.FLOOD_FILL -> {
+                                            val target = pixels[startIdx].toInt() and 0x0F
+                                            if (target != currentSlot) {
+                                                pushUndo(pixels)
+                                                val working = pixels.copyOf()
+                                                SourceTexture.floodFillBuffer(working, w, h, lastPx, lastPy, target, currentSlot)
+                                                pixels = working
+                                            }
+                                        }
+                                        EditTool.EYEDROPPER -> {
+                                            val picked = pixels[startIdx].toInt() and 0x0F
+                                            activeSlot = picked
+                                            state.selectedPaletteSlot = picked
+
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.firstOrNull() ?: break
+                                                if (!change.pressed) break
+                                                change.consume()
+                                                val curPx = (change.position.x / (pixelSize * densityVal)).toInt().coerceIn(0, w - 1)
+                                                val curPy = (change.position.y / (pixelSize * densityVal)).toInt().coerceIn(0, h - 1)
+                                                val curIdx = curPy * w + curPx
+                                                val curPicked = pixels[curIdx].toInt() and 0x0F
+                                                if (activeSlot != curPicked) {
+                                                    activeSlot = curPicked
+                                                    state.selectedPaletteSlot = curPicked
+                                                }
                                             }
                                         }
                                     }
-                                )
+                                }
                             }
                     ) {
                         Canvas(modifier = Modifier.fillMaxSize()) {

@@ -1,5 +1,7 @@
 package dev.secondsun.superx.tools.packer.model
 
+import java.util.ArrayDeque
+
 /**
  * An individual power-of-two bitmap graphic imported into a texture project.
  *
@@ -95,6 +97,19 @@ data class SourceTexture(
         return x >= 0 && y >= 0 && x + width <= atlasWidth && y + height <= atlasHeight
     }
 
+    /**
+     * Performs a 4-way flood fill starting at ([startX], [startY]) with [fillSlot].
+     */
+    fun floodFill(startX: Int, startY: Int, fillSlot: Int): SourceTexture {
+        require(startX in 0 until width && startY in 0 until height) { "Coords out of bounds" }
+        require(fillSlot in 0..15) { "Fill slot must be 0..15" }
+        val targetSlot = getPixel(startX, startY)
+        if (targetSlot == fillSlot) return this
+        val newPixels = indexedPixels.copyOf()
+        floodFillBuffer(newPixels, width, height, startX, startY, targetSlot, fillSlot)
+        return copy(indexedPixels = newPixels)
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -134,6 +149,59 @@ data class SourceTexture(
         fun sanitizeToIdentifier(input: String): String {
             val base = input.replace("[^A-Za-z0-9_]".toRegex(), "_")
             return if (base.isEmpty() || (!base[0].isLetter() && base[0] != '_')) "_$base" else base
+        }
+
+        fun floodFillBuffer(
+            pixels: ByteArray,
+            width: Int,
+            height: Int,
+            startX: Int,
+            startY: Int,
+            targetSlot: Int,
+            fillSlot: Int
+        ) {
+            if (targetSlot == fillSlot) return
+            val startIdx = startY * width + startX
+            if ((pixels[startIdx].toInt() and 0x0F) != targetSlot) return
+
+            val queue = ArrayDeque<Int>()
+            pixels[startIdx] = (fillSlot and 0x0F).toByte()
+            queue.add(startIdx)
+
+            while (queue.isNotEmpty()) {
+                val curr = queue.removeFirst()
+                val cx = curr % width
+                val cy = curr / width
+
+                if (cx > 0) {
+                    val left = curr - 1
+                    if ((pixels[left].toInt() and 0x0F) == targetSlot) {
+                        pixels[left] = (fillSlot and 0x0F).toByte()
+                        queue.add(left)
+                    }
+                }
+                if (cx < width - 1) {
+                    val right = curr + 1
+                    if ((pixels[right].toInt() and 0x0F) == targetSlot) {
+                        pixels[right] = (fillSlot and 0x0F).toByte()
+                        queue.add(right)
+                    }
+                }
+                if (cy > 0) {
+                    val up = curr - width
+                    if ((pixels[up].toInt() and 0x0F) == targetSlot) {
+                        pixels[up] = (fillSlot and 0x0F).toByte()
+                        queue.add(up)
+                    }
+                }
+                if (cy < height - 1) {
+                    val down = curr + width
+                    if ((pixels[down].toInt() and 0x0F) == targetSlot) {
+                        pixels[down] = (fillSlot and 0x0F).toByte()
+                        queue.add(down)
+                    }
+                }
+            }
         }
     }
 }

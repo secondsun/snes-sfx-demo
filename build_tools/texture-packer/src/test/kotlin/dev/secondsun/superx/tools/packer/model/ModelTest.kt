@@ -131,5 +131,58 @@ class ModelTest {
         assertTrue(loadedPalette.isAssigned(3))
         assertEquals(SnesColor(31, 31, 0), loadedPalette[3])
     }
+
+    @Test
+    fun testSourceTextureFloodFillContiguous() {
+        val pixels = ByteArray(16 * 16) { 0 }
+        val tex = SourceTexture("test", 16, 16, 0, 0, pixels)
+        val filled = tex.floodFill(4, 4, 3)
+
+        assertEquals(3, filled.getPixel(4, 4))
+        for (y in 0 until 16) {
+            for (x in 0 until 16) {
+                assertEquals(3, filled.getPixel(x, y), "Pixel at ($x, $y) should be filled with 3")
+            }
+        }
+    }
+
+    @Test
+    fun testSourceTextureFloodFillWithBoundaries() {
+        val pixels = ByteArray(16 * 16) { 0 }
+        // Create vertical barrier at x = 8
+        for (y in 0 until 16) {
+            pixels[y * 16 + 8] = 1
+        }
+        val tex = SourceTexture("test", 16, 16, 0, 0, pixels)
+        val filled = tex.floodFill(2, 2, 5)
+
+        for (y in 0 until 16) {
+            for (x in 0 until 16) {
+                when {
+                    x < 8 -> assertEquals(5, filled.getPixel(x, y), "Left side should be filled with 5")
+                    x == 8 -> assertEquals(1, filled.getPixel(x, y), "Barrier should remain 1")
+                    else -> assertEquals(0, filled.getPixel(x, y), "Right side should remain 0")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun testSourceTextureFloodFillBufferNoOp() {
+        val pixels = ByteArray(16 * 16) { 2 }
+        val before = pixels.copyOf()
+        SourceTexture.floodFillBuffer(pixels, 16, 16, 0, 0, 2, 2)
+        assertArrayEquals(before, pixels)
+    }
+
+    @Test
+    fun testSourceTextureFloodFillTransparency() {
+        val pixels = ByteArray(16 * 16) { 4 }
+        val tex = SourceTexture("test", 16, 16, 0, 0, pixels)
+        val filled = tex.floodFill(0, 0, 0)
+        for (i in 0 until 16 * 16) {
+            assertEquals(0, filled.indexedPixels[i].toInt() and 0x0F)
+        }
+    }
 }
 
