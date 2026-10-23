@@ -30,3 +30,20 @@ Temporary data storage dynamically allocated on `gsu_stack_ram` via `gsu_stack_a
 ### Winding Order
 The clockwise or counter-clockwise sequence of a face's projected 2D vertices on screen, whose signed area indicates whether the face is front-facing or back-facing relative to the camera.
 
+### Source Texture
+An individual power-of-two bitmap graphic imported into a texture project to be quantized, edited, and positioned within a Texture Atlas.
+_Avoid_: Imported tile, bitmap graphic, source image
+
+### Texture Atlas
+The composite power-of-two graphics buffer into which multiple Source Textures are positioned and merged for runtime texture mapping.
+_Avoid_: Binary graphics file, texture map
+
+### Texel
+A single pixel element within a Source Texture or Texture Atlas representing a 4-bit palette color index (`0` for transparent, `1`–`15` for opaque colors).
+_Avoid_: Tile pixel, byte pixel
+
+### Atlas Index
+The symbolic metadata manifest describing the Texture Atlas dimensions and each Source Texture's identifier, coordinates, dimensions, and byte offset for use by the engine.
+_Avoid_: Index file, texture header
+
+
