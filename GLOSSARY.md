@@ -18,6 +18,38 @@ An orthographic camera rig with a fixed downward elevation pitch that orbits hor
 ### Projected Vertex Cache
 The per-frame collection of 2D screen-space vertex coordinates computed during the first frame-half pass and reused during the second frame-half pass.
 
+### Map Grid
+The rectangular $N \times M$ array of Map Cells that defines a tactical battlefield.
+_Avoid_: Game model, board, level mesh
+
+### Map Cell
+A single $(i, j)$ coordinate slot on the Map Grid holding a Base Elevation, a Shape Archetype, texture references, and Neighbor Skirt Drops.
+_Avoid_: Tile, block, map square
+
+### Base Elevation
+The height (in Half-Block steps) of the solid, opaque vertical column beneath a Map Cell's Shape Archetype.
+_Avoid_: Z-height, floor height, Y-offset
+
+### Cell Skirt
+The vertical side faces of a Map Cell's solid column that are exposed above adjacent Map Cells or at the outer perimeter of the Map Grid.
+_Avoid_: Cliff wall, pillar side, drop face
+
+### Shape Archetype
+A canonical 3D surface template from a fixed pool (such as Flat, Wedge, Stairs, Liquid, Pillar, or Foliage Cross) projected once per camera yaw angle and stamped at a Map Cell's Base Elevation.
+_Avoid_: Prop, model object, tile model
+
+### Edge Panel
+A double-sided vertical quad rising above a Map Cell's Base Elevation along one of its four compass edges (North, East, South, or West) to form parapets, railings, awnings, or wall facades.
+_Avoid_: Thin wall, decal, billboard wall
+
+### Canonical Lattice
+The fixed set of 3D sub-cell reference points (corners, midpoints, inset ring, and elevation steps) projected once per camera yaw angle using integer basis vector shifts and additions to guarantee watertight geometry across adjacent Map Cells.
+_Avoid_: Local mesh, unit cube vertices
+
+### Scanline Trapezoid
+A horizontal-top, horizontal-bottom screen-space slice of a visible Shape Archetype face with pre-solved left/right edge slopes and affine UV gradients ready for direct scanline stamping.
+_Avoid_: Cached triangle, span entry
+
 ### Target Cell
 The focal coordinate on the isometric game board around which the camera orbits and at which scene geometry is anchored.
 
