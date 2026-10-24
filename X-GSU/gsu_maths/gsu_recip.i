@@ -171,7 +171,9 @@ endfunction
 ; Format: Unsigned Q0.16 fixed-point
 ; Result = round(65536 / x)
 
+.segment "ROM3"
 reciprocal_table:
+.export reciprocal_table
 .word $0000 ; (1/0)
 .word $7FFF ; (1/1, clamped to max positive signed Q0.15/Q0.16 for signed fmult)
 .word $7FFF ; (1/2, clamped to $7FFF so signed fmult does not negate bit 15)
@@ -429,4 +431,5 @@ reciprocal_table:
 .word $0102 ; (1/254)
 .word $0101 ; (1/255)
 
+.segment "GSUCODE"
 .endif

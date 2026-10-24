@@ -1,0 +1,1174 @@
+; ==============================================================================
+; COMPILE_TRAPS_TEST - GSU Test Suite Harness
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+.include "../../IsoEngine/triangle/cached_trap.i"
+.include "../../IsoEngine/triangle/compile_face_traps_def.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+TEST_FACE:          .res .sizeof(face_def)
+TEST_TRAPS_BUF:     .res 4 * .sizeof(cached_trap) ; up to 4 traps
+
+; Test vector2 vertices for pointer seam (Case 6)
+TEST_P0:            .res .sizeof(vector2)
+TEST_P1:            .res .sizeof(vector2)
+TEST_P2:            .res .sizeof(vector2)
+TEST_P3:            .res .sizeof(vector2)
+
+.segment "GSUCODE"
+GSU_Code:
+    init_stack
+
+    ; Set ROMBR = $04 for GSU ROM data fetches
+    ibt r0, #$04
+    romb
+
+test_setup:
+    iwt r12, #6         ; 6 test cases
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ; Read TEST_CASE_IDX
+    lm r9, (TEST_CASE_IDX)
+
+    ; Clear TEST_RESULT buffer (32 bytes = 16 words)
+    iwt r8, #TEST_RESULT
+    iwt r12, #16
+    iwt r13, #clear_res_loop
+    iwt r0, #0
+clear_res_loop:
+    stw (r8)
+    inc r8
+    inc r8
+    loop
+    nop
+
+    ; Dispatch based on TEST_CASE_IDX (1..6)
+    from r9
+    sub #1
+    bne @check_case_2
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+@check_case_2:
+    from r9
+    sub #2
+    bne @check_case_3
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+@check_case_3:
+    from r9
+    sub #3
+    bne @check_case_4
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+@check_case_4:
+    from r9
+    sub #4
+    bne @check_case_5
+    nop
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+@check_case_5:
+    from r9
+    sub #5
+    bne @check_case_6
+    nop
+    iwt r13, #run_case_5
+    jmp r13
+    nop
+@check_case_6:
+    iwt r13, #run_case_6
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: Screen-Space Backface Culling & Degenerate Faces
+; ==============================================================================
+run_case_1:
+    ; Subtest 1: Triangle Counter-Clockwise (backface):
+    ; V0(0,0), V1(0,16), V2(32,0) -> cross = (0)*(0) - (16)*(32) = -512 <= 0
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_TRI
+    stw (r1)            ; flags
+    inc r1
+    inc r1
+    iwt r0, #UV_MODE_HORIZONTAL
+    stw (r1)            ; uv_mode
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; tex_id
+    inc r1
+    inc r1
+    iwt r0, #6
+    stw (r1)            ; stride_shift = 6
+    inc r1
+    inc r1
+    iwt r0, #$4000
+    stw (r1)            ; cos_yaw = 1.0
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; sin_yaw = 0.0
+
+    ; V0: (0, 0, 0, 0)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+
+    ; V1: (0, 16, 0, 0)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+
+    ; V2: (32, 0, 0, 0)
+    inc r1
+    inc r1
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+
+    ; Call compile_face_traps:
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+    ; Save count (should be 0) in TEST_RESULT + 0
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)
+
+    ; Subtest 2: Collinear / Zero-Area Triangle:
+    ; V0(0,0), V1(10,10), V2(20,20) -> cross = 0 <= 0
+    iwt r1, #TEST_FACE
+    iwt r0, #face_def::v1
+    with r1
+    add r0
+    iwt r0, #10
+    stw (r1)            ; v1.x = 10
+    inc r1
+    inc r1
+    stw (r1)            ; v1.y = 10
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1              ; v2.x
+    iwt r0, #20
+    stw (r1)            ; v2.x = 20
+    inc r1
+    inc r1
+    stw (r1)            ; v2.y = 20
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+    ; Save count (should be 0) in TEST_RESULT + 2
+    iwt r8, #TEST_RESULT + 2
+    from r3
+    stw (r8)
+
+    ; Subtest 3: Quad CCW (backface):
+    ; V0(0,0), V1(0,16), V2(32,16), V3(32,0) -> cross = -512 <= 0
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_QUAD
+    stw (r1)            ; flags = QUAD
+    iwt r0, #face_def::v1
+    with r1
+    add r0
+    iwt r0, #0
+    stw (r1)            ; v1.x = 0
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)            ; v1.y = 16
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1              ; v2
+    iwt r0, #32
+    stw (r1)            ; v2.x = 32
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)            ; v2.y = 16
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1              ; v3
+    iwt r0, #32
+    stw (r1)            ; v3.x = 32
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; v3.y = 0
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+    ; Save count (should be 0) in TEST_RESULT + 4
+    iwt r8, #TEST_RESULT + 4
+    from r3
+    stw (r8)
+
+    ; Subtest 4: Triangle CW (front-facing, visible):
+    ; V0(0,0), V1(32,0), V2(0,16) -> cross = 32*16 - 0 = +512 > 0
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_TRI
+    stw (r1)
+    iwt r0, #face_def::v1
+    with r1
+    add r0
+    iwt r0, #32
+    stw (r1)            ; v1.x = 32
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; v1.y = 0
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1
+    inc r1              ; v2
+    iwt r0, #0
+    stw (r1)            ; v2.x = 0
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)            ; v2.y = 16
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+    ; Save count (should be > 0, exactly 1 or 2) in TEST_RESULT + 6
+    iwt r8, #TEST_RESULT + 6
+    from r3
+    stw (r8)
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: Zero-Height Half Suppression (Flat-Bottom and Flat-Top Triangles)
+; ==============================================================================
+run_case_2:
+    ; Subtest 1: Flat-Bottom Triangle:
+    ; V0(16, 0), V1(32, 16), V2(0, 16) [CW]
+    ; Top half [0, 16): height 16. Bottom half [16, 16): height 0 (suppressed).
+    ; Should emit exactly 1 trapezoid with dy_start = 0, line_count = 16.
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_TRI
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #UV_MODE_HORIZONTAL
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; tex_id
+    inc r1
+    inc r1
+    iwt r0, #6
+    stw (r1)            ; stride_shift
+    inc r1
+    inc r1
+    iwt r0, #$4000
+    stw (r1)            ; cos_yaw = 1.0
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; sin_yaw = 0.0
+
+    ; V0: (16, 0)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)            ; u0 = 0
+    inc r1
+    inc r1
+    stw (r1)            ; v0 = 0
+
+    ; V1: (32, 16)
+    inc r1
+    inc r1
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)            ; u1 = 32 << 8
+    inc r1
+    inc r1
+    iwt r0, #$0400
+    stw (r1)            ; v1 = 16 << 6
+
+    ; V2: (0, 16)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; u2 = 0
+    inc r1
+    inc r1
+    iwt r0, #$0400
+    stw (r1)            ; v2 = 16 << 6
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; TEST_RESULT + 0 = trap_count (expected 1)
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)
+
+    ; Read trap[0].dy_start and trap[0].line_count:
+    iwt r2, #TEST_TRAPS_BUF
+    ldw (r2)            ; dy_start
+    iwt r8, #TEST_RESULT + 2
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)            ; line_count
+    iwt r8, #TEST_RESULT + 4
+    stw (r8)
+
+    ; Subtest 2: Flat-Top Triangle:
+    ; V0(0, 0), V1(32, 0), V2(16, 16) [CW]
+    ; Top half [0, 0): height 0 (suppressed). Bottom half [0, 16): height 16.
+    ; Should emit exactly 1 trapezoid with dy_start = 0, line_count = 16.
+    iwt r1, #TEST_FACE + face_def::v0
+    iwt r0, #0
+    stw (r1)            ; v0.x = 0
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; v0.y = 0
+
+    iwt r1, #TEST_FACE + face_def::v1
+    iwt r0, #32
+    stw (r1)            ; v1.x = 32
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; v1.y = 0
+
+    iwt r1, #TEST_FACE + face_def::v2
+    iwt r0, #16
+    stw (r1)            ; v2.x = 16
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)            ; v2.y = 16
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; TEST_RESULT + 6 = trap_count (expected 1)
+    iwt r8, #TEST_RESULT + 6
+    from r3
+    stw (r8)
+
+    ; Read trap[0].dy_start and trap[0].line_count:
+    iwt r2, #TEST_TRAPS_BUF
+    ldw (r2)            ; dy_start
+    iwt r8, #TEST_RESULT + 8
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)            ; line_count
+    iwt r8, #TEST_RESULT + 10
+    stw (r8)
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: Mode 0 Horizontal Surfaces Across Yaw Angles (0, 30, 45, 90 deg)
+; ==============================================================================
+run_case_3:
+    ; Fill TEST_TRAPS_BUF with $EEEE
+    iwt r1, #TEST_TRAPS_BUF
+    iwt r12, #26
+    iwt r13, #fill_case3
+    iwt r0, #$EEEE
+fill_case3:
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Base Face Setup:
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_TRI
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #UV_MODE_HORIZONTAL
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; tex_id = 0
+    inc r1
+    inc r1
+    iwt r0, #6
+    stw (r1)            ; stride_shift = 6
+
+    ; Vertices: CW triangle V0(0,0), V1(32,0), V2(16,16)
+    iwt r1, #TEST_FACE + face_def::v0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    iwt r1, #TEST_FACE + face_def::v1
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    iwt r1, #TEST_FACE + face_def::v2
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+
+    ; 1. Yaw = 0 deg: cos_yaw = $4000, sin_yaw = $0000
+    ; Expected du_dx = $0100 (256), dv_dx = $0000
+    iwt r1, #TEST_FACE + face_def::cos_yaw
+    iwt r0, #$4000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0000
+    stw (r1)
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; Read du_dx (+20) and dv_dx (+22) from TEST_TRAPS_BUF
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::du_dx
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 0
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 2
+    stw (r8)
+
+    ; 2. Yaw = 30 deg: cos_yaw = $376D, sin_yaw = $2000
+    ; Expected du_dx = $00DD (221), dv_dx = -$0020 = $FFE0 (-32)
+    iwt r1, #TEST_FACE + face_def::cos_yaw
+    iwt r0, #$376D
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::du_dx
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 4
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 6
+    stw (r8)
+
+    ; 3. Yaw = 45 deg: cos_yaw = $2D41, sin_yaw = $2D41
+    ; Expected du_dx = $00B5 (181), dv_dx = -$002D = $FFD3 (-45)
+    iwt r1, #TEST_FACE + face_def::cos_yaw
+    iwt r0, #$2D41
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2D41
+    stw (r1)
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::du_dx
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 8
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 10
+    stw (r8)
+
+    ; 4. Yaw = 90 deg: cos_yaw = $0000, sin_yaw = $4000
+    ; Expected du_dx = $0000, dv_dx = -$0040 = $FFC0 (-64)
+    iwt r1, #TEST_FACE + face_def::cos_yaw
+    iwt r0, #$0000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$4000
+    stw (r1)
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::du_dx
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 12
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 14
+    stw (r8)
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: Modes 1, 2, 3 for Vertical Walls & Sloped Faces
+; ==============================================================================
+run_case_4:
+    ; Subtest 1: Mode 1 (Vertical Wall Skirt NS):
+    ; Quad V0(0,0), V1(32,1), V2(32,15), V3(0,14) [CW]
+    ; U in [0, 32], V in [0, 14]
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_QUAD
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #UV_MODE_WALL_NS
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1            ; tex_id = 1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #6            ; stride_shift = 6
+    stw (r1)
+
+    ; V0: (0, 0, u=0, v=0)
+    iwt r1, #TEST_FACE + face_def::v0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+
+    ; V1: (32, 1, u=32<<8, v=0)
+    iwt r1, #TEST_FACE + face_def::v1
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000        ; 32 << 8
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+
+    ; V2: (32, 15, u=32<<8, v=14<<6)
+    iwt r1, #TEST_FACE + face_def::v2
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #15
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0380        ; 14 << 6
+    stw (r1)
+
+    ; V3: (0, 14, u=0, v=14<<6)
+    iwt r1, #TEST_FACE + face_def::v3
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #14
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0380        ; 14 << 6
+    stw (r1)
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; Save trap_count (expected 4) in TEST_RESULT + 0
+    iwt r8, #TEST_RESULT + 0
+    from r3
+    stw (r8)
+
+    ; Save du_dx and dv_dx in TEST_RESULT + 2 and + 4
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::du_dx
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 2
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 4
+    stw (r8)
+
+    ; Subtest 2: Mode 3 (Sloped Wedge Face):
+    ; Quad V0(0,0), V1(32,0), V2(32,14), V3(0,14) [CW]
+    ; U in [0, 32], V in [0, 32]
+    iwt r1, #TEST_FACE + face_def::uv_mode
+    iwt r0, #UV_MODE_SLOPE
+    stw (r1)
+
+    ; Set V1: (32, 0, u=32<<8, v=0)
+    iwt r1, #TEST_FACE + face_def::v1
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+
+    ; Set V2: (32, 14, u=32<<8, v=32<<6)
+    iwt r1, #TEST_FACE + face_def::v2
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #14
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0800        ; 32 << 6
+    stw (r1)
+
+    ; Set V3: (0, 14, u=0, v=32<<6)
+    iwt r1, #TEST_FACE + face_def::v3
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #14
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0800        ; 32 << 6
+    stw (r1)
+
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; Save trap_count (expected 2) in TEST_RESULT + 6
+    iwt r8, #TEST_RESULT + 6
+    from r3
+    stw (r8)
+
+    ; Save du_dx and dv_dx in TEST_RESULT + 8 and + 10
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::du_dx
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 8
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)
+    iwt r8, #TEST_RESULT + 10
+    stw (r8)
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 5: End-to-End Rasterization & Diagonal UV Continuity
+; ==============================================================================
+run_case_5:
+    ; Clear screen buffer in SRAM ($704000..$7067FF) to background color 0
+    ; GSU can do this quickly by filling words:
+    iwt r1, #$4000
+    iwt r12, #$2800 / 2 ; 5120 words
+    iwt r13, #clear_screen_loop
+    iwt r0, #0
+    from r0
+clear_screen_loop:
+    stw (r1)
+    inc r1
+    inc r1
+    from r0
+    loop
+    nop
+
+    ; Define a horizontal diamond quad (32x32 top cap at yaw 0):
+    ; V0 = (32, 0)
+    ; V1 = (64, 16)
+    ; V2 = (32, 32)
+    ; V3 = (0, 16)
+    ; Winding is Clockwise!
+    iwt r1, #TEST_FACE
+    iwt r0, #FACE_DEF_FLAG_QUAD
+    stw (r1)            ; flags = QUAD
+    inc r1
+    inc r1
+    iwt r0, #UV_MODE_HORIZONTAL
+    stw (r1)            ; uv_mode = 0
+    inc r1
+    inc r1
+    iwt r0, #1          ; tex_id = 1 (32x32 texture)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #6          ; stride_shift = 6
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$4000      ; cos_yaw = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0          ; sin_yaw = 0.0
+    stw (r1)
+
+    ; V0: (32, 0, u=0, v=0)
+    iwt r1, #TEST_FACE + face_def::v0
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+
+    ; V1: (64, 16, u=32<<8, v=0)
+    iwt r1, #TEST_FACE + face_def::v1
+    iwt r0, #64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+
+    ; V2: (32, 32, u=32<<8, v=32<<6)
+    iwt r1, #TEST_FACE + face_def::v2
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #32
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0800
+    stw (r1)
+
+    ; V3: (0, 16, u=0, v=32<<6)
+    iwt r1, #TEST_FACE + face_def::v3
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #16
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0800
+    stw (r1)
+
+    ; Compile Face into TEST_TRAPS_BUF:
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; Save trap_count in TEST_RESULT + 0
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)
+
+    ; Rasterize each compiled trapezoid:
+    ; trap_count is in r3 (e.g. 2 or 4)
+    to r12
+    move r12, r3        ; r12 = loop count
+    iwt r9, #TEST_TRAPS_BUF
+    iwt r13, #raster_traps_loop
+raster_traps_loop:
+    gsu_stack_push r13
+    gsu_stack_push r12
+    gsu_stack_push r9
+
+    ; draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, frame_half
+    ; We stamp at anchor (32, 20), offsets (0, 0), Pass 0
+    to r1
+    move r1, r9         ; trap_ptr
+    iwt r3, #32         ; anchor_x = 32
+    iwt r4, #20         ; anchor_y = 20
+    iwt r5, #0          ; u_offset = 0
+    iwt r6, #0          ; v_offset = 0
+    iwt r7, #0          ; frame_half = 0 (Pass 0)
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    gsu_stack_pop r9
+    gsu_stack_pop r12
+    gsu_stack_pop r13
+
+    ; Advance trap pointer (+26 bytes)
+    iwt r0, #.sizeof(cached_trap)
+    with r9
+    add r0
+    loop
+    nop
+
+    ; Read sample pixels from framebuffer to TEST_RESULT:
+    ; Sample 1: Center of Diamond (x=64, y=36)
+    iwt r8, #TEST_RESULT + 2
+    iwt r1, #64
+    iwt r2, #36
+    rpix
+    from r0
+    stw (r8)            ; [1]: center of diamond (expected != 0)
+
+    ; Sample 2: Along shared diagonal (x=64, y=28)
+    inc r8
+    inc r8
+    iwt r1, #64
+    iwt r2, #28
+    rpix
+    from r0
+    stw (r8)            ; [2]: diagonal seam (expected != 0)
+
+    ; Sample 3: Outside diamond (x=10, y=20)
+    inc r8
+    inc r8
+    iwt r1, #10
+    iwt r2, #20
+    rpix
+    from r0
+    stw (r8)            ; [3]: outside diamond (expected == 0)
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 6: Vertex Pointer Seam (FACE_DEF_FLAG_PTRS)
+; ==============================================================================
+run_case_6:
+    ; Set up 4 vector2 structs in GSURAM:
+    ; P0: (10, 10)
+    iwt r1, #TEST_P0
+    iwt r0, #10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #10
+    stw (r1)
+
+    ; P1: (42, 10)
+    iwt r1, #TEST_P1
+    iwt r0, #42
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #10
+    stw (r1)
+
+    ; P2: (42, 26)
+    iwt r1, #TEST_P2
+    iwt r0, #42
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #26
+    stw (r1)
+
+    ; P3: (10, 26)
+    iwt r1, #TEST_P3
+    iwt r0, #10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #26
+    stw (r1)
+
+    ; Build face_def with flags = FACE_DEF_FLAG_QUAD | FACE_DEF_FLAG_PTRS
+    iwt r1, #TEST_FACE
+    iwt r0, #(FACE_DEF_FLAG_QUAD | FACE_DEF_FLAG_PTRS)
+    stw (r1)            ; flags
+    inc r1
+    inc r1
+    iwt r0, #UV_MODE_HORIZONTAL
+    stw (r1)            ; uv_mode = 0
+    inc r1
+    inc r1
+    iwt r0, #0          ; tex_id = 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #6          ; stride_shift = 6
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$4000      ; cos_yaw = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0          ; sin_yaw = 0.0
+    stw (r1)
+
+    ; V0: pointer to TEST_P0, u=0, v=0
+    iwt r1, #TEST_FACE + face_def::v0
+    iwt r0, #TEST_P0
+    stw (r1)            ; v0.x_or_ptr = TEST_P0
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; pad
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; u0 = 0
+    inc r1
+    inc r1
+    stw (r1)            ; v0 = 0
+
+    ; V1: pointer to TEST_P1, u=32<<8, v=0
+    iwt r1, #TEST_FACE + face_def::v1
+    iwt r0, #TEST_P1
+    stw (r1)            ; v1.x_or_ptr = TEST_P1
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000      ; u1 = 32 << 8
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+
+    ; V2: pointer to TEST_P2, u=32<<8, v=16<<6
+    iwt r1, #TEST_FACE + face_def::v2
+    iwt r0, #TEST_P2
+    stw (r1)            ; v2.x_or_ptr = TEST_P2
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0400      ; v2 = 16 << 6
+    stw (r1)
+
+    ; V3: pointer to TEST_P3, u=0, v=16<<6
+    iwt r1, #TEST_FACE + face_def::v3
+    iwt r0, #TEST_P3
+    stw (r1)            ; v3.x_or_ptr = TEST_P3
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0400      ; v3 = 16 << 6
+    stw (r1)
+
+    ; Compile Face via pointer seam:
+    iwt r1, #TEST_FACE
+    iwt r2, #TEST_TRAPS_BUF
+    call compile_face_traps r1, r2
+
+    ; TEST_RESULT + 0 = trap_count (expected 2)
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)
+
+    ; Read trap[0].dy_start and trap[0].line_count:
+    iwt r2, #TEST_TRAPS_BUF
+    ldw (r2)            ; dy_start (expected 10)
+    iwt r8, #TEST_RESULT + 2
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)            ; line_count (expected 16)
+    iwt r8, #TEST_RESULT + 4
+    stw (r8)
+
+    ; Read trap[0].dxL_dy (+8) and trap[0].dxR_dy (+10) (expected 0 for vertical rectangle edges!):
+    iwt r2, #TEST_TRAPS_BUF + cached_trap::dxL_dy
+    ldw (r2)            ; dxL_dy
+    iwt r8, #TEST_RESULT + 6
+    stw (r8)
+    inc r2
+    inc r2
+    ldw (r2)            ; dxR_dy
+    iwt r8, #TEST_RESULT + 8
+    stw (r8)
+
+test_done:
+    ; 8 NOPs for memory settling before stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    stop
+    nop
+
+.include "../../IsoEngine/triangle/compile_face_traps.i"
+.include "../../IsoEngine/triangle/draw_cached_trap.i"
