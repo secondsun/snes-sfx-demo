@@ -47,6 +47,12 @@
       cam_x    .word
       cam_z    .word
    .endstruct
+
+   .struct iso_basis
+      sx .tag vector2
+      sz .tag vector2
+      sy .tag vector2
+   .endstruct
 .struct gsu_stack
 	entries  .res $800 ; 2048 Bytes of stack
 	.endstruct

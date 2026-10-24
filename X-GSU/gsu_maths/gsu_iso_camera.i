@@ -558,5 +558,744 @@ no_dpad_sync:
     return
 endfunction
 
+; ==============================================================================
+; 28-Point Canonical Lattice (LATTICE_V2) Constants
+; ==============================================================================
+LATTICE_C0          = 0   ; Base corner (0, 0, 0)
+LATTICE_C1          = 1   ; Base corner (32, 0, 0)  = Sx
+LATTICE_C2          = 2   ; Base corner (32, 0, 32) = Sx + Sz
+LATTICE_C3          = 3   ; Base corner (0, 0, 32)  = Sz
+
+LATTICE_SKIRT_C0    = 4   ; Skirt bottom y=-1h (+14px): C0 + (0, 14)
+LATTICE_SKIRT_C1    = 5   ; Skirt bottom y=-1h (+14px): C1 + (0, 14)
+LATTICE_SKIRT_C2    = 6   ; Skirt bottom y=-1h (+14px): C2 + (0, 14)
+LATTICE_SKIRT_C3    = 7   ; Skirt bottom y=-1h (+14px): C3 + (0, 14)
+
+LATTICE_ELEV1_C0    = 8   ; Elevated corner y=+1h (-14px): C0 + (0, -14)
+LATTICE_ELEV1_C1    = 9   ; Elevated corner y=+1h (-14px): C1 + (0, -14)
+LATTICE_ELEV1_C2    = 10  ; Elevated corner y=+1h (-14px): C2 + (0, -14)
+LATTICE_ELEV1_C3    = 11  ; Elevated corner y=+1h (-14px): C3 + (0, -14)
+
+LATTICE_ELEV2_C0    = 12  ; Elevated corner y=+2h (-28px): C0 + (0, -28)
+LATTICE_ELEV2_C1    = 13  ; Elevated corner y=+2h (-28px): C1 + (0, -28)
+LATTICE_ELEV2_C2    = 14  ; Elevated corner y=+2h (-28px): C2 + (0, -28)
+LATTICE_ELEV2_C3    = 15  ; Elevated corner y=+2h (-28px): C3 + (0, -28)
+
+LATTICE_MID_N       = 16  ; Canonical edge midpoint at y=0: MN = Sx/2
+LATTICE_MID_E       = 17  ; Canonical edge midpoint at y=0: ME = Sx + Sz/2
+LATTICE_MID_S       = 18  ; Canonical edge midpoint at y=0: MS = Sx/2 + Sz
+LATTICE_MID_W       = 19  ; Canonical edge midpoint at y=0: MW = Sz/2
+
+LATTICE_PILLAR_B0   = 20  ; Inset [8..24] pillar base at y=0: P0 = Sx/4 + Sz/4
+LATTICE_PILLAR_B1   = 21  ; Inset [8..24] pillar base at y=0: P1 = P0 + Sx/2
+LATTICE_PILLAR_B2   = 22  ; Inset [8..24] pillar base at y=0: P2 = P1 + Sz/2
+LATTICE_PILLAR_B3   = 23  ; Inset [8..24] pillar base at y=0: P3 = P0 + Sz/2
+
+LATTICE_PILLAR_T0   = 24  ; Inset [8..24] pillar top at +2h (-28px): P0 + (0, -28)
+LATTICE_PILLAR_T1   = 25  ; Inset [8..24] pillar top at +2h (-28px): P1 + (0, -28)
+LATTICE_PILLAR_T2   = 26  ; Inset [8..24] pillar top at +2h (-28px): P2 + (0, -28)
+LATTICE_PILLAR_T3   = 27  ; Inset [8..24] pillar top at +2h (-28px): P3 + (0, -28)
+
+LATTICE_POINT_COUNT = 28
+LATTICE_V2_SIZE     = 28 * .sizeof(vector2) ; 112 bytes ($70)
+
+; ==============================================================================
+; iso_compute_basis
+; Computes discrete integer basis vectors (Sx, Sz, Sy) from camera yaw_idx (1..120).
+;   Sx = (round(32 * cos(yaw)), round(16 * sin(yaw)))
+;   Sz = (round(-32 * sin(yaw)), round(16 * cos(yaw)))
+;   Sy = (0, -14)
+; In:       yaw_idx   = camera yaw index (1..120)
+;           basis_ptr = address of iso_basis struct to populate
+; Out:      Writes Sx, Sz, Sy to basis_ptr
+; Clobbers: r0, r14, allocated registers
+; ==============================================================================
+function iso_compute_basis yaw_idx, basis_ptr
+    register sin_val, cos_val, tmp, val, ptr
+
+    move ptr, basis_ptr
+
+    sin_lookup_rom yaw_idx, sin_val
+    cos_lookup_rom yaw_idx, cos_val
+
+    ; 1. Sx.x = round(32 * cos) = (cos_val + 256) asr 9
+    iwt tmp, #256
+    from cos_val
+    add tmp
+    move val, r0
+    with val
+    hib
+    with val
+    sex
+    with val
+    asr
+    from val
+    stw (ptr)
+    inc ptr
+    inc ptr
+
+    ; 2. Sx.y = round(16 * sin) = (sin_val + 512) asr 10
+    iwt tmp, #512
+    from sin_val
+    add tmp
+    move val, r0
+    with val
+    hib
+    with val
+    sex
+    with val
+    asr
+    with val
+    asr
+    from val
+    stw (ptr)
+    inc ptr
+    inc ptr
+
+    ; 3. Sz.x = round(-32 * sin) = - ((sin_val + 256) asr 9)
+    iwt tmp, #256
+    from sin_val
+    add tmp
+    move val, r0
+    with val
+    hib
+    with val
+    sex
+    with val
+    asr
+    with val
+    not
+    inc val
+    from val
+    stw (ptr)
+    inc ptr
+    inc ptr
+
+    ; 4. Sz.y = round(16 * cos) = (cos_val + 512) asr 10
+    iwt tmp, #512
+    from cos_val
+    add tmp
+    move val, r0
+    with val
+    hib
+    with val
+    sex
+    with val
+    asr
+    with val
+    asr
+    from val
+    stw (ptr)
+    inc ptr
+    inc ptr
+
+    ; 5. Sy.x = 0
+    iwt val, #0
+    from val
+    stw (ptr)
+    inc ptr
+    inc ptr
+
+    ; 6. Sy.y = -14 ($FFF2)
+    iwt val, #$FFF2
+    from val
+    stw (ptr)
+
+    return
+endfunction
+
+; Helper to compute basis from an iso_camera struct
+; In:       cam_ptr   = address of iso_camera struct
+;           basis_ptr = address of iso_basis struct
+function iso_camera_compute_basis cam_ptr, basis_ptr
+    register yaw_val, c_ptr
+    move c_ptr, cam_ptr
+    to yaw_val
+    ldw (c_ptr)
+    call iso_compute_basis yaw_val, basis_ptr
+    return
+endfunction
+
+; ==============================================================================
+; iso_populate_lattice
+; Populates the 28-point LATTICE_V2 in GSURAM purely via integer additions
+; and arithmetic right shifts (zero multiplications).
+; In:       basis_ptr   = address of iso_basis struct
+;           lattice_ptr = destination buffer for 28 vector2 points (112 bytes)
+; Out:      Writes 28 vector2 entries to lattice_ptr
+; Clobbers: r0, allocated registers
+; ==============================================================================
+function iso_populate_lattice basis_ptr, lattice_ptr
+    register b_ptr, lat_ptr, sx_x, sx_y, sz_x, sz_y, c2_x, c2_y, tmp, zero, h28
+    register sx2_x, sx2_y, sz2_x, sz2_y, sx4_x, sx4_y, sz4_x, sz4_y
+    register p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y
+
+    move b_ptr, basis_ptr
+    move lat_ptr, lattice_ptr
+    iwt zero, #0
+    iwt h28, #28
+
+    ; Load Sx (x, y) and Sz (x, y)
+    to sx_x
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    to sx_y
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    to sz_x
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    to sz_y
+    ldw (b_ptr)
+
+    ; Compute C2 = Sx + Sz
+    from sx_x
+    add sz_x
+    move c2_x, r0
+
+    from sx_y
+    add sz_y
+    move c2_y, r0
+
+    ; ----------------------------------------------------
+    ; Group 1: Base corners at y=0 (Indices 0..3)
+    ; ----------------------------------------------------
+    ; Index 0: C0 = (0, 0)
+    from zero
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from zero
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 1: C1 = (Sx.x, Sx.y)
+    from sx_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 2: C2 = (C2.x, C2.y)
+    from c2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from c2_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 3: C3 = (Sz.x, Sz.y)
+    from sz_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sz_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; ----------------------------------------------------
+    ; Group 2: Skirt bottom corners at y=-1h (+14px) (Indices 4..7)
+    ; ----------------------------------------------------
+    ; Index 4: C0 + (0, 14) = (0, 14)
+    from zero
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    iwt tmp, #14
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 5: C1 + (0, 14) = (Sx.x, Sx.y + 14)
+    from sx_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx_y
+    add #14
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 6: C2 + (0, 14) = (C2.x, C2.y + 14)
+    from c2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from c2_y
+    add #14
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 7: C3 + (0, 14) = (Sz.x, Sz.y + 14)
+    from sz_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sz_y
+    add #14
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; ----------------------------------------------------
+    ; Group 3: Elevated corners at +1h (-14px) (Indices 8..11)
+    ; ----------------------------------------------------
+    ; Index 8: C0 + (0, -14) = (0, -14)
+    from zero
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    iwt tmp, #$FFF2
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 9: C1 + (0, -14) = (Sx.x, Sx.y - 14)
+    from sx_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx_y
+    sub #14
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 10: C2 + (0, -14) = (C2.x, C2.y - 14)
+    from c2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from c2_y
+    sub #14
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 11: C3 + (0, -14) = (Sz.x, Sz.y - 14)
+    from sz_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sz_y
+    sub #14
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; ----------------------------------------------------
+    ; Group 4: Elevated corners at +2h (-28px) (Indices 12..15)
+    ; ----------------------------------------------------
+    ; Index 12: C0 + (0, -28) = (0, -28)
+    from zero
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    iwt tmp, #$FFE4
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 13: C1 + (0, -28) = (Sx.x, Sx.y - 28)
+    from sx_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 14: C2 + (0, -28) = (C2.x, C2.y - 28)
+    from c2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from c2_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 15: C3 + (0, -28) = (Sz.x, Sz.y - 28)
+    from sz_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sz_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; ----------------------------------------------------
+    ; Group 5: Canonical edge midpoints at y=0 (Indices 16..19)
+    ; ----------------------------------------------------
+    move sx2_x, sx_x
+    with sx2_x
+    asr
+    move sx2_y, sx_y
+    with sx2_y
+    asr
+
+    move sz2_x, sz_x
+    with sz2_x
+    asr
+    move sz2_y, sz_y
+    with sz2_y
+    asr
+
+    ; Index 16: MN = Sx/2
+    from sx2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx2_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 17: ME = Sx + Sz/2
+    from sx_x
+    add sz2_x
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx_y
+    add sz2_y
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 18: MS = Sx/2 + Sz
+    from sx2_x
+    add sz_x
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sx2_y
+    add sz_y
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 19: MW = Sz/2
+    from sz2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from sz2_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; ----------------------------------------------------
+    ; Group 6 & 7: 8-Point Inset Pillar Ring (Indices 20..27)
+    ; [8..24] x [8..24] pillar
+    ; Base corners at y=0 (20..23), Top corners at +2h (24..27)
+    ; ----------------------------------------------------
+    move sx4_x, sx2_x
+    with sx4_x
+    asr
+    move sx4_y, sx2_y
+    with sx4_y
+    asr
+
+    move sz4_x, sz2_x
+    with sz4_x
+    asr
+    move sz4_y, sz2_y
+    with sz4_y
+    asr
+
+    ; P0 = Sx/4 + Sz/4
+    from sx4_x
+    add sz4_x
+    move p0_x, r0
+
+    from sx4_y
+    add sz4_y
+    move p0_y, r0
+
+    ; P1 = P0 + Sx/2
+    from p0_x
+    add sx2_x
+    move p1_x, r0
+
+    from p0_y
+    add sx2_y
+    move p1_y, r0
+
+    ; P2 = P1 + Sz/2
+    from p1_x
+    add sz2_x
+    move p2_x, r0
+
+    from p1_y
+    add sz2_y
+    move p2_y, r0
+
+    ; P3 = P0 + Sz/2
+    from p0_x
+    add sz2_x
+    move p3_x, r0
+
+    from p0_y
+    add sz2_y
+    move p3_y, r0
+
+    ; Index 20: P0 base
+    from p0_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p0_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 21: P1 base
+    from p1_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p1_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 22: P2 base
+    from p2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p2_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 23: P3 base
+    from p3_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p3_y
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 24: P0 top (+2h = -28px)
+    from p0_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p0_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 25: P1 top (+2h = -28px)
+    from p1_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p1_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 26: P2 top (+2h = -28px)
+    from p2_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p2_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+
+    ; Index 27: P3 top (+2h = -28px)
+    from p3_x
+    stw (lat_ptr)
+    inc lat_ptr
+    inc lat_ptr
+    from p3_y
+    sub h28
+    move tmp, r0
+    from tmp
+    stw (lat_ptr)
+
+    return
+endfunction
+
+; Helper alias for iso_populate_lattice
+function iso_camera_populate_lattice basis_ptr, lattice_ptr
+    call iso_populate_lattice basis_ptr, lattice_ptr
+    return
+endfunction
+
+; ==============================================================================
+; iso_cell_anchor
+; Resolves the screen-space anchor of a map cell at (i, j, h):
+;   Anchor(i, j, h) = MapOrigin_screen + i * Sx + j * Sz + h * Sy
+; In:       origin_ptr     = address of vector2 origin (screen X, screen Y) or 0 for (0,0)
+;           basis_ptr      = address of iso_basis struct
+;           i_idx          = grid column (i)
+;           j_idx          = grid row (j)
+;           h_elev         = elevation height in 1h units (h)
+;           out_anchor_ptr = destination vector2 address
+; Out:      Writes Anchor.x, Anchor.y to out_anchor_ptr
+; Clobbers: r0, r4, r6, allocated registers
+; ==============================================================================
+function iso_cell_anchor origin_ptr, basis_ptr, i_idx, j_idx, h_elev, out_anchor_ptr
+    register mul_b = r6, term_x, term_y, tmp, b_ptr, out_ptr
+
+    ; 1. Load origin if non-zero, else (0, 0)
+    with origin_ptr
+    add #0
+    beq zero_orig
+    nop
+
+    to term_x
+    ldw (origin_ptr)
+    inc origin_ptr
+    inc origin_ptr
+    to term_y
+    ldw (origin_ptr)
+    bra orig_done
+    nop
+
+zero_orig:
+    iwt term_x, #0
+    iwt term_y, #0
+
+orig_done:
+    move b_ptr, basis_ptr
+
+    ; 2. Add i * Sx: Sx.x at +0, Sx.y at +2
+    move mul_b, i_idx
+    to tmp
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    from tmp
+    to tmp
+    lmult
+    with term_x
+    add r4
+
+    to tmp
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    from tmp
+    to tmp
+    lmult
+    with term_y
+    add r4
+
+    ; 3. Add j * Sz: Sz.x at +4, Sz.y at +6
+    move mul_b, j_idx
+    to tmp
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    from tmp
+    to tmp
+    lmult
+    with term_x
+    add r4
+
+    to tmp
+    ldw (b_ptr)
+    inc b_ptr
+    inc b_ptr
+    from tmp
+    to tmp
+    lmult
+    with term_y
+    add r4
+
+    ; 4. Add h * Sy: Sy.y at +10 (Sy.x at +8 is 0)
+    inc b_ptr
+    inc b_ptr
+    move mul_b, h_elev
+    to tmp
+    ldw (b_ptr)
+    from tmp
+    to tmp
+    lmult
+    with term_y
+    add r4
+
+    ; 5. Write to out_anchor_ptr
+    move out_ptr, out_anchor_ptr
+    from term_x
+    stw (out_ptr)
+    inc out_ptr
+    inc out_ptr
+    from term_y
+    stw (out_ptr)
+
+    return
+endfunction
+
+; Helper alias for iso_cell_anchor
+function iso_camera_cell_anchor origin_ptr, basis_ptr, i_idx, j_idx, h_elev, out_anchor_ptr
+    call iso_cell_anchor origin_ptr, basis_ptr, i_idx, j_idx, h_elev, out_anchor_ptr
+    return
+endfunction
+
 .endif
 
