@@ -1,0 +1,128 @@
+; SuperFX test_lattice unit test
+; Verifies watertight 28-point canonical vertex lattice and transform pipeline
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+.segment "GSURAM"
+
+YAW_INPUT:
+    .res 2
+MAP_ORIGIN:
+    .tag vector2
+BASIS_OUT:
+    .tag iso_basis
+LATTICE_OUT:
+    .res 28 * .sizeof(vector2)
+ANCHOR_0_0_0:
+    .tag vector2
+ANCHOR_1_0_0:
+    .tag vector2
+ANCHOR_0_1_0:
+    .tag vector2
+ANCHOR_0_0_1:
+    .tag vector2
+ANCHOR_TEST:
+    .tag vector2
+
+.segment "GSUCODE"
+GSU_Code:
+    init_stack
+    register yaw_val, basis_p, lat_p, orig_p, out_p, i_r, j_r, h_r
+
+test_setup:
+    iwt r12, #120
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ; 1. Load yaw input and compute basis
+    lm yaw_val, (YAW_INPUT)
+    iwt basis_p, #BASIS_OUT
+    call iso_compute_basis yaw_val, basis_p
+
+    ; 2. Populate 28-point canonical lattice
+    iwt basis_p, #BASIS_OUT
+    iwt lat_p, #LATTICE_OUT
+    call iso_populate_lattice basis_p, lat_p
+
+    ; 3. Compute Anchor(0, 0, 0)
+    iwt orig_p, #MAP_ORIGIN
+    iwt basis_p, #BASIS_OUT
+    iwt i_r, #0
+    iwt j_r, #0
+    iwt h_r, #0
+    iwt out_p, #ANCHOR_0_0_0
+    call iso_cell_anchor orig_p, basis_p, i_r, j_r, h_r, out_p
+
+    ; 4. Compute Anchor(1, 0, 0)
+    iwt orig_p, #MAP_ORIGIN
+    iwt basis_p, #BASIS_OUT
+    iwt i_r, #1
+    iwt j_r, #0
+    iwt h_r, #0
+    iwt out_p, #ANCHOR_1_0_0
+    call iso_cell_anchor orig_p, basis_p, i_r, j_r, h_r, out_p
+
+    ; 5. Compute Anchor(0, 1, 0)
+    iwt orig_p, #MAP_ORIGIN
+    iwt basis_p, #BASIS_OUT
+    iwt i_r, #0
+    iwt j_r, #1
+    iwt h_r, #0
+    iwt out_p, #ANCHOR_0_1_0
+    call iso_cell_anchor orig_p, basis_p, i_r, j_r, h_r, out_p
+
+    ; 6. Compute Anchor(0, 0, 1)
+    iwt orig_p, #MAP_ORIGIN
+    iwt basis_p, #BASIS_OUT
+    iwt i_r, #0
+    iwt j_r, #0
+    iwt h_r, #1
+    iwt out_p, #ANCHOR_0_0_1
+    call iso_cell_anchor orig_p, basis_p, i_r, j_r, h_r, out_p
+
+    ; 7. Compute Anchor(3, 5, 2)
+    iwt orig_p, #MAP_ORIGIN
+    iwt basis_p, #BASIS_OUT
+    iwt i_r, #3
+    iwt j_r, #5
+    iwt h_r, #2
+    iwt out_p, #ANCHOR_TEST
+    call iso_cell_anchor orig_p, basis_p, i_r, j_r, h_r, out_p
+
+    ; Let memory settle (8 NOPs)
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    ; 8 NOP pipeline settling before stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+
+.include "../../gsu_maths/gsu_iso_camera.i"
