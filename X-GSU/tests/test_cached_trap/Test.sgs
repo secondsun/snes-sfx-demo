@@ -1,0 +1,915 @@
+; ==============================================================================
+; CACHED_TRAP_TEST - GSU Test Suite Harness
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "libSFX.i"
+
+; Include cached_trap struct
+.include "../../IsoEngine/triangle/cached_trap.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:  .res 2
+TEST_RESULT:    .res 32
+TEST_TRAP:      .res .sizeof(cached_trap)
+
+.segment "GSUCODE"
+GSU_Code:
+    init_stack
+
+    ; Set ROMBR = $04 for GSU ROM data fetches
+    ibt r0, #$04
+    romb
+
+test_setup:
+    iwt r12, #6
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ; Read TEST_CASE_IDX
+    lm r9, (TEST_CASE_IDX)
+
+    ; Clear TEST_RESULT buffer (32 bytes = 16 words)
+    iwt r8, #TEST_RESULT
+    iwt r12, #16
+    iwt r13, #clear_res_loop
+    iwt r0, #0
+clear_res_loop:
+    stw (r8)
+    inc r8
+    inc r8
+    loop
+    nop
+
+    ; Dispatch based on TEST_CASE_IDX (1..6)
+    from r9
+    sub #1
+    bne :+
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+:   from r9
+    sub #2
+    bne :+
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+:   from r9
+    sub #3
+    bne :+
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+:   from r9
+    sub #4
+    bne :+
+    nop
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+:   from r9
+    sub #5
+    bne :+
+    nop
+    iwt r13, #run_case_5
+    jmp r13
+    nop
+:   iwt r13, #run_case_6
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: Texture Wrapping across Power-of-Two (16x16, 32x32, 64x64, 128x128)
+; Stride shift 6, 40-pixel span from x=0..40. U wraps at 16, 32, 64.
+; ==============================================================================
+run_case_1:
+    iwt r1, #TEST_TRAP
+    ; dy_start = 10, line_count = 5
+    iwt r0, #10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #5
+    stw (r1)
+    inc r1
+    inc r1
+    ; xL = 0, xR = 40 (Q8.8: $0000, $2800)
+    iwt r0, #$0000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2800
+    stw (r1)
+    inc r1
+    inc r1
+    ; dxL_dy = 0, dxR_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; uL = 0, vL = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dy = 0, dv_dy = 0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dx = 1.0 (Q8.8 = $0100), dv_dx = 0
+    iwt r0, #$0100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    ; tex_id = 0 (16x16 texture)
+    iwt r0, #0
+    stw (r1)
+
+    ; Draw trapezoid: anchor_x = 0, anchor_y = 0, u_offset = 0, v_offset = 0, frame_half = 0
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample pixels at (x=0, y=10), (x=15, y=10), (x=16, y=10), (x=31, y=10), (x=32, y=10)
+    ; Pixel at x=0 should equal pixel at x=16 and x=32 due to 16-pixel wrap!
+    iwt r8, #TEST_RESULT
+    iwt r2, #10
+
+    iwt r1, #0
+    rpix
+    stw (r8)         ; sample 0 (x=0)
+    inc r8
+    inc r8
+
+    iwt r1, #15
+    rpix
+    stw (r8)         ; sample 1 (x=15)
+    inc r8
+    inc r8
+
+    iwt r1, #16
+    rpix
+    stw (r8)         ; sample 2 (x=16, should equal x=0)
+    inc r8
+    inc r8
+
+    iwt r1, #31
+    rpix
+    stw (r8)         ; sample 3 (x=31, should equal x=15)
+    inc r8
+    inc r8
+
+    iwt r1, #32
+    rpix
+    stw (r8)         ; sample 4 (x=32, should equal x=0)
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+    nop
+
+; ==============================================================================
+; Case 2: Watertight Half-Open Vertical Stacking ([y0, y1) and [y1, y2))
+; Trap 1: y in [20, 30). Trap 2: y in [30, 40).
+; Asserts line 29 is drawn by Trap 1, line 30 by Trap 2. Zero gaps, zero double-draw.
+; ==============================================================================
+run_case_2:
+    ; --- Trap 1: dy = 20, line_count = 10, x in [10..30), tex_id = 0 ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #20
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xL = 10.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1E00     ; xR = 30.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; dxL=0, dxR=0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1) ; uL=0
+    inc r1
+    inc r1
+    stw (r1) ; vL=0
+    inc r1
+    inc r1
+    stw (r1) ; du_dy=0
+    inc r1
+    inc r1
+    stw (r1) ; dv_dy=0
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; dv_dx = 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; tex_id = 0
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; --- Trap 2: dy = 30, line_count = 10, x in [10..30), tex_id = 1 ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #30        ; dy = 30
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #10        ; line_count = 10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xL = 10.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1E00     ; xR = 30.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; dv_dx = 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1         ; tex_id = 1 (Texture 1)
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample pixels:
+    ; y=19 (above Trap 1, should be 0/untouched)
+    ; y=29 (bottom of Trap 1, should be texel from tex_id 0)
+    ; y=30 (top of Trap 2, should be texel from tex_id 1)
+    ; y=40 (below Trap 2, should be 0/untouched)
+    iwt r8, #TEST_RESULT
+    iwt r1, #15
+
+    iwt r2, #19
+    rpix
+    stw (r8) ; [0]: y=19 (untouched)
+    inc r8
+    inc r8
+
+    iwt r2, #29
+    rpix
+    stw (r8) ; [1]: y=29 (from Trap 1)
+    inc r8
+    inc r8
+
+    iwt r2, #30
+    rpix
+    stw (r8) ; [2]: y=30 (from Trap 2)
+    inc r8
+    inc r8
+
+    iwt r2, #40
+    rpix
+    stw (r8)                       ; [3]: y=40 (untouched)
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+    nop
+
+; ==============================================================================
+; Case 3: Watertight Horizontal Span Adjacency ([floor(xL), floor(xR)))
+; Trap A: x in [10.0, 25.5) -> floor draws 10..24
+; Trap B: x in [25.5, 40.0) -> floor draws 25..39
+; Asserts pixel 24 is from Trap A, pixel 25 is from Trap B. Zero gaps, zero double-plots.
+; ==============================================================================
+run_case_3:
+    ; --- Trap A: xL = 10.0 ($0A00), xR = 25.5 ($1980), tex_id = 0 ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #50        ; dy = 50
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #4         ; line_count = 4
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xL = 10.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1980     ; xR = 25.5
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; tex_id = 0
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; --- Trap B: xL = 25.5 ($1980), xR = 40.0 ($2800), tex_id = 1 ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #50        ; dy = 50
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #4         ; line_count = 4
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1980     ; xL = 25.5
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2800     ; xR = 40.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1         ; tex_id = 1
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample pixels on line y=50:
+    ; x=9  (outside, 0)
+    ; x=24 (from Trap A)
+    ; x=25 (from Trap B)
+    ; x=40 (outside, 0)
+    iwt r8, #TEST_RESULT
+    iwt r2, #50
+
+    iwt r1, #9
+    rpix
+    stw (r8) ; [0]: x=9 (untouched)
+    inc r8
+    inc r8
+
+    iwt r1, #24
+    rpix
+    stw (r8) ; [1]: x=24 (Trap A)
+    inc r8
+    inc r8
+
+    iwt r1, #25
+    rpix
+    stw (r8) ; [2]: x=25 (Trap B)
+    inc r8
+    inc r8
+
+    iwt r1, #40
+    rpix
+    stw (r8)                       ; [3]: x=40 (untouched)
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+    nop
+
+; ==============================================================================
+; Case 4: Vertical and Horizontal Clipping
+; Top clip (y < 0), bottom clip (y >= 160), left clip (x < 0), right clip (x >= 128)
+; ==============================================================================
+run_case_4:
+    ; --- 4A: Top clipping: dy = -6, line_count = 12 (should render y in 0..5) ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #$FFFA     ; dy = -6
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #12        ; line_count = 12
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xL = 10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1400     ; xR = 20
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; tex_id = 0
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; --- 4B: Left clipping: xL = -5 ($FFFB << 8 = $FB00), xR = 10 ($0A00) at y=70 ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #70        ; dy = 70
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #4         ; line_count = 4
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$FB00     ; xL = -5.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xR = 10.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; tex_id = 0
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample pixels:
+    ; y=0 (rendered from top-clipped trap)
+    ; y=5 (rendered from top-clipped trap)
+    ; y=6 (outside top-clipped trap, untouched)
+    ; (x=0, y=70) rendered from left-clipped trap with UV advanced by 5!
+    iwt r8, #TEST_RESULT
+    iwt r1, #12
+
+    iwt r2, #0
+    rpix
+    stw (r8) ; [0]: y=0 (clipped top rendered)
+    inc r8
+    inc r8
+
+    iwt r2, #5
+    rpix
+    stw (r8) ; [1]: y=5 (bottom line rendered)
+    inc r8
+    inc r8
+
+    iwt r2, #6
+    rpix
+    stw (r8) ; [2]: y=6 (untouched)
+    inc r8
+    inc r8
+
+    iwt r1, #0
+    iwt r2, #70
+    rpix
+    stw (r8)                       ; [3]: (x=0, y=70, left-clipped UV advanced)
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+    nop
+
+; ==============================================================================
+; Case 5: Frame Half Reassembly across X = 127 -> 128 (Pass 0 + Pass 1)
+; Span X in [120..136]: Pass 0 renders 120..127, Pass 1 renders 128..135 (as 0..7)
+; ==============================================================================
+run_case_5:
+    ; --- Pass 0: anchor_x = 0, frame_half = 0 ---
+    iwt r1, #TEST_TRAP
+    iwt r0, #80        ; dy = 80
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #3         ; line_count = 3
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$7800     ; xL = 120.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$8800     ; xR = 136.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0         ; tex_id = 0
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0     ; Pass 0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample Pass 0 pixel at x=127:
+    iwt r8, #TEST_RESULT
+    iwt r1, #127
+    iwt r2, #80
+    rpix
+    stw (r8) ; [0]: x=127 (Pass 0 right edge)
+    inc r8
+    inc r8
+
+    ; --- Pass 1: same trap with frame_half = 1 ---
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #1     ; Pass 1
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample Pass 1 pixel at x'=0 (which represents original X=128):
+    iwt r8, #(TEST_RESULT + 2)
+    iwt r1, #0
+    iwt r2, #80
+    rpix
+    stw (r8)                       ; [1]: x'=0 (Pass 1 left edge, represents X=128)
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+    nop
+
+; ==============================================================================
+; Case 6: Color 0 Transparency vs Color 1 Opaque Black
+; Stamping Texture 3 (checkerboard of $00 and $01) over background.
+; $00 should leave background pixel untouched, $01 should write opaque black.
+; ==============================================================================
+run_case_6:
+    ; Draw background bar at y=90..94, x=10..26 with Texture 1 (color > 1)
+    iwt r1, #TEST_TRAP
+    iwt r0, #90        ; dy = 90
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #4         ; line_count = 4
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xL = 10.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1A00     ; xR = 26.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1         ; tex_id = 1 (fills background with non-zero color)
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Read background pixel at (x=10, y=90) and (x=11, y=90)
+    iwt r8, #TEST_RESULT
+    iwt r2, #90
+
+    iwt r1, #10
+    rpix
+    stw (r8) ; [0]: initial background color at (10, 90)
+    inc r8
+    inc r8
+
+    ; Now overlay Texture 3 (checkerboard of $00 and $01) over same region!
+    iwt r1, #TEST_TRAP
+    iwt r0, #90        ; dy = 90
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #4         ; line_count = 4
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0A00     ; xL = 10.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1A00     ; xR = 26.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0100     ; du_dx = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #3         ; tex_id = 3 (Checkerboard: (col+row)%2==0 -> $00, ==1 -> $01)
+    stw (r1)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Sample:
+    ; (x=10, y=90): (0+0)%2 == 0 -> texel $00 (transparent!). Should retain initial background!
+    ; (x=11, y=90): (1+0)%2 == 1 -> texel $01 (opaque black!). Should be $01!
+    iwt r8, #(TEST_RESULT + 2)
+    iwt r2, #90
+
+    iwt r1, #10
+    rpix
+    stw (r8) ; [1]: after overlay at (10, 90), should match [0]!
+    inc r8
+    inc r8
+
+    iwt r1, #11
+    rpix
+    stw (r8)                       ; [2]: after overlay at (11, 90), should be $01 (opaque black)
+
+test_complete:
+    ; Let memory settle (8 NOPs)
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    stop
+    nop
+
+; Include the rasterizer under test
+.include "../../IsoEngine/triangle/draw_cached_trap.i"
