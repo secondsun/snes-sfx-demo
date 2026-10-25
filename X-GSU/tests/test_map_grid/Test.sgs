@@ -37,6 +37,7 @@ GSU_Code:
     ; Set ROMBR = $04 for GSU ROM data fetches
     ibt r0, #$04
     romb
+    nop
 
 test_setup:
     iwt r12, #4         ; 4 test cases
@@ -862,6 +863,7 @@ clear_screen_c4:
     nop
 
 test_done:
+    nop
 test_stop:
     nop
     nop

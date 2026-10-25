@@ -44,38 +44,38 @@ test_loop:
     to idx_val
     ldw (r7)
 
-    with idx_val
+    from idx_val
     sub #1
-    bne :+
+    bne @not_case_1
     nop
     iwt r13, #run_case_1
     jmp r13
     nop
-:
-    with idx_val
+@not_case_1:
+    from idx_val
     sub #2
-    bne :+
+    bne @not_case_2
     nop
     iwt r13, #run_case_2
     jmp r13
     nop
-:
-    with idx_val
+@not_case_2:
+    from idx_val
     sub #3
-    bne :+
+    bne @not_case_3
     nop
     iwt r13, #run_case_3
     jmp r13
     nop
-:
-    with idx_val
+@not_case_3:
+    from idx_val
     sub #4
-    bne :+
+    bne @not_case_4
     nop
     iwt r13, #run_case_4
     jmp r13
     nop
-:
+@not_case_4:
     iwt r13, #test_done
     jmp r13
     nop
@@ -478,48 +478,52 @@ clear_screen_c4:
     nop
 
     ; Sample pixels:
-    ; 1. Floor of cell (0,0) at (X=73, Y=48):
+    ; 1. Floor of cell (0,0) at (X=80, Y=43):
     iwt r8, #TEST_RESULT
-    iwt r1, #73
-    iwt r2, #48
+    iwt r1, #80
+    iwt r2, #43
     rpix
     from r0
     stw (r8)            ; [0]: floor_00 (expected != 0)
     inc r8
     inc r8
 
-    ; 2. Sloped wedge of cell (1,0) at (X=85, Y=44):
-    iwt r1, #85
-    iwt r2, #44
+    ; 2. Sloped wedge of cell (1,0) at (X=105, Y=45):
+    iwt r1, #105
+    iwt r2, #45
     rpix
     from r0
     stw (r8)            ; [1]: wedge_10 (expected != 0)
     inc r8
     inc r8
 
-    ; 3. Stair tread of cell (0,1) at (X=55, Y=38):
-    iwt r1, #55
-    iwt r2, #38
+    ; 3. Stair tread of cell (0,1) at (X=75, Y=62):
+    iwt r1, #75
+    iwt r2, #62
     rpix
     from r0
     stw (r8)            ; [2]: stairs_01 (expected != 0)
-    inc r8
-    inc r8
 
     iwt r13, #test_done
     jmp r13
     nop
 
 test_done:
-    ; 8 NOP pipeline settling before stop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
     nop
 test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
     stop
     nop

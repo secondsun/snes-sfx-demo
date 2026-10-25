@@ -55,14 +55,14 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     cmode
 
     ; Read dy_start from trap_ptr (+0)
-    ldw (r1)            ; r0 = dy_start
-    with r4
-    add r0              ; r4 = y = anchor_y + dy_start
+    ldw (trap_ptr)      ; r0 = dy_start
+    with anchor_y
+    add r0              ; anchor_y = y = anchor_y + dy_start
 
     ; Read line_count from trap_ptr + 2
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = line_count
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = line_count
 
     ; If line_count == 0: early exit
     beq @early_exit
@@ -70,7 +70,7 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
 
     ; Check if completely above screen: y_end <= 0
     to r8
-    from r4
+    from anchor_y
     add r0              ; r8 = y_end = y + line_count
     from r8
     sub #1
@@ -79,41 +79,41 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
 
     ; Check if completely below screen: y >= 160
     iwt r8, #160
-    from r4
+    from anchor_y
     cmp r8
     bge @early_exit
     nop
 
     ; Top clipping: if y < 0, skip = -y, y = 0, line_count -= skip
-    from r4
+    from anchor_y
     sub #0
     bge @no_top_clip
     nop
-    ; r4 < 0:
+    ; anchor_y < 0:
     iwt r0, #0
     with r0
-    sub r4              ; r0 = skip = 0 - y
+    sub anchor_y        ; r0 = skip = 0 - y
     to r9
     move r9, r0         ; r9 = skip
-    ldw (r1)            ; r0 = line_count
+    ldw (trap_ptr)      ; r0 = line_count
     from r9
     cmp r0
     bge @early_exit     ; if skip >= line_count, entirely off screen!
     nop
     with r0
     sub r9              ; r0 = new line_count = line_count - skip
-    iwt r4, #0          ; y = 0
+    iwt anchor_y, #0    ; y = 0
     bra @top_clip_done
     nop
 
 @no_top_clip:
     iwt r9, #0          ; skip = 0
-    ldw (r1)            ; r0 = line_count
+    ldw (trap_ptr)      ; r0 = line_count
 
 @top_clip_done:
     ; Bottom clipping: if y + line_count > 160, line_count = 160 - y
     to r8
-    from r4
+    from anchor_y
     add r0              ; r8 = y_end
     iwt r11, #160
     from r8
@@ -153,19 +153,19 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
 
     ; Save starting Y in r2 (R2 is SuperFX hardware Y coordinate register for plot)
     to r2
-    move r2, r4
+    move r2, anchor_y
 
     ; Compute effective horizontal anchor shift in Q8.8:
     ; anchor_x_eff = anchor_x << 8
     to r8
-    from r3
+    from anchor_x
     swap
     iwt r11, #$FF00
     with r8
     and r11             ; r8 = anchor_x in Q8.8
 
     ; If frame_half != 0, subtract 128 in Q8.8 (-$8000 = +$8000)
-    from r7
+    from frame_half
     sub #0
     beq @no_frame_half_shift
     nop
@@ -175,18 +175,18 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
 @no_frame_half_shift:
 
     ; Read xL_start (+4) and add anchor_x_eff
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = xL_start
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = xL_start
     with r0
     add r8
     to r7
     move r7, r0         ; r7 = xL = xL_start + anchor_x_eff
 
     ; Read xR_start (+6) and add anchor_x_eff
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = xR_start
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = xR_start
     with r0
     add r8
     to r8
@@ -216,66 +216,66 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     from r8
     stw (r4)
 
-    ; Read dxL_dy (+8 of cached_trap, r1 was at +6)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = dxL_dy
+    ; Read dxL_dy (+8 of cached_trap, trap_ptr was at +6)
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = dxL_dy
     inc r4
     inc r4
     stw (r4)            ; Store dxL_dy at frame + 6
 
     ; Read dxR_dy (+10 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = dxR_dy
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = dxR_dy
     inc r4
     inc r4
     stw (r4)            ; Store dxR_dy at frame + 8
 
     ; Read uL_start (+12 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = uL_start
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = uL_start
     inc r4
     inc r4
     stw (r4)            ; Store uL at frame + 10
 
     ; Read vL_start (+14 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = vL_start
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = vL_start
     inc r4
     inc r4
     stw (r4)            ; Store vL at frame + 12
 
     ; Read du_dy (+16 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = du_dy
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = du_dy
     inc r4
     inc r4
     stw (r4)            ; Store du_dy at frame + 14
 
     ; Read dv_dy (+18 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = dv_dy
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = dv_dy
     inc r4
     inc r4
     stw (r4)            ; Store dv_dy at frame + 16
 
     ; Read du_dx (+20 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = du_dx
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = du_dx
     inc r4
     inc r4
     stw (r4)            ; Store du_dx at frame + 18
 
     ; Read dv_dx (+22 of cached_trap)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = dv_dx
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = dv_dx
     inc r4
     inc r4
     stw (r4)            ; Store dv_dx at frame + 20
@@ -358,10 +358,10 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     nop
 @skip_done:
 
-    ; Read tex_id (+24 of cached_trap, r1 is at +22)
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = tex_id
+    ; Read tex_id (+24 of cached_trap, trap_ptr is at +22)
+    inc trap_ptr
+    inc trap_ptr
+    ldw (trap_ptr)      ; r0 = tex_id
 
     ; Lookup TEXTURE_TABLE + (tex_id << 3)
     from r0
@@ -608,10 +608,12 @@ scanline_loop:
     ; Compute pixel_count = x_end - x_start = r4 - r3
     from r4
     sub r3
-    to r12
-    move r12, r0        ; r12 = pixel_count
     beq @advance_scanline
     nop
+    bmi @advance_scanline
+    nop
+    to r12
+    move r12, r0        ; r12 = pixel_count
 
     ; Set R1 = x_start (plot_x)
     to r1

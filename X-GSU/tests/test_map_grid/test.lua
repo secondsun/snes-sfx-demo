@@ -1,10 +1,11 @@
 -- test.lua - Mesen test script for Map Grid Painter's Traversal & Archetype Stamping
-test_setup = 0x20C5
-test_stop  = 0x2624
-TEST_CASE_IDX = 0x3196
-TEST_RESULT   = 0x3198
+io.stdout:setvbuf("no")
+test_setup = 0x25F1
+test_stop  = 0x2B51
+TEST_CASE_IDX = 0x36F4
+TEST_RESULT   = 0x36F6
 
-local index = 0x0004
+local index = 1
 local fail_count = 0
 local TOTAL_CASES = 4
 
@@ -25,6 +26,7 @@ function onTestSetup(address, value)
     print("==================================================================")
     runCase(index)
 end
+
 
 
 function onTestStop(address, value)
