@@ -1,0 +1,525 @@
+; ==============================================================================
+; Test.sgs - Test Suite for Rotatable Sloped & Stepped Shape Archetypes (Ticket 5)
+; ==============================================================================
+.include "libSFX.i"
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/control.i"
+.include "../../common/structs.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_iso_camera.i"
+.include "../../IsoEngine/triangle/cached_trap.i"
+.include "../../IsoEngine/triangle/draw_cached_trap.i"
+.include "../../IsoEngine/triangle/compile_face_traps.i"
+.include "../../IsoEngine/map_grid.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+
+TEST_CAM:           .res .sizeof(iso_camera)
+TEST_BASIS:         .res .sizeof(iso_basis)
+TEST_LATTICE:       .res LATTICE_V2_SIZE
+TEST_ARCH_TRAPS:    .res .sizeof(arch_traps_table)
+TEST_CACHED_YAW:    .res 2
+TEST_TRACE_BUF:     .res 64
+TEST_MAP_BUF:       .res 256
+
+.segment "GSUCODE"
+.export GSU_Code
+GSU_Code:
+    init_stack
+    register idx_val
+
+test_setup:
+    iwt r12, #100
+    iwt r13, #test_loop
+
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    iwt r7, #TEST_CASE_IDX
+    to idx_val
+    ldw (r7)
+
+    with idx_val
+    sub #1
+    bne :+
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+:
+    with idx_val
+    sub #2
+    bne :+
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+:
+    with idx_val
+    sub #3
+    bne :+
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+:
+    with idx_val
+    sub #4
+    bne :+
+    nop
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+:
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: PRIM_WEDGE_STRAIGHT (+1h and +2h) Across All 4 Rotations
+; ==============================================================================
+run_case_1:
+    ; Reset cached yaw to force compilation
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    ; Initialize camera at yaw = 1 (Quadrant 0: sin > 0, cos > 0)
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Check PRIM_WEDGE_STRAIGHT (1h: arch=1) trap counts for ROT_0, 90, 180, 270:
+    ; Read entry pointers from arch_lut at arch_traps + 326:
+    ; index = (1 << 2) | rot = 4, 5, 6, 7
+    iwt r8, #TEST_RESULT
+    iwt r12, #4         ; index 4 (arch 1, rot 0)
+    iwt r14, #4         ; 4 rotations
+@c1_rot_loop:
+    move r1, r12
+    with r1
+    add r1              ; index * 2
+    iwt r7, #TEST_ARCH_TRAPS + 326
+    with r7
+    add r1
+    ldw (r7)            ; r0 = byte offset of entry from TEST_ARCH_TRAPS
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; r0 = trap count
+    from r0
+    stw (r8)            ; store trap count in TEST_RESULT
+    inc r8
+    inc r8
+    inc r12
+    dec r14
+    bne @c1_rot_loop
+    nop
+
+    ; Also check 2h variant (arch=2, rot 0): index = (2 << 2) | 0 = 8
+    iwt r7, #TEST_ARCH_TRAPS + 326 + 16
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; trap count for 2h straight rot 0
+    from r0
+    stw (r8)            ; store in TEST_RESULT + 8
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: PRIM_WEDGE_OUTER & PRIM_WEDGE_INNER Across All 4 Rotations
+; ==============================================================================
+run_case_2:
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Check PRIM_WEDGE_OUTER (arch=3, rot 0..3): indices 12, 13, 14, 15
+    iwt r8, #TEST_RESULT
+    iwt r12, #12
+    iwt r14, #4
+@c2_outer_loop:
+    move r1, r12
+    with r1
+    add r1
+    iwt r7, #TEST_ARCH_TRAPS + 326
+    with r7
+    add r1
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)
+    from r0
+    stw (r8)
+    inc r8
+    inc r8
+    inc r12
+    dec r14
+    bne @c2_outer_loop
+    nop
+
+    ; Check PRIM_WEDGE_INNER (arch=5, rot 0): index = 20
+    iwt r7, #TEST_ARCH_TRAPS + 326 + 40
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)
+    from r0
+    stw (r8)            ; store in TEST_RESULT + 8
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: PRIM_STAIRS (arch=7) Across All 4 Rotations
+; ==============================================================================
+run_case_3:
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Check PRIM_STAIRS (arch=7, rot 0..3): indices 28, 29, 30, 31
+    iwt r8, #TEST_RESULT
+    iwt r12, #28
+    iwt r14, #4
+@c3_stairs_loop:
+    move r1, r12
+    with r1
+    add r1
+    iwt r7, #TEST_ARCH_TRAPS + 326
+    with r7
+    add r1
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)
+    from r0
+    stw (r8)
+    inc r8
+    inc r8
+    inc r12
+    dec r14
+    bne @c3_stairs_loop
+    nop
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: End-to-End Stepped Ridge, Valley & Stairway Map Grid Rendering
+; ==============================================================================
+run_case_4:
+    ; Clear screen buffer in SRAM ($708000..$70A7FF)
+    iwt r1, #$8000
+    iwt r12, #$2800 / 2
+    iwt r13, #clear_screen_c4
+    iwt r0, #0
+clear_screen_c4:
+    from r0
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Build 2x2 stepped diorama map in TEST_MAP_BUF:
+    ; Cell (0,0): h=0, PRIM_FLAT, top=0, skirt=1, drop_ns=0, drop_ew=0
+    ; Cell (1,0): h=0, PRIM_WEDGE_STRAIGHT (rot 0: South->North rise), top=0, skirt=1
+    ; Cell (0,1): h=0, PRIM_STAIRS (rot 0: South->North rise), top=0, skirt=1
+    ; Cell (1,1): h=1, PRIM_WEDGE_OUTER (rot 0), top=0, skirt=1
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #2          ; cols = 2
+    stb (r1)
+    inc r1
+    iwt r0, #2          ; rows = 2
+    stb (r1)
+    inc r1
+    iwt r0, #64         ; origin_x = 64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #40         ; origin_z = 40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Cell (0, 0): h=0, PRIM_FLAT
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Cell (1, 0): h=0, PRIM_WEDGE_STRAIGHT (rot 0)
+    iwt r0, #0          ; h = 0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_WEDGE_STRAIGHT | ROT_0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Cell (0, 1): h=0, PRIM_STAIRS (rot 0)
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_STAIRS | ROT_0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Cell (1, 1): h=1, PRIM_WEDGE_OUTER (rot 0)
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_WEDGE_OUTER | ROT_0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Force archetype compilation at yaw = 1
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Render Pass 0 (Half 0: [0..127])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Render Pass 1 (Half 1: [128..255])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Flush pixel cache and let RAM writes settle
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Sample pixels:
+    ; 1. Floor of cell (0,0) at (X=73, Y=48):
+    iwt r8, #TEST_RESULT
+    iwt r1, #73
+    iwt r2, #48
+    rpix
+    from r0
+    stw (r8)            ; [0]: floor_00 (expected != 0)
+    inc r8
+    inc r8
+
+    ; 2. Sloped wedge of cell (1,0) at (X=85, Y=44):
+    iwt r1, #85
+    iwt r2, #44
+    rpix
+    from r0
+    stw (r8)            ; [1]: wedge_10 (expected != 0)
+    inc r8
+    inc r8
+
+    ; 3. Stair tread of cell (0,1) at (X=55, Y=38):
+    iwt r1, #55
+    iwt r2, #38
+    rpix
+    from r0
+    stw (r8)            ; [2]: stairs_01 (expected != 0)
+    inc r8
+    inc r8
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+test_done:
+    ; 8 NOP pipeline settling before stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+    stop
+    nop

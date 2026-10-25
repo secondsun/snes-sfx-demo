@@ -47,19 +47,22 @@
 .endmacro
 
 ; Archetype IDs (bits [5:0] of archetype_id)
-PRIM_FLAT           = 0
+PRIM_FLAT              = 0
 
 .ifndef ATLAS_STRIDE_SHIFT
-ATLAS_STRIDE_SHIFT  = 6
+ATLAS_STRIDE_SHIFT     = 6
 .endif
-PRIM_WEDGE_STRAIGHT = 1
-PRIM_WEDGE_OUTER    = 3
-PRIM_WEDGE_INNER    = 5
-PRIM_STAIRS         = 7
-PRIM_LIQUID_SHALLOW = 8
-PRIM_LIQUID_DEEP    = 9
-PRIM_PILLAR         = 10
-PRIM_FOLIAGE_CROSS  = 11
+PRIM_WEDGE_STRAIGHT    = 1
+PRIM_WEDGE_STRAIGHT_2H = 2
+PRIM_WEDGE_OUTER       = 3
+PRIM_WEDGE_OUTER_2H    = 4
+PRIM_WEDGE_INNER       = 5
+PRIM_WEDGE_INNER_2H    = 6
+PRIM_STAIRS            = 7
+PRIM_LIQUID_SHALLOW    = 8
+PRIM_LIQUID_DEEP       = 9
+PRIM_PILLAR            = 10
+PRIM_FOLIAGE_CROSS     = 11
 
 ; Rotation encodings for archetype_id bits [7:6]
 ROT_0               = (0 << 6)
@@ -89,6 +92,8 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
     bbox_xmax       .word   ; +320: Max X offset relative to anchor across corners
     bbox_ymin       .word   ; +322: Min Y offset relative to anchor across corners
     bbox_ymax       .word   ; +324: Max Y offset relative to anchor across corners
+    arch_lut        .res 32 * 2 ; +326: 64 bytes (offsets for (archetype << 2) | rot)
+    arch_buf        .res 3200   ; +390: storage buffer for compiled cached_traps
 .endstruct
 
 ; ==============================================================================
@@ -133,6 +138,13 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
     u_offset        .word ; +58
     v_offset        .word ; +60
     step_y          .word ; +62
+
+    compile_out_ptr .word ; +64: current output pointer in arch_buf
+    arch_trap_count .word ; +66: trap count for current shape
+    elev_midpoints  .res 16 ; +68..+99: 8 points (MN, ME, MS, MW at +1h and +2h)
+    v_ptrs          .res 12 ; +100..+123: B0..B3, E1_0..E1_3, E2_0..E2_3
+    m_ptrs          .res 8  ; +124..+139: MB_W, MB_E, M1_W, M1_E, M2_W, M2_E
+    cur_rot         .word ; +140: current rotation (0..3)
 .endstruct
 
 .segment "GSURAM"
@@ -141,6 +153,303 @@ gsu_map_render_frame:   .res .sizeof(map_render_frame)
 gsu_map_face_def:       .res .sizeof(face_def)
 
 .segment "GSUCODE"
+
+; ==============================================================================
+; map_compile_quad_face
+; Compiles a quad face into cached_traps at compile_out_ptr (+64).
+; In:
+;   r1 = v0_ptr
+;   r2 = v1_ptr
+;   r3 = v2_ptr
+;   r4 = v3_ptr
+;   r5 = uv_mode
+;   r6 = tex_id
+; Modifies:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function map_compile_quad_face v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
+    register v0_p = r1, v1_p = r2, v2_p = r3, v3_p = r4, uv_m = r5, tex_i = r6
+
+    iwt r7, #gsu_map_face_def
+    iwt r0, #FACE_DEF_FLAG_PTRS
+    stw (r7)            ; flags (+0)
+    inc r7
+    inc r7
+    from uv_m
+    stw (r7)            ; uv_mode (+2)
+    inc r7
+    inc r7
+    from tex_i
+    stw (r7)            ; tex_id (+4)
+    inc r7
+    inc r7
+    iwt r0, #ATLAS_STRIDE_SHIFT
+    stw (r7)            ; stride_shift (+6)
+    inc r7
+    inc r7
+    iwt r0, #4
+    stw (r7)            ; num_verts (+8)
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad (+10)
+    inc r7
+    inc r7
+
+    ; V0
+    from v0_p
+    stw (r7)            ; v0.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u0 = 0
+    inc r7
+    inc r7
+    stw (r7)            ; v0 = 0
+    inc r7
+    inc r7
+
+    ; V1
+    from v1_p
+    stw (r7)            ; v1.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$2000      ; 32 << 8
+    stw (r7)            ; u1
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; v1 = 0
+    inc r7
+    inc r7
+
+    ; V2
+    from v2_p
+    stw (r7)            ; v2.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$2000      ; 32 << 8
+    stw (r7)            ; u2
+    inc r7
+    inc r7
+    iwt r0, #(32 << ATLAS_STRIDE_SHIFT)
+    stw (r7)            ; v2
+    inc r7
+    inc r7
+
+    ; V3
+    from v3_p
+    stw (r7)            ; v3.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u3 = 0
+    inc r7
+    inc r7
+    iwt r0, #(32 << ATLAS_STRIDE_SHIFT)
+    stw (r7)            ; v3
+
+    ; Call compile_face_traps:
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r2, r0         ; r2 = compile_out_ptr
+    iwt r1, #gsu_map_face_def
+    call compile_face_traps r1, r2
+
+    ; If r3 == 0 (culled): return
+    with r3
+    add #0
+    beq @quad_done
+    nop
+
+    ; Add r3 to arch_trap_count (+66)
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    with r0
+    add r3
+    from r0
+    stw (r7)
+
+    ; Advance compile_out_ptr by r3 * 26:
+    ; 26 = (r3 << 4) + (r3 << 3) + (r3 << 1)
+    move r1, r3
+    with r1
+    add r1              ; r3 * 2
+    move r2, r1         ; * 2
+    with r1
+    add r1              ; * 4
+    with r1
+    add r1              ; * 8
+    move r4, r1         ; * 8
+    with r1
+    add r1              ; * 16
+    with r1
+    add r4              ; * 24
+    with r1
+    add r2              ; * 26
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    with r0
+    add r1
+    from r0
+    stw (r7)            ; compile_out_ptr += r3 * 26
+
+@quad_done:
+    return
+endfunction
+
+; ==============================================================================
+; map_compile_tri_face
+; Compiles a triangular face into cached_traps at compile_out_ptr (+64).
+; In:
+;   r1 = v0_ptr
+;   r2 = v1_ptr
+;   r3 = v2_ptr
+;   r4 = uv_mode
+;   r5 = tex_id
+; Modifies:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function map_compile_tri_face v0_p, v1_p, v2_p, uv_m, tex_i
+    register v0_p = r1, v1_p = r2, v2_p = r3, uv_m = r4, tex_i = r5
+
+    iwt r7, #gsu_map_face_def
+    iwt r0, #FACE_DEF_FLAG_PTRS
+    stw (r7)            ; flags (+0)
+    inc r7
+    inc r7
+    from uv_m
+    stw (r7)            ; uv_mode (+2)
+    inc r7
+    inc r7
+    from tex_i
+    stw (r7)            ; tex_id (+4)
+    inc r7
+    inc r7
+    iwt r0, #ATLAS_STRIDE_SHIFT
+    stw (r7)            ; stride_shift (+6)
+    inc r7
+    inc r7
+    iwt r0, #3
+    stw (r7)            ; num_verts (+8) = 3
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad (+10)
+    inc r7
+    inc r7
+
+    ; V0
+    from v0_p
+    stw (r7)            ; v0.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u0 = 0
+    inc r7
+    inc r7
+    stw (r7)            ; v0 = 0
+    inc r7
+    inc r7
+
+    ; V1
+    from v1_p
+    stw (r7)            ; v1.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$2000      ; 32 << 8
+    stw (r7)            ; u1
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; v1 = 0
+    inc r7
+    inc r7
+
+    ; V2
+    from v2_p
+    stw (r7)            ; v2.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; u2 = 0
+    inc r7
+    inc r7
+    iwt r0, #(32 << ATLAS_STRIDE_SHIFT)
+    stw (r7)            ; v2
+
+    ; Call compile_face_traps:
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r2, r0         ; r2 = compile_out_ptr
+    iwt r1, #gsu_map_face_def
+    call compile_face_traps r1, r2
+
+    ; If r3 == 0 (culled): return
+    with r3
+    add #0
+    beq @tri_done
+    nop
+
+    ; Add r3 to arch_trap_count (+66)
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    with r0
+    add r3
+    from r0
+    stw (r7)
+
+    ; Advance compile_out_ptr by r3 * 26:
+    move r1, r3
+    with r1
+    add r1              ; * 2
+    move r2, r1
+    with r1
+    add r1              ; * 4
+    with r1
+    add r1              ; * 8
+    move r4, r1         ; * 8
+    with r1
+    add r1              ; * 16
+    with r1
+    add r4              ; * 24
+    with r1
+    add r2              ; * 26
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    with r0
+    add r1
+    from r0
+    stw (r7)            ; compile_out_ptr += r3 * 26
+
+@tri_done:
+    return
+endfunction
 
 ; ==============================================================================
 ; map_grid_compile_archetypes
@@ -345,8 +654,11 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     stw (r7)            ; bbox_xmax
     inc r7
     inc r7
+    iwt r0, #28
+    with r3
+    sub r0
     from r3
-    stw (r7)            ; bbox_ymin
+    stw (r7)            ; bbox_ymin (includes up to 2h elevation headroom)
     inc r7
     inc r7
     from r4
@@ -764,6 +1076,1303 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r3
     stw (r7)            ; store skirt_ew_count (+212)
 
+    ; --------------------------------------------------------------------------
+    ; 7. Initialize Dynamic Archetype Lookup Table (arch_lut at +326):
+    ; --------------------------------------------------------------------------
+    ; Offset 0..3: PRIM_FLAT (all rotations point to flat_count at offset 0)
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r1, #326
+    with r0
+    add r1
+    move r7, r0         ; r7 = &arch_lut[0]
+    iwt r0, #0
+    stw (r7)            ; lut[0] = 0 (PRIM_FLAT rot 0)
+    inc r7
+    inc r7
+    stw (r7)            ; lut[1] = 0 (rot 1)
+    inc r7
+    inc r7
+    stw (r7)            ; lut[2] = 0 (rot 2)
+    inc r7
+    inc r7
+    stw (r7)            ; lut[3] = 0 (rot 3)
+    inc r7
+    inc r7
+
+    ; Initialize remaining 28 entries (4..31) to 0 (default: 0 traps)
+    iwt r12, #28
+@init_lut_loop:
+    iwt r0, #0
+    stw (r7)
+    inc r7
+    inc r7
+    dec r12
+    bne @init_lut_loop
+    nop
+
+    ; Initialize compile_out_ptr (+64) = arch_traps_ptr + 390
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r1, #390
+    with r0
+    add r1
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 64
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; 8. Precompute Elevated Midpoints at +1h and +2h in frame (+68):
+    ;    MN (64), ME (68), MS (72), MW (76) in lattice_ptr (frame + 4)
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + 4
+    ldw (r7)
+    move r11, r0        ; r11 = lattice_ptr
+    iwt r0, #64
+    with r11
+    add r0              ; r11 = &lattice_ptr[16] (MN)
+
+    iwt r12, #0         ; k = 0..3
+@elev_mid_loop:
+    ; Read M_k.x
+    ldw (r11)
+    move r1, r0         ; r1 = x
+    inc r11
+    inc r11
+    ; Read M_k.y
+    ldw (r11)
+    move r2, r0         ; r2 = y
+    inc r11
+    inc r11
+
+    ; k * 4:
+    move r3, r12
+    with r3
+    add r3
+    with r3
+    add r3              ; r3 = k * 4
+
+    ; Store M_k at +1h (x, y - 14) in frame + 68 + k * 4:
+    iwt r7, #gsu_map_render_frame + 68
+    with r7
+    add r3
+    from r1
+    stw (r7)            ; x
+    inc r7
+    inc r7
+    move r0, r2
+    iwt r6, #14
+    with r0
+    sub r6              ; y - 14
+    from r0
+    stw (r7)            ; y - 14
+
+    ; Store M_k at +2h (x, y - 28) in frame + 84 + k * 4:
+    iwt r7, #gsu_map_render_frame + 84
+    with r7
+    add r3
+    from r1
+    stw (r7)            ; x
+    inc r7
+    inc r7
+    move r0, r2
+    iwt r6, #28
+    with r0
+    sub r6              ; y - 28
+    from r0
+    stw (r7)            ; y - 28
+
+    inc r12
+    iwt r0, #4
+    from r12
+    sub r0
+    blt @elev_mid_loop
+    nop
+
+    ; --------------------------------------------------------------------------
+    ; 9. Compile Wedge & Stair Archetypes across Rotations R = 0..3:
+    ; --------------------------------------------------------------------------
+    iwt r0, #0
+    iwt r7, #gsu_map_render_frame + 140
+    stw (r7)            ; frame::cur_rot = 0
+
+@rot_compile_loop:
+    ; Load lattice_ptr from frame + 4
+    iwt r7, #gsu_map_render_frame + 4
+    ldw (r7)
+    move r14, r0        ; r14 = lattice_ptr
+
+    ; Read R from frame + 140
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    move r12, r0        ; r12 = R (0..3)
+
+    ; Setup corner vertex pointers in frame::v_ptrs (+100..+123):
+    ; For corner k in 0..3:
+    ;   ik = (k + R) & 3
+    ;   B_k  = lattice_ptr + ik * 4
+    ;   E1_k = lattice_ptr + (ik + 8) * 4
+    ;   E2_k = lattice_ptr + (ik + 12) * 4
+    iwt r9, #0          ; k = 0..3
+@corner_setup_loop:
+    from r9
+    add r12
+    move r8, r0
+    iwt r6, #3
+    with r8
+    and r6              ; r8 = ik = (k + R) & 3
+
+    ; ik * 4:
+    with r8
+    add r8
+    with r8
+    add r8              ; r8 = ik * 4
+
+    ; B_k = lattice_ptr + ik * 4:
+    move r1, r14
+    with r1
+    add r8              ; r1 = &B_k
+
+    ; E1_k = B_k + 32 (8 * 4):
+    move r2, r1
+    iwt r0, #32
+    with r2
+    add r0              ; r2 = &E1_k
+
+    ; E2_k = B_k + 48 (12 * 4):
+    move r3, r1
+    iwt r0, #48
+    with r3
+    add r0              ; r3 = &E2_k
+
+    ; Store in frame::v_ptrs:
+    ; B_k at +100 + k * 2:
+    move r6, r9
+    with r6
+    add r6              ; k * 2
+    iwt r7, #gsu_map_render_frame + 100
+    with r7
+    add r6
+    from r1
+    stw (r7)            ; &B_k
+
+    ; E1_k at +108 + k * 2:
+    iwt r7, #gsu_map_render_frame + 108
+    with r7
+    add r6
+    from r2
+    stw (r7)            ; &E1_k
+
+    ; E2_k at +116 + k * 2:
+    iwt r7, #gsu_map_render_frame + 116
+    with r7
+    add r6
+    from r3
+    stw (r7)            ; &E2_k
+
+    inc r9
+    iwt r0, #4
+    from r9
+    sub r0
+    blt @corner_setup_loop
+    nop
+
+    ; Setup midpoint pointers for PRIM_STAIRS in frame::m_ptrs (+124..+139):
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    move r12, r0
+
+    ; mW:
+    move r0, r12
+    iwt r6, #3
+    with r0
+    add r6
+    iwt r6, #3
+    with r0
+    and r6              ; r0 = mW = (R + 3) & 3
+    with r0
+    add r0
+    with r0
+    add r0              ; r0 = mW * 4
+    move r8, r0         ; r8 = mW * 4
+
+    ; mE:
+    move r0, r12
+    inc r0
+    iwt r6, #3
+    with r0
+    and r6              ; r0 = mE = (R + 1) & 3
+    with r0
+    add r0
+    with r0
+    add r0              ; r0 = mE * 4
+    move r9, r0         ; r9 = mE * 4
+
+    ; MB_W = lattice_ptr + 64 + mW * 4
+    move r1, r14
+    iwt r0, #64
+    with r1
+    add r0
+    with r1
+    add r8
+    iwt r7, #gsu_map_render_frame + 124
+    from r1
+    stw (r7)            ; MB_W (+124)
+
+    ; MB_E = lattice_ptr + 64 + mE * 4
+    move r1, r14
+    iwt r0, #64
+    with r1
+    add r0
+    with r1
+    add r9
+    inc r7
+    inc r7
+    from r1
+    stw (r7)            ; MB_E (+126)
+
+    ; M1_W = frame + 68 + mW * 4
+    iwt r1, #gsu_map_render_frame + 68
+    with r1
+    add r8
+    inc r7
+    inc r7
+    from r1
+    stw (r7)            ; M1_W (+128)
+
+    ; M1_E = frame + 68 + mE * 4
+    iwt r1, #gsu_map_render_frame + 68
+    with r1
+    add r9
+    inc r7
+    inc r7
+    from r1
+    stw (r7)            ; M1_E (+130)
+
+    ; M2_W = frame + 84 + mW * 4
+    iwt r1, #gsu_map_render_frame + 84
+    with r1
+    add r8
+    inc r7
+    inc r7
+    from r1
+    stw (r7)            ; M2_W (+132)
+
+    ; M2_E = frame + 84 + mE * 4
+    iwt r1, #gsu_map_render_frame + 84
+    with r1
+    add r9
+    inc r7
+    inc r7
+    from r1
+    stw (r7)            ; M2_E (+134)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_WEDGE_STRAIGHT (1h: arch=1) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (1 << 2) | R = 4 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #4
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0         ; r9 = lut byte offset for arch 1
+
+    ; entry_ptr = compile_out_ptr (+64)
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0         ; r8 = entry_ptr
+
+    ; entry_offset = entry_ptr - arch_traps_ptr
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0         ; r2 = entry_offset
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)            ; arch_lut[(1 << 2) | R] = entry_offset
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Face 1: Top sloped quad: E1_0, E1_1, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0         ; E1_0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0         ; E1_1
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0         ; B_2
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0         ; B_3
+    iwt r5, #UV_MODE_SLOPE
+    iwt r6, #0          ; top_tex
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Face 2: Back quad: E1_1, E1_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 110
+    ldw (r7)
+    move r1, r0         ; E1_1
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r2, r0         ; E1_0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0         ; B_0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0         ; B_1
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1          ; skirt_tex
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Face 3: Left cheek tri: E1_0, B_0, B_3
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0         ; E1_0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r2, r0         ; B_0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0         ; B_3
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1          ; skirt_tex
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Face 4: Right cheek tri: E1_1, B_2, B_1
+    iwt r7, #gsu_map_render_frame + 110
+    ldw (r7)
+    move r1, r0         ; E1_1
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0         ; B_2
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r3, r0         ; B_1
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1          ; skirt_tex
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Store trap count at (entry_ptr):
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_WEDGE_STRAIGHT_2H (2h: arch=2) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (2 << 2) | R = 8 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #8
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Top sloped quad: E2_0, E2_1, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_SLOPE
+    iwt r6, #0
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Back quad: E2_1, E2_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Left cheek tri: E2_0, B_0, B_3
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Right cheek tri: E2_1, B_2, B_1
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Store trap count
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_WEDGE_OUTER (1h: arch=3) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (3 << 2) | R = 12 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #12
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Tri 1 (sloped): E1_0, B_1, B_3
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_SLOPE
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Tri 2 (low base): B_1, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_HORIZONTAL
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Cheek 1: E1_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r2, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_NS
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Cheek 2: E1_0, B_3, B_0
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Store trap count
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_WEDGE_OUTER_2H (2h: arch=4) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (4 << 2) | R = 16 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #16
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Tri 1 (sloped): E2_0, B_1, B_3
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_SLOPE
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Tri 2 (low base): B_1, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_HORIZONTAL
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Cheek 1: E2_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r2, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_NS
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Cheek 2: E2_0, B_3, B_0
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Store trap count
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_WEDGE_INNER (1h: arch=5) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (5 << 2) | R = 20 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #20
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Tri 1 (high horizontal): E1_0, E1_1, E1_3
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 114
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_HORIZONTAL
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Tri 2 (sloped down): E1_1, B_2, E1_3
+    iwt r7, #gsu_map_render_frame + 110
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 114
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_SLOPE
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Back wall 1: E1_1, E1_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 110
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Back wall 2: E1_0, E1_3, B_3, B_0
+    iwt r7, #gsu_map_render_frame + 108
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 114
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Store trap count
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_WEDGE_INNER_2H (2h: arch=6) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (6 << 2) | R = 24 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #24
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Tri 1 (high horizontal): E2_0, E2_1, E2_3
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 122
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_HORIZONTAL
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Tri 2 (sloped down): E2_1, B_2, E2_3
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 122
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_SLOPE
+    iwt r5, #0
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Back wall 1: E2_1, E2_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Back wall 2: E2_0, E2_3, B_3, B_0
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 122
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Store trap count
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; Compile PRIM_STAIRS (arch=7) for rotation R:
+    ; --------------------------------------------------------------------------
+    ; lut index = (7 << 2) | R = 28 + R
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    iwt r6, #28
+    with r0
+    add r6
+    with r0
+    add r0
+    move r9, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    from r2
+    stw (r7)
+
+    inc r8
+    inc r8
+    iwt r7, #gsu_map_render_frame + 64
+    from r8
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    ; Step 1 Lower Tread (+1h): M1_W, M1_E, E1_2, E1_3
+    iwt r7, #gsu_map_render_frame + 128
+    ldw (r7)
+    move r1, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 112
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_HORIZONTAL
+    iwt r6, #0
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Riser 1 (0 to +1h): E1_3, E1_2, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 114
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 112
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Step 2 Upper Tread (+2h): E2_0, E2_1, M2_E, M2_W
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 134
+    ldw (r7)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + 132
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_HORIZONTAL
+    iwt r6, #0
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Riser 2 (+1h to +2h): M2_W, M2_E, M1_E, M1_W
+    iwt r7, #gsu_map_render_frame + 132
+    ldw (r7)
+    move r1, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 130
+    ldw (r7)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + 128
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Back Wall (0 to +2h): E2_1, E2_0, B_0, B_1
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; West Cheek Lower Tri: M1_W, B_3, MB_W
+    iwt r7, #gsu_map_render_frame + 128
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 124
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; West Cheek Upper Quad: E2_0, M2_W, MB_W, B_0
+    iwt r7, #gsu_map_render_frame + 116
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 132
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 124
+    ldw (r7)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; East Cheek Lower Tri: M1_E, MB_E, B_2
+    iwt r7, #gsu_map_render_frame + 130
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 126
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; East Cheek Upper Quad: E2_1, B_1, MB_E, M2_E
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 126
+    ldw (r7)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + 134
+    ldw (r7)
+    move r4, r0
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Store trap count for PRIM_STAIRS:
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    move r1, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    iwt r6, #326
+    with r0
+    add r6
+    with r0
+    add r9
+    move r7, r0
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    with r0
+    add r2
+    move r7, r0
+    from r1
+    stw (r7)
+
+    ; Next rotation R = R + 1
+    iwt r7, #gsu_map_render_frame + 140
+    ldw (r7)
+    inc r0
+    from r0
+    stw (r7)
+    iwt r6, #4
+    from r0
+    sub r6
+    bge @rot_compile_done
+    nop
+    iwt r13, #@rot_compile_loop
+    jmp r13
+    nop
+
+@rot_compile_done:
     ; Return 1 (recompiled)
     iwt r3, #1
     return
@@ -1605,16 +3214,42 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
 
 @skirt_ew_done:
 
-    ; --- 9C: Stamp PRIM_FLAT (Top Cap) ---
+    ; --- 9C: Stamp Archetype (Top Cap & Faces) ---
     iwt r7, #gsu_map_render_frame + map_render_frame::archetype_id
     ldw (r7)
-    move r8, r0
-    iwt r14, #$003F
-    with r8
-    and r14             ; r8 = base archetype (bits 0..5)
-    with r8
-    add #0
-    beq :+
+    move r8, r0         ; r8 = archetype_id
+
+    ; base archetype A = r8 & $1F
+    move r1, r8
+    iwt r2, #$001F
+    with r1
+    and r2              ; r1 = A
+    with r1
+    add r1
+    with r1
+    add r1              ; r1 = A << 2
+
+    ; rot R = (r8 >> 6) & 3
+    move r0, r8
+    with r0
+    add r0
+    with r0
+    add r0
+    swap
+    iwt r2, #3
+    with r0
+    and r2              ; r0 = R
+
+    with r1
+    add r0              ; r1 = lut_index = (A << 2) | R
+    with r1
+    add r1              ; r1 = lut_byte_offset = lut_index * 2
+
+    ; Check bounds: lut_byte_offset < 64 (32 entries * 2)
+    iwt r0, #64
+    from r1
+    sub r0
+    blt :+
     nop
     iwt r13, #@cull_cell
     jmp r13
@@ -1622,9 +3257,23 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
 :
     iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
     ldw (r7)
-    move r7, r0         ; r7 = arch_traps_ptr
-    ldw (r7)            ; flat_count (+0)
+    iwt r2, #326        ; offset of arch_lut
     with r0
+    add r2
+    with r0
+    add r1
+    move r7, r0
+    ldw (r7)
+    move r2, r0         ; r2 = entry_offset from arch_traps_ptr
+
+    iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
+    ldw (r7)
+    with r0
+    add r2
+    move r1, r0         ; r1 = &arch_traps_ptr[entry_offset] = ptr to trap_count
+    ldw (r1)
+    move r9, r0         ; r9 = trap_count
+    with r9
     add #0
     bne :+
     nop
@@ -1632,7 +3281,9 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     jmp r13
     nop
 :
-    move r9, r0         ; r9 = flat_count
+    ; Pointer to first cached_trap
+    inc r1
+    inc r1              ; r1 = &first cached_trap
 
     ; u_offset = (i_cur * 32) << 8 = i_cur << 13:
     iwt r7, #gsu_map_render_frame + map_render_frame::i_cur
@@ -1662,30 +3313,40 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     add r0              ; << 11
     move r6, r0         ; r6 = v_offset
 
-    ; Top texture ID
+    ; Load cell top_tex_id and skirt_tex_id
     iwt r7, #gsu_map_render_frame + map_render_frame::top_tex_id
     to r11
     ldw (r7)            ; r11 = top_tex_id
-
-    ; cell_ptr = arch_traps_ptr + flat_traps (+2)
-    iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
-    ldw (r7)
-    inc r0
-    inc r0
-    move r1, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::skirt_tex_id
+    to r12
+    ldw (r7)            ; r12 = skirt_tex_id
 
     move r14, r9
-@flat_trap_loop:
-    ; Set trap tex_id (+24)
+@archetype_trap_loop:
+    ; Read compiled surface type (+24) from current cached_trap (r1 + 24)
     move r7, r1
     iwt r2, #24
     with r7
     add r2
+    ldw (r7)
+    move r8, r0         ; r8 = original template surface type (0 = top, 1 = skirt)
+    with r8
+    add #0
+    beq @use_top_tex
+    nop
+    from r12
+    stw (r7)            ; substitute skirt_tex_id
+    bra @tex_applied
+    nop
+@use_top_tex:
     from r11
-    stw (r7)
+    stw (r7)            ; substitute top_tex_id
+@tex_applied:
 
     gsu_stack_push r14
+    gsu_stack_push r8
     gsu_stack_push r1
+    gsu_stack_push r12
     gsu_stack_push r11
     gsu_stack_push r9
     gsu_stack_push r6
@@ -1709,14 +3370,24 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     gsu_stack_pop r6
     gsu_stack_pop r9
     gsu_stack_pop r11
+    gsu_stack_pop r12
     gsu_stack_pop r1
+    gsu_stack_pop r8
     gsu_stack_pop r14
+
+    ; Restore original template surface type (r8) to trap (+24)
+    move r7, r1
+    iwt r2, #24
+    with r7
+    add r2
+    from r8
+    stw (r7)
 
     iwt r7, #.sizeof(cached_trap)
     with r1
     add r7
     dec r14
-    bne @flat_trap_loop
+    bne @archetype_trap_loop
     nop
 
 @cull_cell:

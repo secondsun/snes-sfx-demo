@@ -621,8 +621,8 @@ clear_trace_c3:
 ; Case 4: Stepped PRIM_FLAT Map Grid Rendering & Watertight Seams
 ; ==============================================================================
 run_case_4:
-    ; Clear screen buffer in SRAM ($704000..$7067FF)
-    iwt r1, #$4000
+    ; Clear screen buffer in SRAM ($708000..$70A7FF)
+    iwt r1, #$8000
     iwt r12, #$2800 / 2
     iwt r13, #clear_screen_c4
     iwt r0, #0
