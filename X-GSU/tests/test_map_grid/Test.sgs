@@ -1,0 +1,887 @@
+; ==============================================================================
+; TEST_MAP_GRID - GSU Test Suite Harness
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../IsoEngine/map_grid.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+
+TEST_CAM:           .res .sizeof(iso_camera)
+TEST_BASIS:         .res .sizeof(iso_basis)
+TEST_LATTICE:       .res LATTICE_V2_SIZE
+TEST_ARCH_TRAPS:    .res .sizeof(arch_traps_table)
+TEST_CACHED_YAW:    .res 2
+TEST_TRACE_BUF:     .res 64
+TEST_MAP_BUF:       .res 256
+
+.segment "GSUCODE"
+.export GSU_Code
+GSU_Code:
+    init_stack
+
+    ; Set ROMBR = $04 for GSU ROM data fetches
+    ibt r0, #$04
+    romb
+
+test_setup:
+    iwt r12, #4         ; 4 test cases
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ; Read TEST_CASE_IDX
+    lm r9, (TEST_CASE_IDX)
+
+    ; Clear TEST_RESULT buffer (32 bytes = 16 words)
+    iwt r8, #TEST_RESULT
+    iwt r12, #16
+    iwt r13, #clear_res_loop
+    iwt r0, #0
+clear_res_loop:
+    stw (r8)
+    inc r8
+    inc r8
+    loop
+    nop
+
+    ; Dispatch based on TEST_CASE_IDX (1..4)
+    from r9
+    sub #1
+    bne @check_case_2
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+@check_case_2:
+    from r9
+    sub #2
+    bne @check_case_3
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+@check_case_3:
+    from r9
+    sub #3
+    bne @check_case_4
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+@check_case_4:
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: Pass-0 Yaw-Dirty ARCH_TRAPS Compilation & Caching
+; ==============================================================================
+run_case_1:
+    ; 1. Initialize TEST_CACHED_YAW = $FFFF
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    ; Setup TEST_CAM at yaw = 1 (approx 0 deg)
+    iwt r1, #TEST_CAM
+    iwt r0, #1          ; yaw = 1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    ; Call 1: should recompile (dirty)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Save dirty flag (r3, expected 1) in TEST_RESULT + 0
+    iwt r7, #TEST_RESULT + 0
+    from r3
+    stw (r7)
+
+    ; Save flat_count in TEST_RESULT + 2
+    iwt r1, #TEST_ARCH_TRAPS + arch_traps_table::flat_count
+    ldw (r1)
+    iwt r7, #TEST_RESULT + 2
+    stw (r7)
+
+    ; Call 2: same yaw = 1, simulate D-pad panning. Should be CLEAN (r3 = 0, zero compilation!)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Save clean flag (r3, expected 0) in TEST_RESULT + 4
+    iwt r7, #TEST_RESULT + 4
+    from r3
+    stw (r7)
+
+    ; Call 3: change yaw to 30 (90 deg). Should recompile (dirty, r3 = 1)
+    iwt r1, #TEST_CAM
+    iwt r0, #30         ; yaw = 30
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$4000      ; sin_yaw = 1.0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0000      ; cos_yaw = 0.0
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Save dirty flag (r3, expected 1) in TEST_RESULT + 6
+    iwt r7, #TEST_RESULT + 6
+    from r3
+    stw (r7)
+
+    ; Save updated cached_yaw in TEST_RESULT + 8
+    iwt r1, #TEST_CACHED_YAW
+    ldw (r1)
+    iwt r7, #TEST_RESULT + 8
+    stw (r7)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: Yaw-Quadrant Back-to-Front Traversal Order Across All 4 Quadrants
+; ==============================================================================
+run_case_2:
+    ; Build 3x3 flat map in TEST_MAP_BUF
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #3          ; cols = 3
+    stb (r1)
+    inc r1
+    iwt r0, #3          ; rows = 3
+    stb (r1)
+    inc r1
+    iwt r0, #128        ; origin_x = 128
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #80         ; origin_z = 80
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; reserved = 0
+    inc r1
+    inc r1
+
+    ; Fill 9 cells with base_height=0, PRIM_FLAT, drop_ns=0, drop_ew=0
+    iwt r12, #9
+@fill_map_c2:
+    iwt r0, #0          ; h = 0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT  ; arch = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; panel_tex = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; panel_flags = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ns = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ew = 0
+    stb (r1)
+    inc r1
+    dec r12
+    bne @fill_map_c2
+    nop
+
+    ; --- Subtest Q0: yaw = 1 (cos >= 0, sin >= 0) ---
+    ; Expected: first cell (0, 0) = $0000, last cell (2, 2) = $0202
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Render with debug trace buffer
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #$FFFF      ; frame_half = -1 (full screen traversal)
+    iwt r6, #TEST_TRACE_BUF
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Check first word (at offset 0) and last word (at offset 16 = 8 * 2)
+    iwt r1, #TEST_TRACE_BUF
+    ldw (r1)
+    move r7, r0         ; r7 = first cell
+    iwt r0, #16
+    with r1
+    add r0
+    ldw (r1)
+    move r8, r0         ; r8 = last cell
+
+    ; If first == $0000 and last == $0202 -> OK (1)
+    iwt r11, #0
+    from r7
+    sub #0
+    bne @q0_fail
+    nop
+    iwt r0, #$0202
+    from r8
+    cmp r0
+    bne @q0_fail
+    nop
+    iwt r11, #1
+@q0_fail:
+    iwt r1, #TEST_RESULT + 0
+    from r11
+    stw (r1)
+
+    ; --- Subtest Q1: yaw = 40 (120 deg: cos < 0, sin >= 0) ---
+    ; Expected: first cell (0, 2) = $0002, last cell (2, 0) = $0200
+    iwt r1, #TEST_CAM
+    iwt r0, #40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$376D      ; sin_yaw (+0.866)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$E000      ; cos_yaw (-0.500)
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #$FFFF
+    iwt r6, #TEST_TRACE_BUF
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    iwt r1, #TEST_TRACE_BUF
+    ldw (r1)
+    move r7, r0
+    iwt r0, #16
+    with r1
+    add r0
+    ldw (r1)
+    move r8, r0
+
+    iwt r11, #0
+    iwt r0, #$0002      ; first = (0, 2)
+    from r7
+    cmp r0
+    bne @q1_fail
+    nop
+    iwt r0, #$0200      ; last = (2, 0)
+    from r8
+    cmp r0
+    bne @q1_fail
+    nop
+    iwt r11, #1
+@q1_fail:
+    iwt r1, #TEST_RESULT + 2
+    from r11
+    stw (r1)
+
+    ; --- Subtest Q2: yaw = 70 (210 deg: cos < 0, sin < 0) ---
+    ; Expected: first cell (2, 2) = $0202, last cell (0, 0) = $0000
+    iwt r1, #TEST_CAM
+    iwt r0, #70
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$E000      ; sin_yaw (-0.500)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C893      ; cos_yaw (-0.866)
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #$FFFF
+    iwt r6, #TEST_TRACE_BUF
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    iwt r1, #TEST_TRACE_BUF
+    ldw (r1)
+    move r7, r0
+    iwt r0, #16
+    with r1
+    add r0
+    ldw (r1)
+    move r8, r0
+
+    iwt r11, #0
+    iwt r0, #$0202      ; first = (2, 2)
+    from r7
+    cmp r0
+    bne @q2_fail
+    nop
+    with r8
+    add #0              ; last = (0, 0)
+    bne @q2_fail
+    nop
+    iwt r11, #1
+@q2_fail:
+    iwt r1, #TEST_RESULT + 4
+    from r11
+    stw (r1)
+
+    ; --- Subtest Q3: yaw = 100 (300 deg: cos >= 0, sin < 0) ---
+    ; Expected: first cell (2, 0) = $0200, last cell (0, 2) = $0002
+    iwt r1, #TEST_CAM
+    iwt r0, #100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C893      ; sin_yaw (-0.866)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000      ; cos_yaw (+0.500)
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #$FFFF
+    iwt r6, #TEST_TRACE_BUF
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    iwt r1, #TEST_TRACE_BUF
+    ldw (r1)
+    move r7, r0
+    iwt r0, #16
+    with r1
+    add r0
+    ldw (r1)
+    move r8, r0
+
+    iwt r11, #0
+    iwt r0, #$0200      ; first = (2, 0)
+    from r7
+    cmp r0
+    bne @q3_fail
+    nop
+    iwt r0, #$0002      ; last = (0, 2)
+    from r8
+    cmp r0
+    bne @q3_fail
+    nop
+    iwt r11, #1
+@q3_fail:
+    iwt r1, #TEST_RESULT + 6
+    from r11
+    stw (r1)
+
+    ; Save last_buf[0] and [8] into TEST_RESULT + 8 and + 10
+    iwt r1, #TEST_RESULT + 8
+    from r7
+    stw (r1)
+    inc r1
+    inc r1
+    from r8
+    stw (r1)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: Bounding Box Culling Against Frame Halves
+; ==============================================================================
+run_case_3:
+    ; Build 5x1 row of cells with origin_x = 30, origin_z = 50, yaw = 1 (Sx = (32, 0))
+    ; Cell 0: X in [30..62] (Pass 0)
+    ; Cell 1: X in [62..94] (Pass 0)
+    ; Cell 2: X in [94..126] (Pass 0)
+    ; Cell 3: X in [126..158] (STRADDLES 128: in Pass 0 AND Pass 1!)
+    ; Cell 4: X in [158..190] (Pass 1)
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #5          ; cols = 5
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; rows = 1
+    stb (r1)
+    inc r1
+    iwt r0, #30         ; origin_x = 30
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #50         ; origin_z = 50
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    iwt r12, #5
+@fill_map_c3:
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    dec r12
+    bne @fill_map_c3
+    nop
+
+    ; Camera at yaw = 1
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0000      ; sin = 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$4000      ; cos = 1
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; --- Pass 0 (Half 0): screen X in [0, 128) ---
+    ; Expected: 4 cells visited (0, 1, 2, 3), cell 4 culled!
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0          ; frame_half = 0
+    iwt r6, #TEST_TRACE_BUF
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Read debug_count from frame (+12)
+    iwt r1, #gsu_map_render_frame + map_render_frame::debug_count
+    ldw (r1)
+    iwt r8, #TEST_RESULT + 0
+    stw (r8)            ; [0]: pass0_count (expected 4)
+
+    ; Clear TEST_TRACE_BUF before Pass 1
+    iwt r8, #TEST_TRACE_BUF
+    iwt r12, #32
+    iwt r13, #clear_trace_c3
+    iwt r0, #0
+clear_trace_c3:
+    stw (r8)
+    inc r8
+    inc r8
+    loop
+    nop
+
+    ; --- Pass 1 (Half 1): screen X in [128, 256) ---
+    ; Expected: 2 cells visited (3, 4), cells 0, 1, 2 culled!
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #1          ; frame_half = 1
+    iwt r6, #TEST_TRACE_BUF
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    iwt r1, #gsu_map_render_frame + map_render_frame::debug_count
+    ldw (r1)
+    iwt r8, #TEST_RESULT + 2
+    stw (r8)            ; [1]: pass1_count (expected 2)
+
+    ; Check that first cell in Pass 1 trace was cell 3: (i=3, j=0) -> $0300
+    iwt r1, #TEST_TRACE_BUF
+    ldw (r1)
+    iwt r8, #TEST_RESULT + 4
+    stw (r8)            ; [2]: pass1_first_cell (expected $0300)
+
+    ; Debug: save bbox_xmin, bbox_xmax, and arch_traps_ptr
+    iwt r1, #TEST_ARCH_TRAPS + arch_traps_table::bbox_xmin
+    ldw (r1)
+    iwt r8, #TEST_RESULT + 6
+    stw (r8)
+    inc r1
+    inc r1
+    ldw (r1)
+    iwt r8, #TEST_RESULT + 8
+    stw (r8)
+    iwt r1, #gsu_map_render_frame + map_render_frame::frame_half
+    ldw (r1)
+    iwt r8, #TEST_RESULT + 10
+    stw (r8)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: Stepped PRIM_FLAT Map Grid Rendering & Watertight Seams
+; ==============================================================================
+run_case_4:
+    ; Clear screen buffer in SRAM ($704000..$7067FF)
+    iwt r1, #$4000
+    iwt r12, #$2800 / 2
+    iwt r13, #clear_screen_c4
+    iwt r0, #0
+clear_screen_c4:
+    from r0
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Build 2x2 stepped diorama map in TEST_MAP_BUF:
+    ; Cell (0,0): h=0, drop_ns=0, drop_ew=0
+    ; Cell (1,0): h=1, drop_ns=0, drop_ew=1 (cliff toward cell 0,0)
+    ; Cell (0,1): h=1, drop_ns=1 (cliff toward cell 0,0), drop_ew=0
+    ; Cell (1,1): h=2, drop_ns=1, drop_ew=1
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #2          ; cols = 2
+    stb (r1)
+    inc r1
+    iwt r0, #2          ; rows = 2
+    stb (r1)
+    inc r1
+    iwt r0, #64         ; origin_x = 64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #40         ; origin_z = 40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Cell (0, 0): h=0, PRIM_FLAT, top=0, skirt=1, drop_ns=0, drop_ew=0
+    iwt r0, #0          ; h = 0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ns = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ew = 0
+    stb (r1)
+    inc r1
+
+    ; Cell (1, 0): h=1, PRIM_FLAT, top=0, skirt=1, drop_ns=0, drop_ew=1
+    iwt r0, #1          ; h = 1
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ns = 0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; drop_ew = 1
+    stb (r1)
+    inc r1
+
+    ; Cell (0, 1): h=1, PRIM_FLAT, top=0, skirt=1, drop_ns=1, drop_ew=0
+    iwt r0, #1          ; h = 1
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; drop_ns = 1
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ew = 0
+    stb (r1)
+    inc r1
+
+    ; Cell (1, 1): h=2, PRIM_FLAT, top=0, skirt=1, drop_ns=1, drop_ew=1
+    iwt r0, #2          ; h = 2
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; drop_ns = 1
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; drop_ew = 1
+    stb (r1)
+    inc r1
+
+    ; Force archetype compilation
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    ; Compile archetypes at yaw = 1
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Render Pass 0 (Half 0: [0..127])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Render Pass 1 (Half 1: [128..255])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Flush pixel cache and let RAM writes settle
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Sample pixels:
+    ; 1. Floor of cell (0,0) at (X=73, Y=48):
+    iwt r8, #TEST_RESULT
+    iwt r1, #73
+    iwt r2, #48
+    rpix
+    from r0
+    stw (r8)            ; [0]: floor_00 (expected != 0)
+    inc r8
+    inc r8
+
+    ; 2. Floor of cell (1,1) at height 2 (X=102, Y=34):
+    iwt r1, #102
+    iwt r2, #34
+    rpix
+    from r0
+    stw (r8)            ; [1]: floor_11 (expected != 0)
+    inc r8
+    inc r8
+
+    ; 3. Skirt of cell (0,1) at (X=66, Y=45):
+    iwt r1, #66
+    iwt r2, #45
+    rpix
+    from r0
+    stw (r8)            ; [2]: skirt_01 (expected != 0)
+    inc r8
+    inc r8
+
+    ; 4. Horizontal seam at frame half border:
+    ; Pass 0 pixel at x=127, y=55 and Pass 1 pixel at x=128 (x'=0, y=55)
+    iwt r1, #127
+    iwt r2, #55
+    rpix
+    from r0
+    stw (r8)            ; [3]: pass0_edge (expected != 0)
+    inc r8
+    inc r8
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+test_done:
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
