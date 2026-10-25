@@ -116,3 +116,4 @@ TEXTURE_TABLE:
     .word .loword(TEST_ATLAS + 0),     31, 31, 6 ; ID 0: Water/Cap (pitch 64, stride_shift 6)
     .word .loword(TEST_ATLAS + 2048),  31, 31, 6 ; ID 1: Riverbed/Wall (pitch 64, stride_shift 6)
     .word .loword(TEST_ATLAS + 4096),  31, 31, 6 ; ID 2: Foliage Fin (pitch 64, stride_shift 6)
+
