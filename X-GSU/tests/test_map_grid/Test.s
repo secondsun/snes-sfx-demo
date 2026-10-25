@@ -13,19 +13,19 @@ Main:
     jml __MAIN_LOOP_RUN__
 
 .segment "MAIN_LOOP"
-    ; Clear screen buffer in SRAM at $704000 ($2800 bytes)
-    ldx #$4000
+    ; Clear screen buffer in SRAM at $708000 ($2800 bytes)
+    ldx #$8000
     lda #0
 :   sta $700000, x
     inx
-    cpx #$6800
+    cpx #$A800
     bne :-
 
     ; Configure GSU registers
     lda #$70
     sta GSU_PBR         ; Program Bank = $70
-    lda #$10
-    sta GSU_SCBR        ; Screen Base Register = $10 ($704000)
+    lda #$20
+    sta GSU_SCBR        ; Screen Base Register = $20 ($708000)
     lda #%00011101      ; 4bpp, 160-height, SuperFX controls RAM and ROM
     sta GSU_SCMR
     lda #%10000000      ; 21.47 MHz high speed
