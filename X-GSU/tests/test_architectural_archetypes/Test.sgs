@@ -1,0 +1,743 @@
+; ==============================================================================
+; Test.sgs - Test Suite for Multi-Surface & Architectural Archetypes (Ticket 6)
+; ==============================================================================
+.include "libSFX.i"
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/control.i"
+.include "../../common/structs.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_iso_camera.i"
+.include "../../IsoEngine/triangle/cached_trap.i"
+.include "../../IsoEngine/triangle/draw_cached_trap.i"
+.include "../../IsoEngine/triangle/compile_face_traps.i"
+.include "../../IsoEngine/map_grid.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+
+TEST_CAM:           .res .sizeof(iso_camera)
+TEST_BASIS:         .res .sizeof(iso_basis)
+TEST_LATTICE:       .res LATTICE_V2_SIZE
+TEST_ARCH_TRAPS:    .res .sizeof(arch_traps_table)
+TEST_CACHED_YAW:    .res 2
+TEST_TRACE_BUF:     .res 64
+TEST_MAP_BUF:       .res 256
+
+.segment "GSUCODE"
+.export GSU_Code
+GSU_Code:
+    init_stack
+    register idx_val
+
+test_setup:
+    iwt r12, #100
+    iwt r13, #test_loop
+
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    iwt r7, #TEST_CASE_IDX
+    to idx_val
+    ldw (r7)
+
+    from idx_val
+    sub #1
+    bne @not_case_1
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+@not_case_1:
+    from idx_val
+    sub #2
+    bne @not_case_2
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+@not_case_2:
+    from idx_val
+    sub #3
+    bne @not_case_3
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+@not_case_3:
+    from idx_val
+    sub #4
+    bne @not_case_4
+    nop
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+@not_case_4:
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: PRIM_LIQUID (Shallow +1h and Deep +2h) Trap Compilation & Surface Types
+; ==============================================================================
+run_case_1:
+    ; Reset cached yaw to force compilation
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    ; Initialize camera at yaw = 1 (Quadrant 0: sin > 0, cos > 0)
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Check PRIM_LIQUID_SHALLOW (arch=8): index = (8 << 2) | 0 = 32
+    ; arch_lut offset = 326 + 32 * 2 = 390
+    iwt r8, #TEST_RESULT
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (32 * 2)
+    ldw (r7)
+    move r2, r0         ; entry offset
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; r0 = shallow trap count
+    from r0
+    stw (r8)            ; [0]: shallow_count (exp > 0)
+    inc r8
+    inc r8
+
+    ; Check PRIM_LIQUID_DEEP (arch=9): index = (9 << 2) | 0 = 36
+    ; arch_lut offset = 326 + 36 * 2 = 398
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (36 * 2)
+    ldw (r7)
+    move r2, r0         ; entry offset
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; r0 = deep trap count
+    from r0
+    stw (r8)            ; [2]: deep_count (exp > 0)
+    inc r8
+    inc r8
+
+    ; Check surface texture types of first trap (riverbed: skirt_tex = 1)
+    ; and last trap (water: top_tex = 0) of shallow liquid:
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (32 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2              ; r7 = &entry
+    inc r7
+    inc r7              ; r7 = &first_trap
+    iwt r6, #cached_trap::tex_id
+    with r7
+    add r6
+    ldw (r7)            ; first trap tex_id
+    from r0
+    stw (r8)            ; [4]: riverbed_tex (exp = 1)
+    inc r8
+    inc r8
+
+    ; Shallow liquid has dual-quad (riverbed + water surface).
+    ; Riverbed is emitted first (skirt_tex=1), water surface emitted second (top_tex=0).
+    ; Read the last trap's tex_id:
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (32 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; r0 = count
+    move r9, r0
+    dec r9              ; last trap index
+    ; trap offset = 2 + index * 26
+    ; r9 * 26 = (r9 << 4) + (r9 << 3) + (r9 << 1)
+    move r1, r9
+    with r1
+    add r1              ; *2
+    move r3, r1
+    with r1
+    add r1              ; *4
+    with r1
+    add r1              ; *8
+    move r4, r1
+    with r1
+    add r1              ; *16
+    with r1
+    add r4              ; *24
+    with r1
+    add r3              ; *26
+    inc r1
+    inc r1              ; + 2 for count word
+    with r1
+    add r2              ; + entry offset
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r1
+    iwt r6, #cached_trap::tex_id
+    with r7
+    add r6
+    ldw (r7)            ; last trap tex_id
+    from r0
+    stw (r8)            ; [6]: water_tex (exp = 0)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: PRIM_PILLAR (arch=10) Across All 4 Yaw Quadrants
+; ==============================================================================
+run_case_2:
+    ; Quadrant 0: yaw = 1 (sin > 0, cos > 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin > 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos > 0
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Read PRIM_PILLAR (arch=10): index = 40 (offset 326 + 80 = 406)
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q0 pillar count
+    iwt r7, #TEST_RESULT + 0
+    stw (r7)            ; [0]: q0_count (exp > 0)
+
+    ; Quadrant 1: yaw = 40 (120 deg: cos < 0, sin >= 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$376D      ; sin_yaw (+0.866)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$E000      ; cos_yaw (-0.500)
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q1 pillar count
+    iwt r7, #TEST_RESULT + 2
+    stw (r7)            ; [2]: q1_count (exp > 0)
+
+    ; Quadrant 2: yaw = 70 (210 deg: cos < 0, sin < 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #70
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$E000      ; sin_yaw (-0.500)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C893      ; cos_yaw (-0.866)
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q2 pillar count
+    iwt r7, #TEST_RESULT + 4
+    stw (r7)            ; [4]: q2_count (exp > 0)
+
+    ; Quadrant 3: yaw = 100 (300 deg: cos >= 0, sin < 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C893      ; sin_yaw (-0.866)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000      ; cos_yaw (+0.500)
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q3 pillar count
+    iwt r7, #TEST_RESULT + 6
+    stw (r7)            ; [6]: q3_count (exp > 0)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: PRIM_FOLIAGE_CROSS (arch=11) Across All 4 Yaw Quadrants
+; ==============================================================================
+run_case_3:
+    ; Quadrant 0: yaw = 1
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Read PRIM_FOLIAGE_CROSS (arch=11): index = 44 (offset 326 + 88 = 414)
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q0 foliage count
+    iwt r7, #TEST_RESULT + 0
+    stw (r7)            ; [0]: q0_count (exp > 0)
+
+    ; Quadrant 1: yaw = 40 (120 deg: cos < 0, sin >= 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$376D      ; sin_yaw (+0.866)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$E000      ; cos_yaw (-0.500)
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q1 foliage count
+    iwt r7, #TEST_RESULT + 2
+    stw (r7)            ; [2]: q1_count (exp > 0)
+
+    ; Quadrant 2: yaw = 70 (210 deg: cos < 0, sin < 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #70
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$E000      ; sin_yaw (-0.500)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C893      ; cos_yaw (-0.866)
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q2 foliage count
+    iwt r7, #TEST_RESULT + 4
+    stw (r7)            ; [4]: q2_count (exp > 0)
+
+    ; Quadrant 3: yaw = 100 (300 deg: cos >= 0, sin < 0)
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r0, #100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C893      ; sin_yaw (-0.866)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000      ; cos_yaw (+0.500)
+    stw (r1)
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
+    ldw (r7)
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; q3 foliage count
+    iwt r7, #TEST_RESULT + 6
+    stw (r7)            ; [6]: q3_count (exp > 0)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: End-to-End Architectural Scene Rendering & Pixel Composition Verification
+; ==============================================================================
+run_case_4:
+    ; Set plot register options:
+    ; bit 0 = 0 Transparency On (color 0 transparent)
+    ; bit 1 = 0 dither off
+    ; bit 2 = 0 upper 4 bit color off
+    ; bit 3 = 1 sprite mode on
+    iwt r0, #$8
+    cmode
+
+    ; Clear screen buffer in SRAM ($708000..$70A7FF)
+    iwt r1, #$8000
+    iwt r12, #$2800 / 2
+    iwt r13, #clear_screen_c4
+    iwt r0, #0
+clear_screen_c4:
+    from r0
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Build 2x2 architectural map in TEST_MAP_BUF:
+    ; Cell (0,0): h=0, PRIM_LIQUID_SHALLOW, top=0 (water check), skirt=1 (riverbed)
+    ; Cell (1,0): h=0, PRIM_PILLAR, top=0 (cap), skirt=1 (walls)
+    ; Cell (0,1): h=0, PRIM_FOLIAGE_CROSS, top=0 (floor), skirt=1, panel=2 (green fin)
+    ; Cell (1,1): h=1, PRIM_FLAT, top=0, skirt=1, panel=0
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #2          ; cols = 2
+    stb (r1)
+    inc r1
+    iwt r0, #2          ; rows = 2
+    stb (r1)
+    inc r1
+    iwt r0, #64         ; origin_x = 64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #40         ; origin_z = 40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Cell (0, 0): h=0, PRIM_LIQUID_SHALLOW
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_LIQUID_SHALLOW
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0 (water)
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1 (riverbed)
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; panel_tex = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; panel_flags = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ns = 0
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ew = 0
+    stb (r1)
+    inc r1
+
+    ; Cell (1, 0): h=0, PRIM_PILLAR
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_PILLAR
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0 (cap)
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1 (column walls)
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Cell (0, 1): h=0, PRIM_FOLIAGE_CROSS
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FOLIAGE_CROSS
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0 (floor)
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1
+    stb (r1)
+    inc r1
+    iwt r0, #2          ; panel_tex = 2 (cutout foliage fin)
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Cell (1, 1): h=1, PRIM_FLAT
+    iwt r0, #1          ; h = 1
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; drop_ns = 1
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; drop_ew = 1
+    stb (r1)
+    inc r1
+
+    ; Force archetype compilation at yaw = 1
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Render Pass 0 (Half 0: [0..127])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Render Pass 1 (Half 1: [128..255])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Flush pixel cache and let RAM writes settle
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Sample pixels:
+    ; 1. Water cell (0,0) at (X=80, Y=43):
+    iwt r8, #TEST_RESULT
+    iwt r1, #80
+    iwt r2, #43
+    rpix
+    from r0
+    stw (r8)            ; [0]: water_pixel (exp != 0)
+    inc r8
+    inc r8
+
+    ; 2. Pillar cell (1,0) at (X=105, Y=45):
+    iwt r1, #105
+    iwt r2, #45
+    rpix
+    from r0
+    stw (r8)            ; [2]: pillar_pixel (exp != 0)
+    inc r8
+    inc r8
+
+    ; 3. Foliage fin cell (0,1) at (X=75, Y=62):
+    iwt r1, #75
+    iwt r2, #62
+    rpix
+    from r0
+    stw (r8)            ; [4]: foliage_pixel (exp != 0)
+    inc r8
+    inc r8
+
+    ; 4. Elevated flat cell (1,1) at (X=110, Y=48):
+    iwt r1, #110
+    iwt r2, #48
+    rpix
+    from r0
+    stw (r8)            ; [6]: elevated_pixel (exp != 0)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+test_done:
+    nop
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop

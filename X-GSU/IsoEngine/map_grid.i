@@ -2534,7 +2534,7 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     sub r6
     blt @rot_loop_cont
     nop
-    iwt r13, #@rot_compile_done
+    iwt r13, #@compile_universal_archetypes
     jmp r13
     nop
 @rot_loop_cont:
