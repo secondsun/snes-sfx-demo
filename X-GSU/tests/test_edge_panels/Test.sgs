@@ -1,0 +1,669 @@
+; ==============================================================================
+; Test.sgs - Automated Unit Tests for Compass Edge Panels & Intra-Cell Pipeline (Ticket 7)
+; ==============================================================================
+.include "libSFX.i"
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/control.i"
+.include "../../common/structs.i"
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../gsu_maths/gsu_iso_camera.i"
+.include "../../IsoEngine/triangle/cached_trap.i"
+.include "../../IsoEngine/triangle/draw_cached_trap.i"
+.include "../../IsoEngine/triangle/compile_face_traps.i"
+.include "../../IsoEngine/map_grid.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+
+TEST_CAM:           .res .sizeof(iso_camera)
+TEST_BASIS:         .res .sizeof(iso_basis)
+TEST_LATTICE:       .res LATTICE_V2_SIZE
+TEST_ARCH_TRAPS:    .res .sizeof(arch_traps_table)
+TEST_CACHED_YAW:    .res 2
+TEST_TRACE_BUF:     .res 64
+TEST_MAP_BUF:       .res 256
+
+.segment "GSUCODE"
+.export GSU_Code
+GSU_Code:
+    init_stack
+
+    ; Set ROMBR = $04 for GSU ROM data fetches
+    ibt r0, #$04
+    romb
+    nop
+
+    register idx_val
+
+test_setup:
+    iwt r12, #4
+    iwt r13, #test_loop
+
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    iwt r7, #TEST_CASE_IDX
+    to idx_val
+    ldw (r7)
+
+    from idx_val
+    sub #1
+    bne @not_case_1
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+@not_case_1:
+    from idx_val
+    sub #2
+    bne @not_case_2
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+@not_case_2:
+    from idx_val
+    sub #3
+    bne @not_case_3
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+@not_case_3:
+    from idx_val
+    sub #4
+    bne @not_case_4
+    nop
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+@not_case_4:
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: Edge Panel Template Compilation (all 8 templates: N/E/S/W in 1h and 2h)
+; ==============================================================================
+run_case_1:
+    ; Reset cached yaw to force compilation
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    ; Initialize camera at yaw = 1
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Iterate through the 8 entries in panel_lut:
+    ; Count how many templates have trap_count > 0 and sum trap counts
+    iwt r11, #gsu_map_render_frame + map_render_frame::panel_lut
+    iwt r12, #8         ; 8 templates
+    iwt r8, #0          ; non_zero_templates
+    iwt r9, #0          ; total_traps
+
+@c1_loop:
+    ldw (r11)           ; r0 = entry_offset
+    move r2, r0
+    iwt r7, #TEST_ARCH_TRAPS
+    with r7
+    add r2
+    ldw (r7)            ; r0 = trap_count
+    with r0
+    add #0
+    beq @c1_skip
+    nop
+    inc r8              ; non_zero_templates++
+    with r9
+    add r0              ; total_traps += trap_count
+@c1_skip:
+    inc r11
+    inc r11
+    dec r12
+    bne @c1_loop
+    nop
+
+    ; Store results:
+    ; [0]: non_zero_templates (expected 8)
+    ; [2]: total_traps (expected 16: 2 traps per panel)
+    ; [4]: 1h template 0 trap_count (expected 2)
+    ; [6]: 2h template 1 trap_count (expected 2)
+    iwt r7, #TEST_RESULT
+    from r8
+    stw (r7)
+    inc r7
+    inc r7
+    from r9
+    stw (r7)
+    inc r7
+    inc r7
+
+    ; Read template 0 (N 1h) and template 1 (N 2h) trap counts
+    iwt r11, #gsu_map_render_frame + map_render_frame::panel_lut
+    ldw (r11)
+    move r2, r0
+    iwt r1, #TEST_ARCH_TRAPS
+    with r1
+    add r2
+    ldw (r1)
+    from r0
+    stw (r7)            ; [4]: template 0 trap count
+    inc r7
+    inc r7
+
+    inc r11
+    inc r11
+    ldw (r11)
+    move r2, r0
+    iwt r1, #TEST_ARCH_TRAPS
+    with r1
+    add r2
+    ldw (r1)
+    from r0
+    stw (r7)            ; [6]: template 1 trap count
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: Compass Yaw-Quadrant Partitioning (Back vs Front across 4 quadrants)
+; ==============================================================================
+run_case_2:
+    iwt r8, #TEST_RESULT
+
+    ; Build dummy 1x1 map
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #1
+    stb (r1)            ; cols = 1
+    inc r1
+    stb (r1)            ; rows = 1
+    inc r1
+    iwt r0, #64
+    stw (r1)            ; origin_x
+    inc r1
+    inc r1
+    iwt r0, #40
+    stw (r1)            ; origin_z
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)            ; pad
+    inc r1
+    inc r1
+
+    ; Cell (0, 0): h=0, PRIM_FLAT, no panels
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    stb (r1)            ; PRIM_FLAT = 0
+    inc r1
+    stb (r1)            ; top_tex
+    inc r1
+    stb (r1)            ; skirt_tex
+    inc r1
+    stb (r1)            ; panel_tex
+    inc r1
+    stb (r1)            ; panel_flags = 0
+    inc r1
+    stb (r1)            ; drop_ns
+    inc r1
+    stb (r1)            ; drop_ew
+
+    ; --- Quadrant 0: yaw = 1 (cos > 0, sin > 0) ---
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin > 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos > 0
+    stw (r1)
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Q0 Back: back_ns_mask | back_ew_mask (exp: PANEL_N | PANEL_W = $01 | $08 = $09)
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    ldw (r7)
+    with r0
+    or r2
+    move r1, r0
+    iwt r8, #TEST_RESULT
+    from r1
+    stw (r8)            ; [0]: Q0 back mask (exp $09)
+
+    ; --- Quadrant 1: yaw = 31 (cos < 0, sin > 0) ---
+    iwt r1, #TEST_CAM
+    iwt r0, #31
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; sin > 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$FFBB      ; cos < 0
+    stw (r1)
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Q1 Back: back_ns_mask | back_ew_mask (exp: PANEL_S | PANEL_W = $04 | $08 = $0C)
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    ldw (r7)
+    with r0
+    or r2
+    move r1, r0
+    iwt r8, #TEST_RESULT + 2
+    from r1
+    stw (r8)            ; [2]: Q1 back mask (exp $0C)
+
+    ; --- Quadrant 2: yaw = 61 (cos < 0, sin < 0) ---
+    iwt r1, #TEST_CAM
+    iwt r0, #61
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$FFBB      ; sin < 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C001      ; cos < 0
+    stw (r1)
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Q2 Back: back_ns_mask | back_ew_mask (exp: PANEL_S | PANEL_E = $04 | $02 = $06)
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    ldw (r7)
+    with r0
+    or r2
+    move r1, r0
+    iwt r8, #TEST_RESULT + 4
+    from r1
+    stw (r8)            ; [4]: Q2 back mask (exp $06)
+
+    ; --- Quadrant 3: yaw = 91 (cos > 0, sin < 0) ---
+    iwt r1, #TEST_CAM
+    iwt r0, #91
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$C001      ; sin < 0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; cos > 0
+    stw (r1)
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Q3 Back: back_ns_mask | back_ew_mask (exp: PANEL_N | PANEL_E = $01 | $02 = $03)
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    ldw (r7)
+    move r2, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    ldw (r7)
+    with r0
+    or r2
+    move r1, r0
+    iwt r8, #TEST_RESULT + 6
+    from r1
+    stw (r8)            ; [6]: Q3 back mask (exp $03)
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: 5-Step Intra-Cell Painter's Sequence & Cutout Transparency Verification
+; ==============================================================================
+run_case_3:
+    ; Set transparency on (bit 0 = 0)
+    iwt r0, #$8
+    cmode
+
+    ; Clear screen buffer in SRAM ($708000..$70A7FF)
+    iwt r1, #$8000
+    iwt r12, #$2800 / 2
+    iwt r13, #clear_screen_c3
+    iwt r0, #0
+clear_screen_c3:
+    from r0
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Compile archetypes at yaw = 1 (cached from Case 1)
+    ; iwt r1, #TEST_CACHED_YAW
+    ; iwt r0, #$FFFF
+    ; stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Build 1x1 map at (0, 0):
+    ; h=0, PRIM_FLAT, top_tex=0 (solid floor 6), panel_tex=2 (parapet 9 with cutouts 0),
+    ; panel_flags = PANEL_N | PANEL_S (North is Back in Step 2, South is Front in Step 5)
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #1          ; cols = 1
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; rows = 1
+    stb (r1)
+    inc r1
+    iwt r0, #64         ; origin_x = 64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #40         ; origin_z = 40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Cell (0, 0)
+    iwt r0, #0          ; h = 0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; top_tex = 0 (Floor = 6)
+    stb (r1)
+    inc r1
+    iwt r0, #1          ; skirt_tex = 1
+    stb (r1)
+    inc r1
+    iwt r0, #2          ; panel_tex = 2 (Cutout parapet = 9 and 0)
+    stb (r1)
+    inc r1
+    iwt r0, #(PANEL_N | PANEL_S) ; panel_flags: Back North + Front South
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ns
+    stb (r1)
+    inc r1
+    iwt r0, #0          ; drop_ew
+    stb (r1)
+
+    ; Render Pass 0
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Render Pass 1
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    ; Settle pipeline
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Sample:
+    ; 1. Floor center at (X=78, Y=42): expected floor color (non-zero)
+    iwt r8, #TEST_RESULT
+    iwt r1, #78
+    iwt r2, #42
+    rpix
+    from r0
+    stw (r8)            ; [0]: floor_pixel
+    inc r8
+    inc r8
+
+    ; 2. Front parapet solid wall (Step 5) at (X=78, Y=49): expected stone color 9
+    iwt r1, #78
+    iwt r2, #49
+    rpix
+    from r0
+    stw (r8)            ; [2]: parapet_wall_pixel
+    inc r8
+    inc r8
+
+    ; 3. Front parapet upper embrasure / cutout at (X=78, Y=47)
+    iwt r1, #78
+    iwt r2, #47
+    rpix
+    from r0
+    stw (r8)            ; [4]: embrasure_cutout_pixel
+    inc r8
+    inc r8
+
+    ; 4. Parapet top at (X=84, Y=46)
+    iwt r1, #84
+    iwt r2, #46
+    rpix
+    from r0
+    stw (r8)            ; [6]: merlon_pixel
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: Tall 2H Facade Panel Verification (PANEL_TALL_2H)
+; ==============================================================================
+run_case_4:
+    ; Clear screen buffer
+    iwt r1, #$8000
+    iwt r12, #$2800 / 2
+    iwt r13, #clear_screen_c4
+    iwt r0, #0
+clear_screen_c4:
+    from r0
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Build 1x1 map with 2h South Facade:
+    ; Cell (0,0): h=0, PRIM_FLAT, panel_flags = (PANEL_S | PANEL_TALL_2H)
+    iwt r1, #TEST_MAP_BUF
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #60         ; origin_z = 60
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Cell (0, 0)
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #1
+    stb (r1)
+    inc r1
+    iwt r0, #2          ; panel_tex = 2
+    stb (r1)
+    inc r1
+    iwt r0, #(PANEL_S | PANEL_TALL_2H)
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+    inc r1
+    iwt r0, #0
+    stb (r1)
+
+    ; Render Pass 0 & Pass 1
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call map_grid_render r1, r2, r3, r4, r5, r6
+
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Sample upper facade at (X=78, Y=52):
+    ; High facade pixel that only exists in 2h mode
+    iwt r8, #TEST_RESULT
+    iwt r1, #78
+    iwt r2, #52
+    rpix
+    from r0
+    stw (r8)            ; [0]: facade_2h_high_pixel
+    inc r8
+    inc r8
+
+    ; Sample lower facade at (X=86, Y=70)
+    iwt r1, #86
+    iwt r2, #70
+    rpix
+    from r0
+    stw (r8)            ; [2]: facade_2h_low_pixel
+    inc r8
+    inc r8
+
+    iwt r0, #1
+    stw (r8)            ; [4]: status flag
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+.align 2
+test_done:
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop

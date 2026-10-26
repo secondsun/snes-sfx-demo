@@ -93,7 +93,7 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
     bbox_ymin       .word   ; +322: Min Y offset relative to anchor across corners
     bbox_ymax       .word   ; +324: Max Y offset relative to anchor across corners
     arch_lut        .res 64 * 2 ; +326: 128 bytes (offsets for (archetype << 2) | rot)
-    arch_buf        .res 8192   ; +454: storage buffer for compiled cached_traps
+    arch_buf        .res 10240   ; +454: storage buffer for compiled cached_traps
 .endstruct
 
 ; ==============================================================================
@@ -149,6 +149,16 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
     k_bot           .res 4 ; +144: center bottom point (x, y)
     k_top           .res 4 ; +148: center top point (x, y)
     cur_entry_ptr   .word ; +152: entry pointer for current shape
+    panel_flags     .word ; +154: cell panel_flags
+    back_ns_mask    .word ; +156: PANEL_N or PANEL_S
+    back_ns_edge    .word ; +158: 0 or 2
+    back_ew_mask    .word ; +160: PANEL_W or PANEL_E
+    back_ew_edge    .word ; +162: 3 or 1
+    front_ns_mask   .word ; +164: PANEL_S or PANEL_N
+    front_ns_edge   .word ; +166: 2 or 0
+    front_ew_mask   .word ; +168: PANEL_E or PANEL_W
+    front_ew_edge   .word ; +170: 1 or 3
+    panel_lut       .res 8 * 2 ; +172..+187: offsets in arch_traps_ptr for the 8 panel templates
 .endstruct
 
 .segment "GSURAM"
@@ -325,6 +335,175 @@ function map_compile_quad_face v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     stw (r7)            ; compile_out_ptr += r3 * 26
 
 @quad_done:
+    return
+endfunction
+
+; ==============================================================================
+; map_compile_panel_quad
+; Compiles a vertical edge panel quad face into cached_traps at compile_out_ptr (+64).
+; In:
+;   r1 = v0_ptr
+;   r2 = v1_ptr
+;   r3 = v2_ptr
+;   r4 = v3_ptr
+;   r5 = uv_mode
+;   r6 = v_height (16 << ATLAS_STRIDE_SHIFT for 1h, 32 << ATLAS_STRIDE_SHIFT for 2h)
+; Modifies:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function map_compile_panel_quad v0_p, v1_p, v2_p, v3_p, uv_m, v_ht
+    register v0_p = r1, v1_p = r2, v2_p = r3, v3_p = r4, uv_m = r5, v_ht = r6
+
+    iwt r7, #gsu_map_face_def
+    iwt r0, #(FACE_DEF_FLAG_QUAD | FACE_DEF_FLAG_PTRS)
+    stw (r7)            ; flags (+0)
+    inc r7
+    inc r7
+    from uv_m
+    stw (r7)            ; uv_mode (+2)
+    inc r7
+    inc r7
+    iwt r0, #2          ; tex_id = 2 (panel_tex_id slot)
+    stw (r7)            ; tex_id (+4)
+    inc r7
+    inc r7
+    iwt r0, #ATLAS_STRIDE_SHIFT
+    stw (r7)            ; stride_shift (+6)
+    inc r7
+    inc r7
+
+    ; Read cos_yaw and sin_yaw from cam_ptr (gsu_map_render_frame + 0)
+    iwt r8, #gsu_map_render_frame
+    ldw (r8)
+    inc r0
+    inc r0
+    move r8, r0
+    ldw (r8)            ; sin_yaw
+    move r9, r0
+    inc r8
+    inc r8
+    ldw (r8)            ; cos_yaw
+    from r0
+    stw (r7)            ; cos_yaw (+8)
+    inc r7
+    inc r7
+    from r9
+    stw (r7)            ; sin_yaw (+10)
+    inc r7
+    inc r7
+
+    ; V0: Top-Left (u0=0, v0=0)
+    from v0_p
+    stw (r7)            ; v0.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u0 = 0
+    inc r7
+    inc r7
+    stw (r7)            ; v0 = 0
+    inc r7
+    inc r7
+
+    ; V1: Top-Right (u1=32<<8, v1=0)
+    from v1_p
+    stw (r7)            ; v1.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$2000      ; 32 << 8
+    stw (r7)            ; u1
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; v1 = 0
+    inc r7
+    inc r7
+
+    ; V2: Bottom-Right (u2=32<<8, v2=v_ht)
+    from v2_p
+    stw (r7)            ; v2.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$2000      ; 32 << 8
+    stw (r7)            ; u2
+    inc r7
+    inc r7
+    from v_ht
+    stw (r7)            ; v2 = v_ht
+    inc r7
+    inc r7
+
+    ; V3: Bottom-Left (u3=0, v3=v_ht)
+    from v3_p
+    stw (r7)            ; v3.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u3 = 0
+    inc r7
+    inc r7
+    from v_ht
+    stw (r7)            ; v3 = v_ht
+
+    ; Call compile_face_traps:
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r2, r0         ; r2 = compile_out_ptr
+    iwt r1, #gsu_map_face_def
+    call compile_face_traps r1, r2
+
+    ; If r3 == 0 (culled): return
+    with r3
+    add #0
+    beq @panel_quad_done
+    nop
+
+    ; Add r3 to arch_trap_count (+66)
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    with r0
+    add r3
+    from r0
+    stw (r7)
+
+    ; Advance compile_out_ptr by r3 * 26:
+    move r1, r3
+    with r1
+    add r1              ; r3 * 2
+    move r2, r1         ; * 2
+    with r1
+    add r1              ; * 4
+    with r1
+    add r1              ; * 8
+    move r4, r1         ; * 8
+    with r1
+    add r1              ; * 16
+    with r1
+    add r4              ; * 24
+    with r1
+    add r2              ; * 26
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    with r0
+    add r1
+    from r0
+    stw (r7)            ; compile_out_ptr += r3 * 26
+
+@panel_quad_done:
     return
 endfunction
 
@@ -669,6 +848,508 @@ function compile_fin_w
     iwt r5, #UV_MODE_WALL_EW
     iwt r6, #2          ; panel_tex_id
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
+    return
+endfunction
+
+; ==============================================================================
+; compile_panel_n
+; Compiles North Edge Panel template (1h or 2h).
+; In: r1 = is_2h (0 or 1)
+; ==============================================================================
+function compile_panel_n is_2h
+    register is_2h = r1, lat_ptr = r14
+
+    iwt r7, #gsu_map_render_frame + 4
+    ldw (r7)
+    move lat_ptr, r0
+
+    ; Reserve word for trap_count
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0         ; r8 = cur_entry_ptr
+    inc r0
+    inc r0
+    stw (r7)            ; compile_out_ptr += 2
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)            ; arch_trap_count = 0
+
+    ; entry_offset = cur_entry_ptr - arch_traps_ptr
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    ; panel_idx = 0 | is_2h
+    from is_2h
+    to r9
+    add is_2h           ; is_2h * 2
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_lut
+    with r7
+    add r9
+    from r2
+    stw (r7)
+
+    with is_2h
+    add #0
+    bne :+
+    nop
+    iwt r13, #32        ; 1h elev
+    iwt r6, #(16 << ATLAS_STRIDE_SHIFT)
+    bra :++
+    nop
+:
+    iwt r13, #48        ; 2h elev
+    iwt r6, #(32 << ATLAS_STRIDE_SHIFT)
+:
+
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)
+    inc r0
+    inc r0
+    inc r0
+    inc r0
+    move r7, r0
+    ldw (r7)            ; cos_yaw
+    with r0
+    add #0
+    blt @north_rev
+    nop
+    ; cos_yaw >= 0: V0=E0, V1=E1, V2=B1, V3=B0
+    move r1, lat_ptr
+    with r1
+    add r13             ; E0
+    move r2, r1
+    inc r2
+    inc r2
+    inc r2
+    inc r2              ; E1
+    move r3, lat_ptr
+    inc r3
+    inc r3
+    inc r3
+    inc r3              ; B1
+    move r4, lat_ptr    ; B0
+    bra @north_do
+    nop
+@north_rev:
+    ; cos_yaw < 0: V0=E1, V1=E0, V2=B0, V3=B1
+    move r2, lat_ptr
+    with r2
+    add r13             ; E0
+    move r1, r2
+    inc r1
+    inc r1
+    inc r1
+    inc r1              ; E1
+    move r3, lat_ptr    ; B0
+    move r4, lat_ptr
+    inc r4
+    inc r4
+    inc r4
+    inc r4              ; B1
+@north_do:
+    gsu_stack_push r8
+    call map_compile_panel_quad r1, r2, r3, r4, r5, r6
+    gsu_stack_pop r8
+
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    from r0
+    stw (r8)
+    return
+endfunction
+
+; ==============================================================================
+; compile_panel_e
+; Compiles East Edge Panel template (1h or 2h).
+; In: r1 = is_2h (0 or 1)
+; ==============================================================================
+function compile_panel_e is_2h
+    register is_2h = r1, lat_ptr = r14
+
+    iwt r7, #gsu_map_render_frame + 4
+    ldw (r7)
+    move lat_ptr, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+    inc r0
+    inc r0
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    ; panel_idx = 2 | is_2h -> byte offset = 4 + is_2h * 2
+    from is_2h
+    to r9
+    add is_2h
+    iwt r0, #4
+    with r9
+    add r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_lut
+    with r7
+    add r9
+    from r2
+    stw (r7)
+
+    with is_2h
+    add #0
+    bne :+
+    nop
+    iwt r13, #32
+    iwt r6, #(16 << ATLAS_STRIDE_SHIFT)
+    bra :++
+    nop
+:
+    iwt r13, #48
+    iwt r6, #(32 << ATLAS_STRIDE_SHIFT)
+:
+
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)
+    inc r0
+    inc r0
+    move r7, r0
+    ldw (r7)            ; sin_yaw
+    with r0
+    add #0
+    blt @east_rev
+    nop
+    ; sin_yaw >= 0: V0=E2, V1=E1, V2=B1, V3=B2
+    move r1, lat_ptr
+    with r1
+    add r13
+    iwt r0, #8
+    with r1
+    add r0              ; E2
+    move r2, lat_ptr
+    with r2
+    add r13
+    inc r2
+    inc r2
+    inc r2
+    inc r2              ; E1
+    move r3, lat_ptr
+    inc r3
+    inc r3
+    inc r3
+    inc r3              ; B1
+    move r4, lat_ptr
+    iwt r0, #8
+    with r4
+    add r0              ; B2
+    bra @east_do
+    nop
+@east_rev:
+    ; sin_yaw < 0: V0=E1, V1=E2, V2=B2, V3=B1
+    move r1, lat_ptr
+    with r1
+    add r13
+    inc r1
+    inc r1
+    inc r1
+    inc r1              ; E1
+    move r2, lat_ptr
+    with r2
+    add r13
+    iwt r0, #8
+    with r2
+    add r0              ; E2
+    move r3, lat_ptr
+    iwt r0, #8
+    with r3
+    add r0              ; B2
+    move r4, lat_ptr
+    inc r4
+    inc r4
+    inc r4
+    inc r4              ; B1
+@east_do:
+    gsu_stack_push r8
+    call map_compile_panel_quad r1, r2, r3, r4, r5, r6
+    gsu_stack_pop r8
+
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    from r0
+    stw (r8)
+    return
+endfunction
+
+; ==============================================================================
+; compile_panel_s
+; Compiles South Edge Panel template (1h or 2h).
+; In: r1 = is_2h (0 or 1)
+; ==============================================================================
+function compile_panel_s is_2h
+    register is_2h = r1, lat_ptr = r14
+
+    iwt r7, #gsu_map_render_frame + 4
+    ldw (r7)
+    move lat_ptr, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+    inc r0
+    inc r0
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    ; panel_idx = 4 | is_2h -> byte offset = 8 + is_2h * 2
+    from is_2h
+    to r9
+    add is_2h
+    iwt r0, #8
+    with r9
+    add r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_lut
+    with r7
+    add r9
+    from r2
+    stw (r7)
+
+    with is_2h
+    add #0
+    bne :+
+    nop
+    iwt r13, #32
+    iwt r6, #(16 << ATLAS_STRIDE_SHIFT)
+    bra :++
+    nop
+:
+    iwt r13, #48
+    iwt r6, #(32 << ATLAS_STRIDE_SHIFT)
+:
+
+    iwt r5, #UV_MODE_WALL_NS
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)
+    inc r0
+    inc r0
+    inc r0
+    inc r0
+    move r7, r0
+    ldw (r7)            ; cos_yaw
+    with r0
+    add #0
+    blt @south_rev
+    nop
+    ; cos_yaw >= 0: V0=E3, V1=E2, V2=B2, V3=B3
+    move r1, lat_ptr
+    with r1
+    add r13
+    iwt r0, #12
+    with r1
+    add r0              ; E3
+    move r2, lat_ptr
+    with r2
+    add r13
+    iwt r0, #8
+    with r2
+    add r0              ; E2
+    move r3, lat_ptr
+    iwt r0, #8
+    with r3
+    add r0              ; B2
+    move r4, lat_ptr
+    iwt r0, #12
+    with r4
+    add r0              ; B3
+    bra @south_do
+    nop
+@south_rev:
+    ; cos_yaw < 0: V0=E2, V1=E3, V2=B3, V3=B2
+    move r1, lat_ptr
+    with r1
+    add r13
+    iwt r0, #8
+    with r1
+    add r0              ; E2
+    move r2, lat_ptr
+    with r2
+    add r13
+    iwt r0, #12
+    with r2
+    add r0              ; E3
+    move r3, lat_ptr
+    iwt r0, #12
+    with r3
+    add r0              ; B3
+    move r4, lat_ptr
+    iwt r0, #8
+    with r4
+    add r0              ; B2
+@south_do:
+    gsu_stack_push r8
+    call map_compile_panel_quad r1, r2, r3, r4, r5, r6
+    gsu_stack_pop r8
+
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    from r0
+    stw (r8)
+    return
+endfunction
+
+; ==============================================================================
+; compile_panel_w
+; Compiles West Edge Panel template (1h or 2h).
+; In: r1 = is_2h (0 or 1)
+; ==============================================================================
+function compile_panel_w is_2h
+    register is_2h = r1, lat_ptr = r14
+
+    iwt r7, #gsu_map_render_frame + 4
+    ldw (r7)
+    move lat_ptr, r0
+
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r8, r0
+    inc r0
+    inc r0
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 66
+    iwt r0, #0
+    stw (r7)
+
+    iwt r7, #gsu_map_render_frame + 6
+    ldw (r7)
+    from r8
+    sub r0
+    move r2, r0
+
+    ; panel_idx = 6 | is_2h -> byte offset = 12 + is_2h * 2
+    from is_2h
+    to r9
+    add is_2h
+    iwt r0, #12
+    with r9
+    add r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_lut
+    with r7
+    add r9
+    from r2
+    stw (r7)
+
+    with is_2h
+    add #0
+    bne :+
+    nop
+    iwt r13, #32
+    iwt r6, #(16 << ATLAS_STRIDE_SHIFT)
+    bra :++
+    nop
+:
+    iwt r13, #48
+    iwt r6, #(32 << ATLAS_STRIDE_SHIFT)
+:
+
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)
+    inc r0
+    inc r0
+    move r7, r0
+    ldw (r7)            ; sin_yaw
+    with r0
+    add #0
+    blt @west_rev
+    nop
+    ; sin_yaw >= 0: V0=E3, V1=E0, V2=B0, V3=B3
+    move r1, lat_ptr
+    with r1
+    add r13
+    iwt r0, #12
+    with r1
+    add r0              ; E3
+    move r2, lat_ptr
+    with r2
+    add r13             ; E0
+    move r3, lat_ptr    ; B0
+    move r4, lat_ptr
+    iwt r0, #12
+    with r4
+    add r0              ; B3
+    bra @west_do
+    nop
+@west_rev:
+    ; sin_yaw < 0: V0=E0, V1=E3, V2=B3, V3=B0
+    move r1, lat_ptr
+    with r1
+    add r13             ; E0
+    move r2, lat_ptr
+    with r2
+    add r13
+    iwt r0, #12
+    with r2
+    add r0              ; E3
+    move r3, lat_ptr
+    iwt r0, #12
+    with r3
+    add r0              ; B3
+    move r4, lat_ptr    ; B0
+@west_do:
+    gsu_stack_push r8
+    call map_compile_panel_quad r1, r2, r3, r4, r5, r6
+    gsu_stack_pop r8
+
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    from r0
+    stw (r8)
+    return
+endfunction
+
+; ==============================================================================
+; compile_edge_panels
+; Compiles all 8 canonical Edge Panel templates into arch_buf.
+; ==============================================================================
+function compile_edge_panels
+    iwt r1, #0
+    call compile_panel_n r1
+    iwt r1, #1
+    call compile_panel_n r1
+
+    iwt r1, #0
+    call compile_panel_e r1
+    iwt r1, #1
+    call compile_panel_e r1
+
+    iwt r1, #0
+    call compile_panel_s r1
+    iwt r1, #1
+    call compile_panel_s r1
+
+    iwt r1, #0
+    call compile_panel_w r1
+    iwt r1, #1
+    call compile_panel_w r1
     return
 endfunction
 
@@ -3277,6 +3958,9 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+    ; Compile 8 canonical Edge Panel templates into arch_buf:
+    call compile_edge_panels
+
 @rot_compile_done:
     ; Restore ROMBR to bank 4 for texture atlas
     ibt r0, #4
@@ -3284,6 +3968,175 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
 
     ; Return 1 (recompiled)
     iwt r3, #1
+    return
+endfunction
+
+; ==============================================================================
+; map_stamp_edge_panel
+; Stamps pre-compiled Edge Panel trapezoids for a given compass edge (0..3).
+; In:
+;   r1 = edge_idx (0=North, 1=East, 2=South, 3=West)
+; Modifies:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r14
+; ==============================================================================
+function map_stamp_edge_panel edge_idx
+    register edge_idx = r1
+
+    ; Determine is_2h (0 for 1h, 1 for 2h):
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_flags
+    ldw (r7)
+    iwt r2, #PANEL_TALL_2H
+    with r0
+    and r2
+    beq :+
+    nop
+    iwt r2, #1          ; is_2h = 1
+    bra :++
+    nop
+:
+    iwt r2, #0          ; is_2h = 0
+:
+
+    ; panel_idx = (edge_idx << 1) | is_2h
+    from edge_idx
+    to r8
+    add edge_idx        ; edge_idx << 1
+    with r8
+    or r2               ; panel_idx (0..7)
+    with r8
+    add r8              ; byte offset in panel_lut (panel_idx * 2)
+
+    ; Read entry_offset from panel_lut:
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_lut
+    with r7
+    add r8
+    ldw (r7)
+    move r2, r0         ; r2 = entry_offset
+
+    ; Read trap_count from arch_traps_ptr + entry_offset:
+    iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
+    ldw (r7)
+    with r0
+    add r2
+    move r1, r0         ; r1 = entry_ptr
+    ldw (r1)
+    move r9, r0         ; r9 = trap_count
+    with r9
+    add #0
+    bne @panel_has_traps
+    nop
+    return
+@panel_has_traps:
+    inc r1
+    inc r1              ; r1 = pointer to first cached_trap
+
+    ; Determine UV offsets (u_offset, v_offset):
+    ; If edge_idx & 1 == 0 (North=0, South=2): u_offset = i_cur << 13
+    ; If edge_idx & 1 != 0 (East=1, West=3):   u_offset = j_cur << 13
+    from edge_idx
+    to r0
+    and #1
+    bne @panel_ew_uv
+    nop
+
+    ; NS UV:
+    iwt r7, #gsu_map_render_frame + map_render_frame::i_cur
+    ldw (r7)
+    swap
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    move r5, r0         ; r5 = u_offset
+    bra @panel_v_uv
+    nop
+
+@panel_ew_uv:
+    iwt r7, #gsu_map_render_frame + map_render_frame::j_cur
+    ldw (r7)
+    swap
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    move r5, r0         ; r5 = u_offset
+
+@panel_v_uv:
+    ; v_offset = base_height << 10:
+    iwt r7, #gsu_map_render_frame + map_render_frame::base_height
+    ldw (r7)
+    swap
+    with r0
+    add r0
+    with r0
+    add r0
+    move r6, r0         ; r6 = v_offset
+
+    ; Read panel_tex_id:
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_tex_id
+    ldw (r7)
+    move r11, r0        ; r11 = panel_tex_id
+
+    move r14, r9        ; r14 = trap counter
+@panel_trap_loop:
+    ; Set trap tex_id (+24)
+    move r7, r1
+    iwt r2, #24
+    with r7
+    add r2
+    from r11
+    stw (r7)
+
+    gsu_stack_push r14
+    gsu_stack_push r1
+    gsu_stack_push r11
+    gsu_stack_push r9
+    gsu_stack_push r6
+    gsu_stack_push r5
+
+    iwt r7, #gsu_map_render_frame + map_render_frame::anchor_x
+    ldw (r7)
+    move r3, r0         ; anchor_x
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0         ; anchor_y
+
+    iwt r7, #gsu_map_render_frame + map_render_frame::frame_half
+    ldw (r7)
+    move r7, r0         ; frame_half
+
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    gsu_stack_pop r5
+    gsu_stack_pop r6
+    gsu_stack_pop r9
+    gsu_stack_pop r11
+    gsu_stack_pop r1
+    gsu_stack_pop r14
+
+    iwt r7, #.sizeof(cached_trap)
+    with r1
+    add r7
+    dec r14
+    beq :+
+    nop
+    iwt r13, #@panel_trap_loop
+    jmp r13
+    nop
+:
     return
 endfunction
 
@@ -3441,6 +4294,93 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     stw (r7)           ; i_count = cols
 
     ; --------------------------------------------------------------------------
+    ; 2B. Partition compass edges by camera yaw quadrant:
+    ;     Step 2: Back Edge Panels (receding edges)
+    ;     Step 5: Front Edge Panels (camera-facing edges)
+    ; --------------------------------------------------------------------------
+    ; Check cos_yaw (r12)
+    with r12
+    add #0
+    blt @cos_quad_neg
+    nop
+    ; cos_yaw >= 0:
+    ; Back NS: North (PANEL_N = $01, edge = 0)
+    ; Front NS: South (PANEL_S = $04, edge = 2)
+    iwt r8, #PANEL_N
+    iwt r9, #0
+    iwt r1, #PANEL_S
+    iwt r2, #2
+    bra @cos_quad_done
+    nop
+@cos_quad_neg:
+    ; cos_yaw < 0:
+    ; Back NS: South (PANEL_S = $04, edge = 2)
+    ; Front NS: North (PANEL_N = $01, edge = 0)
+    iwt r8, #PANEL_S
+    iwt r9, #2
+    iwt r1, #PANEL_N
+    iwt r2, #0
+@cos_quad_done:
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    from r8
+    stw (r7)
+    inc r7
+    inc r7
+    from r9
+    stw (r7)            ; back_ns_edge
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ns_mask
+    from r1
+    stw (r7)
+    inc r7
+    inc r7
+    from r2
+    stw (r7)            ; front_ns_edge
+
+    ; Check sin_yaw
+    iwt r7, #gsu_map_render_frame + map_render_frame::cam_ptr
+    ldw (r7)
+    inc r0
+    inc r0
+    move r7, r0
+    ldw (r7)            ; sin_yaw
+    with r0
+    add #0
+    blt @sin_quad_neg
+    nop
+    ; sin_yaw >= 0:
+    ; Back EW: West (PANEL_W = $08, edge = 3)
+    ; Front EW: East (PANEL_E = $02, edge = 1)
+    iwt r8, #PANEL_W
+    iwt r9, #3
+    iwt r1, #PANEL_E
+    iwt r2, #1
+    bra @sin_quad_done
+    nop
+@sin_quad_neg:
+    ; sin_yaw < 0:
+    ; Back EW: East (PANEL_E = $02, edge = 1)
+    ; Front EW: West (PANEL_W = $08, edge = 3)
+    iwt r8, #PANEL_E
+    iwt r9, #1
+    iwt r1, #PANEL_W
+    iwt r2, #3
+@sin_quad_done:
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    from r8
+    stw (r7)
+    inc r7
+    inc r7
+    from r9
+    stw (r7)            ; back_ew_edge
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ew_mask
+    from r1
+    stw (r7)
+    inc r7
+    inc r7
+    from r2
+    stw (r7)            ; front_ew_edge
+
+    ; --------------------------------------------------------------------------
     ; 3. Outer J Loop (Rows)
     ; --------------------------------------------------------------------------
     iwt r7, #gsu_map_render_frame + map_render_frame::j_start
@@ -3545,22 +4485,23 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     iwt r8, #gsu_map_render_frame + map_render_frame::panel_tex_id
     stw (r8)
 
-    ; panel_flags (+5) [skip to +6]
+    ; panel_flags (+5)
     inc r7
-    inc r7
+    ldb (r7)
+    iwt r8, #gsu_map_render_frame + map_render_frame::panel_flags
+    stw (r8)
 
     ; drop_ns (+6)
+    inc r7
     ldb (r7)
-    inc r11
-    inc r11
-    stw (r11)
+    iwt r8, #gsu_map_render_frame + map_render_frame::drop_ns
+    stw (r8)
 
     ; drop_ew (+7)
     inc r7
     ldb (r7)
-    inc r11
-    inc r11
-    stw (r11)
+    iwt r8, #gsu_map_render_frame + map_render_frame::drop_ew
+    stw (r8)
 
     ; --------------------------------------------------------------------------
     ; 6. Calculate 2D Screen Anchor(i, j, base_height):
@@ -4130,7 +5071,45 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
 
 @skirt_ew_done:
 
-    ; --- 9C: Stamp Archetype (Top Cap & Faces) ---
+    ; --------------------------------------------------------------------------
+    ; Step 2: Back Edge Panels (receding edges in current yaw quadrant)
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_flags
+    ldw (r7)
+    move r8, r0         ; r8 = panel_flags
+    iwt r1, #$000F
+    with r0
+    and r1
+    beq @step_2_done
+    nop
+
+    ; Check Back NS edge:
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    ldw (r7)
+    with r0
+    and r8
+    beq @check_back_ew
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_edge
+    ldw (r7)
+    move r1, r0
+    call map_stamp_edge_panel r1
+
+@check_back_ew:
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    ldw (r7)
+    with r0
+    and r8
+    beq @step_2_done
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_edge
+    ldw (r7)
+    move r1, r0
+    call map_stamp_edge_panel r1
+
+@step_2_done:
+
+    ; --- Step 3: Stamp Archetype (Top Cap & Faces) ---
     iwt r7, #gsu_map_render_frame + map_render_frame::archetype_id
     ldw (r7)
     move r8, r0         ; r8 = archetype_id
@@ -4194,7 +5173,7 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     add #0
     bne @arch_trap_count_ok
     nop
-    iwt r13, #@cull_cell
+    iwt r13, #@step_4_unit_hook
     jmp r13
     nop
 @arch_trap_count_ok:
@@ -4316,9 +5295,57 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     with r1
     add r7
     dec r14
-    beq @cull_cell
+    beq @step_4_unit_hook
     nop
     iwt r13, #@archetype_trap_loop
+    jmp r13
+    nop
+
+@step_4_unit_hook:
+    ; --------------------------------------------------------------------------
+    ; Step 4: On-Cell Unit / Sprite Hook (reserved callback before front parapets)
+    ; --------------------------------------------------------------------------
+@unit_hook:
+    nop
+
+    ; --------------------------------------------------------------------------
+    ; Step 5: Front Edge Panels (camera-facing edges in current yaw quadrant)
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_flags
+    ldw (r7)
+    move r8, r0         ; r8 = panel_flags
+    iwt r1, #$000F
+    with r0
+    and r1
+    beq @step_5_done
+    nop
+
+    ; Check Front NS edge:
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ns_mask
+    ldw (r7)
+    with r0
+    and r8
+    beq @check_front_ew
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ns_edge
+    ldw (r7)
+    move r1, r0
+    call map_stamp_edge_panel r1
+
+@check_front_ew:
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ew_mask
+    ldw (r7)
+    with r0
+    and r8
+    beq @step_5_done
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ew_edge
+    ldw (r7)
+    move r1, r0
+    call map_stamp_edge_panel r1
+
+@step_5_done:
+    iwt r13, #@cull_cell
     jmp r13
     nop
 
