@@ -105,10 +105,11 @@ TEXTURE_SAND_WIDTH_SHIFT = 5 ; log2(32): V << 5
 ;; Format per entry: rom_offset, u_mask, v_mask, stride_shift (8 bytes total)
 ;; ==============================================================================
 TEXTURE_TABLE:
-    .word 0, 31, 31, 6 ; roof
-    .word 32, 31, 31, 6 ; grass
-    .word 2080, 31, 31, 6 ; water
-    .word 4096, 31, 31, 6 ; stone
-    .word 2048, 31, 31, 6 ; sand
+    .word 0, 31, 31, 6 ; 0: roof
+    .word 32, 31, 31, 6 ; 1: grass
+    .word 2080, 31, 31, 6 ; 2: water
+    .word 2048, 31, 31, 6 ; 3: sand
+    .word 2080, 31, 31, 6 ; 4: water
+    .word 4096, 31, 31, 6 ; 5: stone
 
 .endif ; __TEXTURES_I_DEFINED__
