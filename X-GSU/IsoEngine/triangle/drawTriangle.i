@@ -465,4 +465,644 @@ function plot_texel xPx, yPx, uTex, vTex, table_index
     return
 endfunction
 
+; Rasterizes an affine-textured triangle to the GSU framebuffer using plot_texel
+; In:       points = pointer to 3 interleaved vertices (24 bytes: x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2)
+;                    where x, y are integer screen coordinates and u, v are Q8.8 texture coordinates
+;           table_index = index into TEXTURE_TABLE
+; Out:      Texels plotted to framebuffer
+; Clobbers: All
+function draw_textured_triangle points, table_index
+    register curr_y = r2, u_val = r4, f_reg = r6
+    register xMin, xMax, v0_ptr, v1_ptr, dy
+
+    iwt r0, #TEX_TRI_TBL_IDX
+    from table_index
+    stw (r0)
+
+    ; yPoints[0] is at points + 2
+    from points
+    to dy
+    add #2
+
+    ; maxY (v1_ptr) = yPoints[0], minY (v0_ptr) = yPoints[0]
+    to v1_ptr
+    ldw (dy)
+    move v0_ptr, v1_ptr
+
+    ; yPoints[1] is at points + 10 (dy + 8)
+    from dy
+    add #8
+    ldw (r0)
+    if_lt r0, v0_ptr, { move v0_ptr, r0 }
+    nop
+    if_gt r0, v1_ptr, { move v1_ptr, r0 }
+    nop
+
+    ; yPoints[2] is at points + 18 (dy + 16)
+    from dy
+    add #8
+    add #8
+    ldw (r0)
+    if_lt r0, v0_ptr, { move v0_ptr, r0 }
+    nop
+    if_gt r0, v1_ptr, { move v1_ptr, r0 }
+    nop
+
+    ; Clamp minY and maxY to 0..SCREEN_HEIGHT (160)
+    ibt r0, #0
+    if_lt v0_ptr, r0, { move v0_ptr, r0 }
+    nop
+    iwt r0, #SCREEN_HEIGHT
+    if_lt r0, v1_ptr, { move v1_ptr, r0 }
+    nop
+    if_lte v1_ptr, v0_ptr, { return }
+    nop
+
+    ; Bounding box culling in X (x0 at +0, x1 at +8, x2 at +16)
+    to xMax
+    ldw (points)
+    move xMin, xMax
+
+    from points
+    add #8
+    ldw (r0)
+    if_lt r0, xMin, { move xMin, r0 }
+    nop
+    if_gt r0, xMax, { move xMax, r0 }
+    nop
+
+    from points
+    add #8
+    add #8
+    ldw (r0)
+    if_lt r0, xMin, { move xMin, r0 }
+    nop
+    if_gt r0, xMax, { move xMax, r0 }
+    nop
+
+    ; If all vertices have X < 0, entirely off-screen to the left
+    ibt r0, #0
+    if_lt xMax, r0, { return }
+    nop
+
+    ; If all vertices have X >= 256, entirely off-screen to the right
+    iwt r0, #256
+    if_gte xMin, r0, { return }
+    nop
+
+    backuploop
+    move curr_y, v0_ptr
+    iwt r13, #yLoop
+    to r12
+    from v1_ptr
+    sub v0_ptr
+
+yLoop:
+    iwt xMin, #$0FFF
+    iwt xMax, #$F000
+    ibt dy, #0
+    iwt r0, #TEX_TRI_MIN_U
+    from dy
+    stw (r0)
+    iwt r0, #TEX_TRI_MAX_U
+    from dy
+    stw (r0)
+    iwt r0, #TEX_TRI_MIN_V
+    from dy
+    stw (r0)
+    iwt r0, #TEX_TRI_MAX_V
+    from dy
+    stw (r0)
+
+    ; Edge 0: i = 0 (points + 0), j = 1 (points + 8)
+i_eq_0:
+    from points
+    to v0_ptr
+    add #2
+    from points
+    to v1_ptr
+    add #10
+
+    to u_val
+    ldw (v0_ptr)    ; u_val = y0
+    from curr_y
+    to dy
+    sub u_val       ; dy = y - y0
+
+    to f_reg
+    ldw (v1_ptr)    ; f_reg = y1
+    from curr_y
+    sub f_reg       ; r0 = y - y1
+    xor dy          ; r0 = (y - y0) ^ (y - y1)
+    bpl i_eq_1
+    nop
+
+    from f_reg
+    sub u_val
+    bpl :+
+    nop
+        move dy, v0_ptr
+        move v0_ptr, v1_ptr
+        move v1_ptr, dy
+        from curr_y
+        to dy
+        sub f_reg
+        from u_val
+        sub f_reg
+    :
+    reciprocal_lookup_rom r0, f_reg
+    from dy
+    lmult
+    from u_val
+    to f_reg
+    lsr
+
+    dec v0_ptr
+    dec v0_ptr
+    dec v1_ptr
+    dec v1_ptr
+
+    to u_val
+    ldw (v0_ptr)    ; x_top
+    ldw (v1_ptr)    ; x_bot
+    sub u_val
+    add r0
+    fmult
+    to dy
+    add u_val       ; dy = x
+
+    from v0_ptr
+    to v0_ptr
+    add #4
+    from v1_ptr
+    to v1_ptr
+    add #4
+
+    to u_val
+    ldw (v0_ptr)    ; u_top
+    ldw (v1_ptr)    ; u_bot
+    sub u_val
+    add r0
+    fmult
+    with u_val
+    add r0          ; u_val = u
+
+    inc v0_ptr
+    inc v0_ptr
+    inc v1_ptr
+    inc v1_ptr
+
+    to v0_ptr
+    ldw (v0_ptr)    ; v_top
+    ldw (v1_ptr)    ; v_bot
+    sub v0_ptr
+    add r0
+    fmult
+    with v0_ptr
+    add r0          ; v0_ptr = v
+
+    from dy
+    cmp xMin
+    bge :+
+    nop
+        move xMin, dy
+        iwt r0, #TEX_TRI_MIN_U
+        from u_val
+        stw (r0)
+        iwt r0, #TEX_TRI_MIN_V
+        from v0_ptr
+        stw (r0)
+    :
+    from xMax
+    cmp dy
+    bge :+
+    nop
+        move xMax, dy
+        iwt r0, #TEX_TRI_MAX_U
+        from u_val
+        stw (r0)
+        iwt r0, #TEX_TRI_MAX_V
+        from v0_ptr
+        stw (r0)
+    :
+
+    ; Edge 1: i = 1 (points + 8), j = 2 (points + 16)
+i_eq_1:
+    from points
+    to v0_ptr
+    add #10
+    from v0_ptr
+    to v1_ptr
+    add #8
+
+    to u_val
+    ldw (v0_ptr)    ; u_val = y0
+    from curr_y
+    to dy
+    sub u_val       ; dy = y - y0
+
+    to f_reg
+    ldw (v1_ptr)    ; f_reg = y1
+    from curr_y
+    sub f_reg       ; r0 = y - y1
+    xor dy          ; r0 = (y - y0) ^ (y - y1)
+    bpl i_eq_2
+    nop
+
+    from f_reg
+    sub u_val
+    bpl :+
+    nop
+        move dy, v0_ptr
+        move v0_ptr, v1_ptr
+        move v1_ptr, dy
+        from curr_y
+        to dy
+        sub f_reg
+        from u_val
+        sub f_reg
+    :
+    reciprocal_lookup_rom r0, f_reg
+    from dy
+    lmult
+    from u_val
+    to f_reg
+    lsr
+
+    dec v0_ptr
+    dec v0_ptr
+    dec v1_ptr
+    dec v1_ptr
+
+    to u_val
+    ldw (v0_ptr)    ; x_top
+    ldw (v1_ptr)    ; x_bot
+    sub u_val
+    add r0
+    fmult
+    to dy
+    add u_val       ; dy = x
+
+    from v0_ptr
+    to v0_ptr
+    add #4
+    from v1_ptr
+    to v1_ptr
+    add #4
+
+    to u_val
+    ldw (v0_ptr)    ; u_top
+    ldw (v1_ptr)    ; u_bot
+    sub u_val
+    add r0
+    fmult
+    with u_val
+    add r0          ; u_val = u
+
+    inc v0_ptr
+    inc v0_ptr
+    inc v1_ptr
+    inc v1_ptr
+
+    to v0_ptr
+    ldw (v0_ptr)    ; v_top
+    ldw (v1_ptr)    ; v_bot
+    sub v0_ptr
+    add r0
+    fmult
+    with v0_ptr
+    add r0          ; v0_ptr = v
+
+    from dy
+    cmp xMin
+    bge :+
+    nop
+        move xMin, dy
+        iwt r0, #TEX_TRI_MIN_U
+        from u_val
+        stw (r0)
+        iwt r0, #TEX_TRI_MIN_V
+        from v0_ptr
+        stw (r0)
+    :
+    from xMax
+    cmp dy
+    bge :+
+    nop
+        move xMax, dy
+        iwt r0, #TEX_TRI_MAX_U
+        from u_val
+        stw (r0)
+        iwt r0, #TEX_TRI_MAX_V
+        from v0_ptr
+        stw (r0)
+    :
+
+    ; Edge 2: i = 2 (points + 16), j = 0 (points + 0)
+i_eq_2:
+    from points
+    to v0_ptr
+    add #10
+    with v0_ptr
+    add #8
+    from points
+    to v1_ptr
+    add #2
+
+    to u_val
+    ldw (v0_ptr)    ; u_val = y0
+    from curr_y
+    to dy
+    sub u_val       ; dy = y - y0
+
+    to f_reg
+    ldw (v1_ptr)    ; f_reg = y1
+    from curr_y
+    sub f_reg       ; r0 = y - y1
+    xor dy          ; r0 = (y - y0) ^ (y - y1)
+    bpl plotXLoop
+    nop
+
+    from f_reg
+    sub u_val
+    bpl :+
+    nop
+        move dy, v0_ptr
+        move v0_ptr, v1_ptr
+        move v1_ptr, dy
+        from curr_y
+        to dy
+        sub f_reg
+        from u_val
+        sub f_reg
+    :
+    reciprocal_lookup_rom r0, f_reg
+    from dy
+    lmult
+    from u_val
+    to f_reg
+    lsr
+
+    dec v0_ptr
+    dec v0_ptr
+    dec v1_ptr
+    dec v1_ptr
+
+    to u_val
+    ldw (v0_ptr)    ; x_top
+    ldw (v1_ptr)    ; x_bot
+    sub u_val
+    add r0
+    fmult
+    to dy
+    add u_val       ; dy = x
+
+    from v0_ptr
+    to v0_ptr
+    add #4
+    from v1_ptr
+    to v1_ptr
+    add #4
+
+    to u_val
+    ldw (v0_ptr)    ; u_top
+    ldw (v1_ptr)    ; u_bot
+    sub u_val
+    add r0
+    fmult
+    with u_val
+    add r0          ; u_val = u
+
+    inc v0_ptr
+    inc v0_ptr
+    inc v1_ptr
+    inc v1_ptr
+
+    to v0_ptr
+    ldw (v0_ptr)    ; v_top
+    ldw (v1_ptr)    ; v_bot
+    sub v0_ptr
+    add r0
+    fmult
+    with v0_ptr
+    add r0          ; v0_ptr = v
+
+    from dy
+    cmp xMin
+    bge :+
+    nop
+        move xMin, dy
+        iwt r0, #TEX_TRI_MIN_U
+        from u_val
+        stw (r0)
+        iwt r0, #TEX_TRI_MIN_V
+        from v0_ptr
+        stw (r0)
+    :
+    from xMax
+    cmp dy
+    bge :+
+    nop
+        move xMax, dy
+        iwt r0, #TEX_TRI_MAX_U
+        from u_val
+        stw (r0)
+        iwt r0, #TEX_TRI_MAX_V
+        from v0_ptr
+        stw (r0)
+    :
+
+plotXLoop:
+    ; If no edge intersected this scanline (xMin > xMax), skip to nextY
+    from xMax
+    cmp xMin
+    bge :+
+    nop
+    iwt r15, #nextY
+    nop
+:
+    ; Shift xMin and xMax by -128 when rendering the right half of the screen
+    iwt r0, #GSU_FRAME_HALF
+    ldb (r0)
+    with r0
+    add #0
+    beq :+
+    nop
+        iwt r0, #128
+        with xMin
+        sub r0
+        with xMax
+        sub r0
+:
+    ; Check if minX == maxX or minX < maxX
+    from xMin
+    cmp xMax
+    bne :+
+    nop
+    iwt r15, #singlePixelSpan
+    nop
+:
+
+    ; startX (v0_ptr) = Math.max(0, minX)
+    move v0_ptr, xMin
+    ibt r0, #0
+    if_lt v0_ptr, r0, { move v0_ptr, r0 }
+    nop
+
+    ; endX (v1_ptr) = Math.min(SCREEN_WIDTH - 1, maxX)
+    move v1_ptr, xMax
+    iwt r0, #(SCREEN_WIDTH - 1)
+    if_gt v1_ptr, r0, { move v1_ptr, r0 }
+    nop
+
+    ; If startX > endX, span is outside the active 128px screen half
+    from v1_ptr
+    cmp v0_ptr
+    bge :+
+    nop
+    iwt r15, #nextY
+    nop
+:
+    ; Precompute 1 / dx in Q0.15 for the scanline and restore ROM bank 4
+    from xMax
+    sub xMin
+    reciprocal_lookup_rom r0, f_reg
+    ibt dy, #1
+    from r0
+    cmp dy
+    beq :+
+    nop
+        dec f_reg
+        with f_reg
+        lsr
+    :
+    iwt r0, #TEX_TRI_RECIP_DX
+    from f_reg
+    stw (r0)
+    ibt r0, #4
+    romb
+
+xLoop:
+    iwt r0, #TEX_TRI_RECIP_DX
+    to f_reg
+    ldw (r0)
+    from v0_ptr
+    sub xMin
+    lmult
+    move f_reg, u_val
+
+    ; u = minU + (((maxU - minU) * f) >> 8)
+    iwt r0, #TEX_TRI_MIN_U
+    to u_val
+    ldw (r0)
+    iwt r0, #TEX_TRI_MAX_U
+    to dy
+    ldw (r0)
+    from dy
+    sub u_val
+    add r0
+    fmult
+    with u_val
+    add r0
+
+    ; v = minV + (((maxV - minV) * f) >> 8)
+    iwt r0, #TEX_TRI_MIN_V
+    to dy
+    ldw (r0)
+    iwt r0, #TEX_TRI_MAX_V
+    ldw (r0)
+    sub dy
+    add r0
+    fmult
+    to f_reg
+    add dy
+
+    ; tu = (u >> 8) & 31
+    with u_val
+    hib
+    ibt r0, #31
+    to u_val
+    and u_val
+
+    ; tv = (v >> 8) & 31
+    with f_reg
+    hib
+    to f_reg
+    and f_reg
+
+    iwt r0, #TEX_TRI_TBL_IDX
+    to dy
+    ldw (r0)
+    call plot_texel v0_ptr, curr_y, u_val, f_reg, dy
+
+    inc v0_ptr
+    from v1_ptr
+    cmp v0_ptr
+    bge xLoop
+    nop
+    bra nextY
+    nop
+
+singlePixelSpan:
+    ; else if (minX == maxX && minX in 0 until width)
+    ibt r0, #0
+    from xMin
+    cmp r0
+    blt nextY
+    nop
+    iwt r0, #SCREEN_WIDTH
+    from xMin
+    cmp r0
+    bge nextY
+    nop
+
+    iwt r0, #TEX_TRI_MIN_U
+    to u_val
+    ldw (r0)
+    with u_val
+    hib
+    ibt r0, #31
+    to u_val
+    and u_val
+
+    iwt r0, #TEX_TRI_MIN_V
+    to f_reg
+    ldw (r0)
+    with f_reg
+    hib
+    to f_reg
+    and f_reg
+
+    ibt r0, #4
+    romb
+
+    iwt r0, #TEX_TRI_TBL_IDX
+    to dy
+    ldw (r0)
+    call plot_texel xMin, curr_y, u_val, f_reg, dy
+
+nextY:
+    loop
+    inc curr_y
+
+    restoreloop
+    return
+endfunction
+
+.segment "GSURAM"
+TEX_TRI_MIN_U:
+    .res 2
+TEX_TRI_MAX_U:
+    .res 2
+TEX_TRI_MIN_V:
+    .res 2
+TEX_TRI_MAX_V:
+    .res 2
+TEX_TRI_RECIP_DX:
+    .res 2
+TEX_TRI_TBL_IDX:
+    .res 2
+
+.segment "GSUCODE"
+
 .endif

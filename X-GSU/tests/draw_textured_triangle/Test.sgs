@@ -1,0 +1,203 @@
+; SuperFX
+; Test draw_textured_triangle by rendering textured triangles into GSURAM screenbuffer
+
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "libSFX.i"
+
+.segment "GSURAM"
+screenbuffer = $4000
+screenbuffer_len = $2800
+
+GSU_FRAME_HALF:
+.export GSU_FRAME_HALF
+    .res 2
+
+TRI_POINTS:
+.export TRI_POINTS
+    .res 24
+
+.segment "GSUCODE"
+GSU_Code:
+
+    init_stack
+
+test_setup:
+    nop
+    nop
+
+    ; Clear screenbuffer in GSURAM
+    iwt r1, #screenbuffer
+    iwt r12, #($2800 / 2)
+    iwt r0, #0
+    cache
+    move r13, r15
+        stw (r1)
+        inc r1
+        loop
+        inc r1
+    nop
+
+    ; Clear GSU_FRAME_HALF (left half 0..127)
+    iwt r1, #GSU_FRAME_HALF
+    ibt r0, #0
+    stw (r1)
+
+    ; Set ROM bank to Bank 4 where TEXTURES_graphics.bin is located
+    ibt r0, #4
+    romb
+
+    ; Enable plotting opaque color (bit 0 = 1 so color 0 also plots)
+    ibt r0, #1
+    cmode
+
+test_start:
+    register pts_ptr, tex_idx
+
+    ; ---------------------------------------------------------
+    ; Triangle 1: Upper-left right triangle (roof, table_index = 0)
+    ; V0 = (x=0,  y=0,  u=$0000, v=$0000)
+    ; V1 = (x=31, y=0,  u=$1F00, v=$0000)
+    ; V2 = (x=0,  y=31, u=$0000, v=$1F00)
+    ; ---------------------------------------------------------
+    iwt pts_ptr, #TRI_POINTS
+    iwt r0, #0
+    stw (pts_ptr)       ; x0 = 0
+    inc pts_ptr
+    inc pts_ptr
+    stw (pts_ptr)       ; y0 = 0
+    inc pts_ptr
+    inc pts_ptr
+    stw (pts_ptr)       ; u0 = $0000
+    inc pts_ptr
+    inc pts_ptr
+    stw (pts_ptr)       ; v0 = $0000
+    inc pts_ptr
+    inc pts_ptr
+
+    iwt r0, #31
+    stw (pts_ptr)       ; x1 = 31
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #0
+    stw (pts_ptr)       ; y1 = 0
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #$1F00
+    stw (pts_ptr)       ; u1 = $1F00
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #0
+    stw (pts_ptr)       ; v1 = $0000
+    inc pts_ptr
+    inc pts_ptr
+
+    iwt r0, #0
+    stw (pts_ptr)       ; x2 = 0
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #31
+    stw (pts_ptr)       ; y2 = 31
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #0
+    stw (pts_ptr)       ; u2 = $0000
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #$1F00
+    stw (pts_ptr)       ; v2 = $1F00
+
+    iwt pts_ptr, #TRI_POINTS
+    iwt tex_idx, #0
+    call draw_textured_triangle pts_ptr, tex_idx
+
+    ; ---------------------------------------------------------
+    ; Triangle 2: General triangle (grass, table_index = 1)
+    ; V0 = (x=40, y=8,  u=$0000, v=$0000)
+    ; V1 = (x=88, y=24, u=$1F00, v=$0000)
+    ; V2 = (x=52, y=64, u=$0000, v=$1F00)
+    ; ---------------------------------------------------------
+    iwt pts_ptr, #TRI_POINTS
+    iwt r0, #40
+    stw (pts_ptr)       ; x0 = 40
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #8
+    stw (pts_ptr)       ; y0 = 8
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #0
+    stw (pts_ptr)       ; u0 = $0000
+    inc pts_ptr
+    inc pts_ptr
+    stw (pts_ptr)       ; v0 = $0000
+    inc pts_ptr
+    inc pts_ptr
+
+    iwt r0, #88
+    stw (pts_ptr)       ; x1 = 88
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #24
+    stw (pts_ptr)       ; y1 = 24
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #$1F00
+    stw (pts_ptr)       ; u1 = $1F00
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #0
+    stw (pts_ptr)       ; v1 = $0000
+    inc pts_ptr
+    inc pts_ptr
+
+    iwt r0, #52
+    stw (pts_ptr)       ; x2 = 52
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #64
+    stw (pts_ptr)       ; y2 = 64
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #0
+    stw (pts_ptr)       ; u2 = $0000
+    inc pts_ptr
+    inc pts_ptr
+    iwt r0, #$1F00
+    stw (pts_ptr)       ; v2 = $1F00
+
+    iwt pts_ptr, #TRI_POINTS
+    iwt tex_idx, #1
+    call draw_textured_triangle pts_ptr, tex_idx
+
+    ; Flush GSU pixel cache to RAM
+    rpix
+    rpix
+
+    ; Let memory settle (8 NOPs)
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+
+; Includes that need to be in GSURAM as part of GSUCODE
+.include "../../gsu_maths/gsu_recip.i"
+.include "../../IsoEngine/triangle/drawTriangle.i"
