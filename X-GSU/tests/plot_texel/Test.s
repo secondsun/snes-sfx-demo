@@ -10,6 +10,7 @@ Main:
         memcpy GSU_SRAM, __GSUCODE_LOAD__, __GSUCODE_SIZE__
         ;Copy SNES code
         memcpy  __MAIN_LOOP_RUN__, __MAIN_LOOP_LOAD__, __MAIN_LOOP_SIZE__
+        memcpy  __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__
 
         ;Copy Palette
         CGRAM_memcpy 0, Palette, sizeof_Palette

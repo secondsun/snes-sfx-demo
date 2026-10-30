@@ -176,14 +176,6 @@ test_start:
     nop
 
 test_stop:
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
     stop
     nop
 

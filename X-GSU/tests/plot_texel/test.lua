@@ -26,7 +26,7 @@ local post_stop_frames = 0
 emu.addEventCallback(function()
     if test_finished then
         post_stop_frames = post_stop_frames + 1
-        if post_stop_frames >= 4 then
+        if post_stop_frames >= 8 then
             local screenshot = emu.takeScreenshot()
             if screenshot then
                 local out_path = "/Users/summerspittman/Projects/retro-superfx/snes-sfx-demo/X-GSU/tests/plot_texel/actual_render.png"

@@ -101,5 +101,10 @@ On the FX3, reading `R15` from the 65816 CPU while the GSU is executing is expli
 - Software can determine when the FX has finished by polling `R15` until it reads `0`.
 - In MesenCE emulation, `STOP` still raises the SNES IRQ signal if configured in `CFGR`.
 
-### Simultaneous Bus Access
-Unlike the original SuperFX chip, the SNES 65816 CPU does not need to disable ROM/RAM access (`RON`/`RAN` bits in `SCMR`) to prevent bus collision. Both processors have uninterrupted access to ROM and FX SRAM.
+### Simultaneous Bus Access & Mesen Emulation Nuances
+Unlike the original SuperFX chip, the FX3 hardware allows simultaneous 65816 and GSU access to ROM and FX SRAM. However:
+- **Mesen Emulation `GSU_SCMR` Bus Lockout**: In Mesen CE, if `GSU_SCMR` bit 4 (`RAN = 1`, e.g. `#$18`) is set, the SNES CPU is locked out of reading `$70:xxxx` (reads return `$00` and `VRAM_memcpy` DMAs transfer all zeros). Always clear the `RAN` bit (`lda #$00; sta f:GSU_SCMR`) after GSU execution stops and before the SNES CPU or DMA reads from `GSURAM`.
+- **PPU Display Setup in `libSFX` Tests**:
+  1. `libSFX`'s `Runtime.s` places `VBlankVector` inside `.segment "VBLANK"` (loaded in ROM and executed from `LORAM` at `$000200`). Any `Test.s` that enables `VBL_on` **must** first copy the handler to RAM via `memcpy __VBLANK_RUN__, __VBLANK_LOAD__, __VBLANK_SIZE__` and register a VBlank callback (`VBL_set Vblank`) ending with **`rtl`** (not `rts`).
+  2. Set the CPU Data Bank to `$80` (`phk; plb` or `dbank $80`) before writing to `$2100-$213F` (`CGRAM_setcolor_rgb`, `VRAM_memcpy`, `INIDISP`), because GSU launch loops often leave `DB = $70` where `$70:21xx` writes to `GSURAM` instead of PPU registers.
+  3. Set `z:SFX_inidisp` (`lda #inidisp(ON, DISP_BRIGHTNESS_MAX); sta z:SFX_inidisp`), since `libSFX`'s `VBlankVector` copies `z:SFX_inidisp` to `$2100` (`INIDISP`) on every NMI.
