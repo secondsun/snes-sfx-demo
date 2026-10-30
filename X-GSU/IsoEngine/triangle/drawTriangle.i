@@ -10,6 +10,7 @@
 .include "../../common/function.i"
 .include "../../common/control.i"
 .include "../constants.i"
+.include "../Data/TEXTURES.i"
 ; Rasterizes a flat-shaded triangle to the GSU framebuffer
 ; In:       points = points array pointer (6 bytes: x0, y0, x1, y1, x2, y2), col = color
 ; Out:      Pixels plotted to framebuffer
@@ -413,6 +414,54 @@ function draw_triangle points, col
         ; //end for (y in minY..maxY) 
     endcache:
     restoreloop
+    return
+endfunction
+
+; Plot a single texel at the current position. This function will 
+; load a texel from the specified atlas and plot a pixel at x and y
+; xPx: X coordinate of the texel
+; yPx: Y coordinate of the texel
+; uTex: U coordinate of the texel
+; vTex: V coordinate of the texel
+; table_index: Index of the texture table entry
+function plot_texel xPx, yPx, uTex, vTex, table_index
+    register plot_x = r1, plot_y = r2
+    ;set plot options
+    move plot_x, xPx
+    move plot_y, yPx
+
+    ; Implementation for plotting a single texel goes here
+    register texture_base_address
+    
+    ;find texture table entry
+    ;texture table entry address = TEXTURE_TABLE + table_index * 8
+    
+    iwt texture_base_address, #(.loword(TEXTURE_TABLE))
+    with table_index
+    mult #8
+    with texture_base_address
+    add table_index
+
+    ;r0 = texture rom_offset
+    ;for the rest of this code we're assuming textures are 32x32
+    to r0
+    ldw (texture_base_address)
+
+    ;texture offset = vTex * ATLAS_WIDTH + uTex
+    ;vText = offset within texture
+    iwt r6, #ATLAS_WIDTH
+    with vTex
+    umult r6
+    with vTex
+    add uTex
+
+    to r14
+    from vTex
+    add r0
+    ;fetch and plot color
+    getc
+    plot
+
     return
 endfunction
 

@@ -61,10 +61,40 @@ emu.addMemoryCallback(
    - `0` (`emu.cpuType.snes`): Main SNES 65816 CPU.
 6. **`memoryType`**:
    - `emu.memType.gsuWorkRam`: SuperFX Work RAM (covers GSU code and data segments).
+   - `emu.memType.snesMemory`: SNES 24-bit CPU bus.
+   - `emu.memType.snesVideoRam`: SNES PPU VRAM (note: `emu.memType.snesVram` does NOT exist).
+   - `emu.memType.snesCgRam`: SNES PPU CGRAM palette memory (note: `emu.memType.snesCgram` does NOT exist).
+   - `emu.memType.snesSpriteRam`: SNES OAM.
+
+> [!WARNING]
+> **1-Second Per-Callback Lua Timeout**: Mesen enforces a hard 1-second wall-clock timeout per Lua callback invocation (`Maximum execution time (1 seconds) exceeded`). Never register per-instruction execution callbacks (`0x0000..0xFFFF`) over long loops. Instead, hook a single terminal address (`test_stop`) or frame boundary (`emu.eventType.endFrame`).
 
 ---
 
-## 4. Reading and Writing Memory
+## 4. Frame Events & Headless Screenshot Capture
+
+Use `emu.addEventCallback(fn, emu.eventType.endFrame)` and `emu.takeScreenshot()` to capture rendered PPU frames as PNG byte strings:
+
+```lua
+local post_stop_frames = 0
+emu.addEventCallback(function()
+    if test_finished then
+        post_stop_frames = post_stop_frames + 1
+        -- Wait >= 8 frames after GSU test_stop so SNES CPU VRAM DMA and PPU rendering complete
+        if post_stop_frames >= 8 then
+            local png_bytes = emu.takeScreenshot()
+            local f = io.open("actual_render.png", "wb")
+            f:write(png_bytes)
+            f:close()
+            emu.stop(0)
+        end
+    end
+end, emu.eventType.endFrame)
+```
+
+---
+
+## 5. Reading and Writing Memory
 
 All memory offsets are 16-bit relative to GSU Work RAM (`$0000` to `$7FFF` / `$FFFF`):
 

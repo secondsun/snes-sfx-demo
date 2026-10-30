@@ -93,15 +93,33 @@ The GSU hardware uses write buffers with cycle delays for RAM stores (`stb`, `st
       nop
 
   test_stop:
-      nop
-      nop
       stop
       nop
   ```
 
+### Dual `rpix` Pixel Cache Flush (When Using `plot`)
+- SuperFX `plot` buffers pixels in dual 8-pixel caches (primary and secondary).
+- Before the 8 settling `nop`s and `stop`, always execute **two `rpix` instructions** (`rpix; rpix`) so both pixel caches flush to Work RAM.
+
 ---
 
-## 5. Key Macro APIs
+## 5. SuperFX 4bpp 160-Line Framebuffer Layout (Column-Major Tiles)
+
+When `GSU_SCMR` is configured for 4bpp (`GSU_SCMR_4BPP`) and 160-pixel height (`GSU_SCMR_H160`, 20 tiles per column), the SuperFX plots pixels into `screenbuffer` (e.g. `$70:4000`) in **column-major** 8x8 tile order:
+- `tx = math.floor(x / 8)` and `ty = math.floor(y / 8)`
+- `tileIndex = tx * 20 + ty` (20 tiles per vertical column)
+- `tileAddress = screenbase + tileIndex * 32 + (y % 8) * 2`
+- Within each 32-byte 4bpp tile:
+  - `b0 = RAM[tileAddress + 0]` (Bitplane 0)
+  - `b1 = RAM[tileAddress + 1]` (Bitplane 1)
+  - `b2 = RAM[tileAddress + 16]` (Bitplane 2)
+  - `b3 = RAM[tileAddress + 17]` (Bitplane 3)
+- For pixel `(x, y)` with `shift = 7 - (x % 8)`:
+  `color = ((b0 >> shift) & 1) | (((b1 >> shift) & 1) << 1) | (((b2 >> shift) & 1) << 2) | (((b3 >> shift) & 1) << 3)`
+
+---
+
+## 6. Key Macro APIs
 
 ### `rom_to_ram` (`common/util.i`)
 Copies a contiguous block of data from SuperFX ROM into RAM.
