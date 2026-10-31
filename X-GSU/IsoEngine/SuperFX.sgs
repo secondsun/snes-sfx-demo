@@ -88,7 +88,16 @@ rasterize_cached_tris:
         add #12
         to tri_color
         ldw (tmp)
-        call draw_triangle tri_ptr, tri_color
+        with tri_color
+        add #0
+        bmi @draw_tex_tri
+        nop
+            call draw_triangle tri_ptr, tri_color
+            bra @next_cached_tri
+            nop
+@draw_tex_tri:
+            call draw_cached_textured_triangle tri_ptr, tri_color
+@next_cached_tri:
         with tri_ptr
         add #8
         with tri_ptr
@@ -99,10 +108,151 @@ finish:
 shutdown:
     rpix
     rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
     stop
     nop
     nop
     nop
+
+; Unpacks a cached 2D triangle and its quad UV coordinates into TEX_TRI_VERTS and calls draw_textured_triangle.
+function draw_cached_textured_triangle tri_ptr, tri_color
+    register src_ptr, dst_ptr, tex_id, tri_part, tmp
+
+    move src_ptr, tri_ptr
+    iwt r0, #$7FFF
+    to tex_id
+    and tri_color
+
+    from src_ptr
+    add #14
+    move tmp, r0
+    to tri_part
+    ldw (tmp)
+
+    iwt dst_ptr, #TEX_TRI_VERTS
+
+    ; Vertex 0 (v0): (x0, y0, u0 = $0000, v0 = $1F00)
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$0000
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$1F00
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+
+    with tri_part
+    add #0
+    bne @tri_part_2
+    nop
+
+    ; Triangle 1 (v0, v1, v2):
+    ; Vertex 1 (v1): (x1, y1, u1 = $0000, v1 = $0000)
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$0000
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+
+    ; Vertex 2 (v2): (x2, y2, u2 = $1F00, v2 = $0000)
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$1F00
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$0000
+    stw (dst_ptr)
+    bra @do_draw
+    nop
+
+@tri_part_2:
+    ; Triangle 2 (v0, v2, v3):
+    ; Vertex 1 (v2): (x1, y1, u1 = $1F00, v1 = $0000)
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$1F00
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$0000
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+
+    ; Vertex 2 (v3): (x2, y2, u2 = $1F00, v2 = $1F00)
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc src_ptr
+    inc src_ptr
+    inc dst_ptr
+    inc dst_ptr
+    ldw (src_ptr)
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    iwt r0, #$1F00
+    stw (dst_ptr)
+    inc dst_ptr
+    inc dst_ptr
+    stw (dst_ptr)
+
+@do_draw:
+    iwt dst_ptr, #TEX_TRI_VERTS
+    call draw_textured_triangle dst_ptr, tex_id
+    return
+endfunction
 
 ; Initializes MODEL_V3, MODEL_FACES, and ISO_CAM once on boot.
 function init_iso_scene
@@ -252,7 +402,7 @@ emit_face:
         beq skip_triangle_2
         nop
 
-        ; Emit Triangle 2: (v0, v2, v3, color, pad)
+        ; Emit Triangle 2: (v0, v2, v3, color, pad=1)
         ; face_ptr is currently at +6 (pointing to v3).
         with face_ptr
         sub #6
@@ -267,7 +417,7 @@ emit_face:
         stw (cache_ptr)
         inc cache_ptr
         inc cache_ptr
-        iwt r0, #0
+        iwt r0, #1
         stw (cache_ptr)
         inc cache_ptr
         inc cache_ptr
@@ -603,6 +753,8 @@ OBJ_ORDER:
     .res 5 * 2
 CACHED_TRIS:
     .res 48 * 16
+TEX_TRI_VERTS:
+    .res 24
 
 CUBE_V3 = MODEL_V3
 CUBE_FACES = MODEL_FACES

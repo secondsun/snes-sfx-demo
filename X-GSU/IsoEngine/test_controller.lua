@@ -1,9 +1,9 @@
 -- Automated controller integration test for IsoEngine in Mesen CE
-local ADDR_JOYPAD   = 0x09D6
-local ADDR_ISO_CAM  = 0x09D8
-local ADDR_YAW      = 0x09D8
-local ADDR_CENTER_X = 0x09DE
-local ADDR_CENTER_Y = 0x09E0
+local ADDR_JOYPAD   = 0x09E2
+local ADDR_ISO_CAM  = 0x09E4
+local ADDR_YAW      = 0x09E4
+local ADDR_CENTER_X = 0x09EA
+local ADDR_CENTER_Y = 0x09EC
 
 -- Dynamically resolve symbols from SuperFX.cpu.sym if available
 local function load_symbols()
@@ -12,7 +12,7 @@ local function load_symbols()
         local f = io.open(path, "r")
         if f then
             for line in f:lines() do
-                local addr, sym = line:match("^al (%x+) %.(%w+)")
+                local addr, sym = line:match("^al (%x+) %.([%w_]+)")
                 if addr and sym then
                     local num = tonumber(addr, 16) & 0xFFFF
                     if sym == "GSU_JOYPAD" then
@@ -160,8 +160,8 @@ local function onEndFrame()
         current_inputs = { left = true }
     end
 
-    -- Phase 7 check at frame 370: Clamping
-    if frame_count == 370 then
+    -- Phase 7 check at frame 430: Clamping
+    if frame_count == 430 then
         print(string.format("  [Phase 7] Clamping check: cx=%d (expected 0)", cx))
         if cx ~= 0 then
             print(string.format("FAIL: Center X not clamped to 0! cx=%d", cx))

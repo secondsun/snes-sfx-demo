@@ -184,10 +184,10 @@
 ; 13 terrain/path + 14 house + 4 tree 1 + 4 tree 2 + 4 tree 3 + 5 well
 .macro scene_faces
     ; 13 Terrain faces
-    .word .loword(MODEL_V2 +  0*4), .loword(MODEL_V2 +  1*4), .loword(MODEL_V2 +  4*4), .loword(MODEL_V2 +  3*4), 11 ; lawn_nw
-    .word .loword(MODEL_V2 +  1*4), .loword(MODEL_V2 +  2*4), .loword(MODEL_V2 +  5*4), .loword(MODEL_V2 +  4*4), 11 ; lawn_ne
-    .word .loword(MODEL_V2 +  3*4), .loword(MODEL_V2 +  4*4), .loword(MODEL_V2 +  7*4), .loword(MODEL_V2 +  6*4), 11 ; lawn_sw
-    .word .loword(MODEL_V2 +  4*4), .loword(MODEL_V2 +  5*4), .loword(MODEL_V2 +  8*4), .loword(MODEL_V2 +  7*4), 11 ; lawn_se
+    .word .loword(MODEL_V2 +  0*4), .loword(MODEL_V2 +  1*4), .loword(MODEL_V2 +  4*4), .loword(MODEL_V2 +  3*4), $8001 ; lawn_nw (TEXTURE_ID_GRASS = 1)
+    .word .loword(MODEL_V2 +  1*4), .loword(MODEL_V2 +  2*4), .loword(MODEL_V2 +  5*4), .loword(MODEL_V2 +  4*4), $8001 ; lawn_ne (TEXTURE_ID_GRASS = 1)
+    .word .loword(MODEL_V2 +  3*4), .loword(MODEL_V2 +  4*4), .loword(MODEL_V2 +  7*4), .loword(MODEL_V2 +  6*4), $8001 ; lawn_sw (TEXTURE_ID_GRASS = 1)
+    .word .loword(MODEL_V2 +  4*4), .loword(MODEL_V2 +  5*4), .loword(MODEL_V2 +  8*4), .loword(MODEL_V2 +  7*4), $8001 ; lawn_se (TEXTURE_ID_GRASS = 1)
     .word .loword(MODEL_V2 +  6*4), .loword(MODEL_V2 +  7*4), .loword(MODEL_V2 + 14*4), .loword(MODEL_V2 + 15*4),  4 ; soil_front_l
     .word .loword(MODEL_V2 +  7*4), .loword(MODEL_V2 +  8*4), .loword(MODEL_V2 + 13*4), .loword(MODEL_V2 + 14*4),  4 ; soil_front_r
     .word .loword(MODEL_V2 +  8*4), .loword(MODEL_V2 +  5*4), .loword(MODEL_V2 + 12*4), .loword(MODEL_V2 + 13*4),  5 ; soil_right_f
@@ -196,7 +196,7 @@
     .word .loword(MODEL_V2 +  1*4), .loword(MODEL_V2 +  0*4), .loword(MODEL_V2 +  9*4), .loword(MODEL_V2 + 10*4),  4 ; soil_back_l
     .word .loword(MODEL_V2 +  0*4), .loword(MODEL_V2 +  3*4), .loword(MODEL_V2 + 16*4), .loword(MODEL_V2 +  9*4),  5 ; soil_left_b
     .word .loword(MODEL_V2 +  3*4), .loword(MODEL_V2 +  6*4), .loword(MODEL_V2 + 15*4), .loword(MODEL_V2 + 16*4),  5 ; soil_left_f
-    .word .loword(MODEL_V2 + 17*4), .loword(MODEL_V2 + 18*4), .loword(MODEL_V2 + 19*4), .loword(MODEL_V2 + 20*4),  6 ; path
+    .word .loword(MODEL_V2 + 17*4), .loword(MODEL_V2 + 18*4), .loword(MODEL_V2 + 19*4), .loword(MODEL_V2 + 20*4), $8005 ; path (stone, table_index = 5)
 
     ; 14 House faces
     .word .loword(MODEL_V2 + 28*4), .loword(MODEL_V2 + 35*4), .loword(MODEL_V2 + 31*4), .loword(MODEL_V2 + 25*4),  7 ; house_front_left
@@ -209,8 +209,8 @@
     .word .loword(MODEL_V2 + 44*4), .loword(MODEL_V2 + 41*4), .loword(MODEL_V2 + 42*4), .loword(MODEL_V2 + 43*4), 12 ; house_left_window
     .word .loword(MODEL_V2 + 27*4), .loword(MODEL_V2 + 23*4), .loword(MODEL_V2 + 22*4), .loword(MODEL_V2 + 26*4), 15 ; house_right_wall
     .word .loword(MODEL_V2 + 39*4), .loword(MODEL_V2 + 40*4), .loword(MODEL_V2 + 37*4), .loword(MODEL_V2 + 38*4), 12 ; house_right_window
-    .word .loword(MODEL_V2 + 28*4), .loword(MODEL_V2 + 29*4), .loword(MODEL_V2 + 30*4), .loword(MODEL_V2 + 27*4),  8 ; house_front_roof
-    .word .loword(MODEL_V2 + 23*4), .loword(MODEL_V2 + 30*4), .loword(MODEL_V2 + 29*4), .loword(MODEL_V2 + 24*4),  2 ; house_back_roof
+    .word .loword(MODEL_V2 + 28*4), .loword(MODEL_V2 + 29*4), .loword(MODEL_V2 + 30*4), .loword(MODEL_V2 + 27*4), $8000 ; house_front_roof (TEXTURE_ID_ROOF = 0)
+    .word .loword(MODEL_V2 + 23*4), .loword(MODEL_V2 + 30*4), .loword(MODEL_V2 + 29*4), .loword(MODEL_V2 + 24*4), $8000 ; house_back_roof  (TEXTURE_ID_ROOF = 0)
     .word .loword(MODEL_V2 + 24*4), .loword(MODEL_V2 + 29*4), .loword(MODEL_V2 + 28*4), .loword(MODEL_V2 + 28*4), 10 ; house_left_gable
     .word .loword(MODEL_V2 + 27*4), .loword(MODEL_V2 + 30*4), .loword(MODEL_V2 + 23*4), .loword(MODEL_V2 + 23*4),  9 ; house_right_gable
 
@@ -229,11 +229,11 @@
     .word .loword(MODEL_V2 + 59*4), .loword(MODEL_V2 + 62*4), .loword(MODEL_V2 + 61*4), .loword(MODEL_V2 + 61*4),  1 ; tree3_br
 
     ; 5 Well faces
-    .word .loword(MODEL_V2 + 71*4), .loword(MODEL_V2 + 70*4), .loword(MODEL_V2 + 66*4), .loword(MODEL_V2 + 67*4), 12 ; well_water
-    .word .loword(MODEL_V2 + 67*4), .loword(MODEL_V2 + 66*4), .loword(MODEL_V2 + 65*4), .loword(MODEL_V2 + 64*4),  6 ; well_front
-    .word .loword(MODEL_V2 + 66*4), .loword(MODEL_V2 + 70*4), .loword(MODEL_V2 + 69*4), .loword(MODEL_V2 + 65*4), 13 ; well_right
-    .word .loword(MODEL_V2 + 70*4), .loword(MODEL_V2 + 71*4), .loword(MODEL_V2 + 68*4), .loword(MODEL_V2 + 69*4),  5 ; well_back
-    .word .loword(MODEL_V2 + 71*4), .loword(MODEL_V2 + 67*4), .loword(MODEL_V2 + 64*4), .loword(MODEL_V2 + 68*4),  6 ; well_left
+    .word .loword(MODEL_V2 + 71*4), .loword(MODEL_V2 + 70*4), .loword(MODEL_V2 + 66*4), .loword(MODEL_V2 + 67*4), $8002 ; well_water (TEXTURE_ID_WATER = 2)
+    .word .loword(MODEL_V2 + 67*4), .loword(MODEL_V2 + 66*4), .loword(MODEL_V2 + 65*4), .loword(MODEL_V2 + 64*4), $8005 ; well_front (stone, table_index = 5)
+    .word .loword(MODEL_V2 + 66*4), .loword(MODEL_V2 + 70*4), .loword(MODEL_V2 + 69*4), .loword(MODEL_V2 + 65*4), $8005 ; well_right (stone, table_index = 5)
+    .word .loword(MODEL_V2 + 70*4), .loword(MODEL_V2 + 71*4), .loword(MODEL_V2 + 68*4), .loword(MODEL_V2 + 69*4), $8005 ; well_back  (stone, table_index = 5)
+    .word .loword(MODEL_V2 + 71*4), .loword(MODEL_V2 + 67*4), .loword(MODEL_V2 + 64*4), .loword(MODEL_V2 + 68*4), $8005 ; well_left  (stone, table_index = 5)
 .endmac
 
 ; Backwards compatibility aliases

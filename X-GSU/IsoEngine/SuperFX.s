@@ -210,5 +210,10 @@ SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram;
                                 ; 1 = $702900
 
 FRAME_READY: .res 1
+.segment "GSUDATA"
+textures_binary:
+.export textures_binary
+    .incbin "Data/TEXTURES_graphics.bin"
+
 .segment "RODATA"
-   incbin  Palette,        "Data/superfx.palette.bin"
+   incbin  Palette,        "Data/TEXTURES_palette.bin"

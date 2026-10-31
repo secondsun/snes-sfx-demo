@@ -444,8 +444,68 @@ function plot_texel xPx, yPx, uTex, vTex, table_index
 
     ;r0 = texture rom_offset
     ;for the rest of this code we're assuming textures are 32x32
+    bpl @load_tex_from_ram
+    nop
+        with table_index
+        add #0
+        bne :+
+        nop
+            ibt r0, #0
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #8
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            ibt r0, #32
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #16
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #2080
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #24
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #2048
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #40
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #4096
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #3
+        romb
+        move r14, texture_base_address
+        getbl
+        inc r14
+        getbh
+        move texture_base_address, r0
+        ibt r0, #4
+        romb
+        move r0, texture_base_address
+        bra @tex_offset_ready
+        nop
+@load_tex_from_ram:
     to r0
     ldw (texture_base_address)
+@tex_offset_ready:
 
     ;texture offset = vTex * ATLAS_WIDTH + uTex
     ;vText = offset within texture
