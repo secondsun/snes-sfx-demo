@@ -2,8 +2,9 @@
 name: create-gsu-test
 description: >-
   Creates, configures, and executes automated SuperFX (GSU) unit tests using the
-  tests/test_template framework. Use whenever asked to create, write, or run a test
-  for SuperFX assembly code, GSU macros (e.g. rom_to_ram, stack macros), or math/decompression
+  tests/test_template framework. Use whenever authoring a new X-GSU function or macro
+  in snes-sfx-demo/X-GSU/, or when asked to create, write, or run a test for SuperFX
+  assembly code, GSU macros (e.g. rom_to_ram, stack macros), or math/rasterization/decompression
   routines.
 ---
 
