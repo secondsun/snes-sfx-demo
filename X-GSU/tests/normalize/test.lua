@@ -1,7 +1,7 @@
 test_setup = 0x0003
-test_stop  = 0x0028
-INPUT      = 0x0EDA
-OUTPUT      = 0x0EE0
+test_stop  = 0x0027
+INPUT      = 0x0ECE
+OUTPUT      = 0x0ED4
 vector_normalize_out = OUTPUT
 
 local input = {

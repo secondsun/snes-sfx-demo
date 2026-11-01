@@ -1,8 +1,8 @@
 -- test.lua - Mesen test script for Multi-Surface & Architectural Shape Archetypes (Ticket 6)
-test_setup = 0x2B6F
-test_stop  = 0x2FA5
-TEST_CASE_IDX = 0x3ACE
-TEST_RESULT   = 0x3AD0
+test_setup = 0x2BE5
+test_stop  = 0x301B
+TEST_CASE_IDX = 0x3B44
+TEST_RESULT   = 0x3B46
 
 local index = 1
 local fail_count = 0

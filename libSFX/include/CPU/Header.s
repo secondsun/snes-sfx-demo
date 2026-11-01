@@ -3,6 +3,16 @@
 
 .include "../libSFX.i"
 
+; Validate Cartridge Expansion RAM size against linker memory layout
+.if ROM_EXPRAMSIZE > 0
+    .import __SRAM_SIZE__
+    .if ROM_EXPRAMSIZE <= $05
+        .assert __SRAM_SIZE__ <= $8000, error, "ROM_EXPRAMSIZE is configured for 32KB (or less) Cartridge RAM, but SRAM memory layout in Map.cfg exceeds 32KB ($8000). Set ROM_EXPRAMSIZE = $06 (64KB) in libSFX.cfg to prevent hardware memory aliasing/wraparound at $708000+."
+    .elseif ROM_EXPRAMSIZE = $06
+        .assert __SRAM_SIZE__ <= $10000, error, "ROM_EXPRAMSIZE is configured for 64KB Cartridge RAM, but SRAM memory layout in Map.cfg exceeds 64KB ($10000)."
+    .endif
+.endif
+
 ;-------------------------------------------------------------------------------
 .segment "HEADER"
 ROM_HEADER:

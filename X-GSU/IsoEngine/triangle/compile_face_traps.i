@@ -1029,6 +1029,13 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     lmult               ; r7:r4_reg = dy1 * recip
     move r6, r4         ; r6 = t in Q0.16 (since r8 < r5, r7 is 0)
 
+    ; Check if t >= 0.5 (bit 15 set in Q0.16):
+    from r6
+    sub #0
+    bmi @general_split_m_high_t
+    nop
+
+    ; --- Case A: t < 0.5 (bit 15 == 0, signed fmult works directly) ---
     ; m_x = t0_x + fmult(t2_x - t0_x, t):
     frame_ptr compile_frame::t2_x, r7
     ldw (r7)
@@ -1077,6 +1084,62 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     fmult
     with r0
     add r2              ; m_v
+    frame_ptr compile_frame::m_v, r7
+    stw (r7)
+    iwt r13, #@split_m_done
+    jmp r13
+    nop
+
+@general_split_m_high_t:
+    ; --- Case B: t >= 0.5 (bit 15 == 1). Unsigned correction: fmult(delta, t) + delta ---
+    ; m_x = t0_x + fmult(delta_x, t) + delta_x = t2_x + fmult(delta_x, t):
+    frame_ptr compile_frame::t2_x, r7
+    ldw (r7)
+    move r1, r0
+    frame_ptr compile_frame::t0_x, r7
+    ldw (r7)
+    move r2, r0
+    from r1
+    sub r2              ; r0 = t2_x - t0_x
+    from r0
+    to r0
+    fmult               ; r0 = delta_x * t (negative due to bit 15)
+    with r0
+    add r1              ; r0 = m_x (t2_x + fmult)
+    frame_ptr compile_frame::m_x, r7
+    stw (r7)            ; frame.m_x = m_x
+
+    ; m_u = t2_u + fmult(t2_u - t0_u, t):
+    frame_ptr compile_frame::t2_u, r7
+    ldw (r7)
+    move r1, r0
+    frame_ptr compile_frame::t0_u, r7
+    ldw (r7)
+    move r2, r0
+    from r1
+    sub r2              ; delta_u
+    from r0
+    to r0
+    fmult
+    with r0
+    add r1              ; m_u
+    frame_ptr compile_frame::m_u, r7
+    stw (r7)
+
+    ; m_v = t2_v + fmult(t2_v - t0_v, t):
+    frame_ptr compile_frame::t2_v, r7
+    ldw (r7)
+    move r1, r0
+    frame_ptr compile_frame::t0_v, r7
+    ldw (r7)
+    move r2, r0
+    from r1
+    sub r2              ; delta_v
+    from r0
+    to r0
+    fmult
+    with r0
+    add r1              ; m_v
     frame_ptr compile_frame::m_v, r7
     stw (r7)
 

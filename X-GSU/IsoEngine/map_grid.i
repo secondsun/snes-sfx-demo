@@ -1881,6 +1881,22 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     ;    If cos_yaw >= 0: South face (C3 -> C2 -> SKIRT_C2 -> SKIRT_C3)
     ;    If cos_yaw < 0:  North face (C1 -> C0 -> SKIRT_C0 -> SKIRT_C1)
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)            ; r0 = cam_ptr
+    inc r0
+    inc r0
+    move r8, r0
+    to r11
+    ldw (r8)            ; r11 = sin_yaw
+    inc r8
+    inc r8
+    to r12
+    ldw (r8)            ; r12 = cos_yaw
+
+    iwt r7, #gsu_map_render_frame + 4
+    to r14
+    ldw (r7)            ; r14 = lattice_ptr
+
     iwt r7, #gsu_map_face_def
     inc r7
     inc r7
@@ -2018,6 +2034,22 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     ;    If sin_yaw >= 0: East face (C2 -> C1 -> SKIRT_C1 -> SKIRT_C2)
     ;    If sin_yaw < 0:  West face (C0 -> C3 -> SKIRT_C3 -> SKIRT_C0)
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)            ; r0 = cam_ptr
+    inc r0
+    inc r0
+    move r8, r0
+    to r11
+    ldw (r8)            ; r11 = sin_yaw
+    inc r8
+    inc r8
+    to r12
+    ldw (r8)            ; r12 = cos_yaw
+
+    iwt r7, #gsu_map_render_frame + 4
+    to r14
+    ldw (r7)            ; r14 = lattice_ptr
+
     iwt r7, #gsu_map_face_def
     inc r7
     inc r7

@@ -67,7 +67,20 @@ scene_initialized:
     iwt cam_ptr, #ISO_CAM
     call iso_camera_update_controls cam_ptr, tmp
 
-    ; Synchronize camera center_x / center_y to map origin_x / origin_z
+    ; Check if yaw is dirty; if dirty, compile archetypes
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt lat_ptr, #LATTICE_V2
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt yaw_ptr, #CACHED_YAW
+    call map_grid_compile_archetypes cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr
+
+    ; Compute centered origin_x / origin_z from camera focus (center_x, center_y):
+    ;   mid_i = cols / 2, mid_j = rows / 2
+    ;   offset_x = mid_i * Sx.x + mid_j * Sz.x
+    ;   offset_y = mid_i * Sx.y + mid_j * Sz.y
+    ;   origin_x = center_x - offset_x
+    ;   origin_z = center_y - offset_y
     iwt cam_ptr, #ISO_CAM
     from cam_ptr
     add #6
@@ -80,22 +93,59 @@ scene_initialized:
     move cy_val, r0     ; cy_val = center_y
 
     iwt map_ptr, #MAP_BUF
-    inc map_ptr
-    inc map_ptr
+    ldb (map_ptr)       ; r0 = cols
+    lsr
+    move r6, r0         ; mul_b = cols >> 1 (mid_i)
+
+    iwt basis_ptr, #ISO_BASIS
+    ldw (basis_ptr)     ; Sx.x
+    to r8
+    lmult
+    move yaw_ptr, r4    ; yaw_ptr = off_x = mid_i * Sx.x
+
+    inc basis_ptr
+    inc basis_ptr
+    ldw (basis_ptr)     ; Sx.y
+    to r8
+    lmult
+    move lat_ptr, r4    ; lat_ptr = off_y = mid_i * Sx.y
+
+    iwt map_ptr, #MAP_BUF + 1
+    ldb (map_ptr)       ; r0 = rows
+    lsr
+    move r6, r0         ; mul_b = rows >> 1 (mid_j)
+
+    inc basis_ptr
+    inc basis_ptr
+    ldw (basis_ptr)     ; Sz.x
+    to r8
+    lmult
+    with yaw_ptr
+    add r4              ; off_x += mid_j * Sz.x
+
+    inc basis_ptr
+    inc basis_ptr
+    ldw (basis_ptr)     ; Sz.y
+    to r8
+    lmult
+    with lat_ptr
+    add r4              ; off_y += mid_j * Sz.y
+
     from cx_val
-    stw (map_ptr)       ; origin_x = center_x
+    sub yaw_ptr
+    move cx_val, r0
+
+    from cy_val
+    sub lat_ptr
+    move cy_val, r0
+
+    iwt map_ptr, #MAP_BUF + 2
+    from cx_val
+    stw (map_ptr)       ; origin_x
     inc map_ptr
     inc map_ptr
     from cy_val
-    stw (map_ptr)       ; origin_z = center_y
-
-    ; Check if yaw is dirty; if dirty, compile archetypes
-    iwt cam_ptr, #ISO_CAM
-    iwt basis_ptr, #ISO_BASIS
-    iwt lat_ptr, #LATTICE_V2
-    iwt arch_ptr, #ARCH_TRAPS
-    iwt yaw_ptr, #CACHED_YAW
-    call map_grid_compile_archetypes cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr
+    stw (map_ptr)       ; origin_z
 
     ; Render Pass 0 (frame_half = 0)
     iwt map_ptr, #MAP_BUF

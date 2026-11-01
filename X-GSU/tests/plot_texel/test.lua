@@ -1,5 +1,5 @@
 -- test.lua for plot_texel test
-local test_stop = 0x0142
+local test_stop = 0x0138
 local idle_addr = 0x035B
 
 -- Synchronize test_stop and idle from Test.cpu.sym if available

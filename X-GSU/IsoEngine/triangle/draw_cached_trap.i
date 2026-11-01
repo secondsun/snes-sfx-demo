@@ -64,8 +64,12 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     inc trap_ptr
     ldw (trap_ptr)      ; r0 = line_count
 
-    ; If line_count == 0: early exit
+    ; If line_count <= 0: early exit
     beq @early_exit
+    nop
+    with r0
+    add #0
+    blt @early_exit
     nop
 
     ; Check if completely above screen: y_end <= 0
