@@ -69,6 +69,11 @@ emu.addMemoryCallback(
 > [!WARNING]
 > **1-Second Per-Callback Lua Timeout**: Mesen enforces a hard 1-second wall-clock timeout per Lua callback invocation (`Maximum execution time (1 seconds) exceeded`). Never register per-instruction execution callbacks (`0x0000..0xFFFF`) over long loops. Instead, hook a single terminal address (`test_stop`) or frame boundary (`emu.eventType.endFrame`).
 
+### PPU MMIO Register Write-Only Behavior
+- SNES PPU registers `$2100`–`$213F` (`INIDISP`, `BGMODE`, `BG1SC`, `TM`, etc.) are write-only hardware ports.
+- Calling `emu.read(0x2100, emu.memType.snesRegister)` or reading `$2100` in memory returns open bus (`$00`), which can mimic uninitialized PPU state.
+- To inspect or verify PPU configurations in test scripts, intercept writes using `emu.addMemoryCallback(..., emu.callbackType.write, 0x2100, 0x213F, ...)` or read the zero-page shadow variables maintained by `libSFX` (e.g., `SFX_inidisp` at `$002B`).
+
 ---
 
 ## 4. Frame Events & Headless Screenshot Capture

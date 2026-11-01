@@ -6,9 +6,15 @@ local ADDR_CENTER_X = 0x09EA
 local ADDR_CENTER_Y = 0x09EC
 
 -- Dynamically resolve symbols from SuperFX.cpu.sym if available
+local function get_script_dir()
+    local str = debug.getinfo(1, "S").source:sub(2)
+    return str:match("(.*/)") or "./"
+end
+
 local function load_symbols()
+    local script_dir = get_script_dir()
     local paths = {
-        "/Users/summerspittman/Projects/retro-superfx/snes-sfx-demo/X-GSU/IsoEngine/SuperFX.cpu.sym",
+        script_dir .. "SuperFX.cpu.sym",
         "SuperFX.cpu.sym",
         "snes-sfx-demo/X-GSU/IsoEngine/SuperFX.cpu.sym"
     }
@@ -71,6 +77,25 @@ local function onEndFrame()
         print("  [Init] Boot state validated (yaw=1, cx=128, cy=80).")
         -- Start Phase 1: Hold R for 12 frames
         current_inputs = { r = true }
+    end
+
+    -- Visual smoke check at frame 15: assert that at least one scanline buffer contains non-zero pixels
+    if frame_count == 15 then
+        local non_zero = 0
+        local start_addr = 0x4000
+        local buffer_len = 0x5000 -- scanline buffers: primary (0x2800) and secondary buffer
+        for addr = start_addr, start_addr + buffer_len - 1 do
+            if emu.read(addr, emu.memType.gsuWorkRam, false) ~= 0 then
+                non_zero = non_zero + 1
+            end
+        end
+        print(string.format("  [Visual Smoke Check] Frame 15 screenbuffer non-zero bytes: %d", non_zero))
+        if non_zero == 0 then
+            print("FAIL: Visual smoke check failed! Screen buffer is completely empty / unrendered at frame 15.")
+            emu.stop(1)
+            return
+        end
+        print("  [Visual Smoke Check] PASSED: Rendered scene detected in screenbuffer.")
     end
 
     -- Phase 1 check at frame 20: R was held
