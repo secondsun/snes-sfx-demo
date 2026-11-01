@@ -3897,29 +3897,6 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r0
     stw (r7)
 
-    ; 1. Floor Quad at y=0 (C0, C1, C2, C3, uv_mode=0, tex_id=0 [top_tex_id])
-    iwt r7, #gsu_map_render_frame + 4
-    ldw (r7)
-    move r1, r0         ; C0
-    inc r0
-    inc r0
-    inc r0
-    inc r0
-    move r2, r0         ; C1
-    inc r0
-    inc r0
-    inc r0
-    inc r0
-    move r3, r0         ; C2
-    inc r0
-    inc r0
-    inc r0
-    inc r0
-    move r4, r0         ; C3
-    iwt r5, #UV_MODE_HORIZONTAL
-    iwt r6, #0          ; top_tex_id
-    call map_compile_quad_face r1, r2, r3, r4, r5, r6
-
     ; 2. Camera-Facing NS Column Wall:
     ; P0 = lat + 80 (20*4), P1 = +84, P2 = +88, P3 = +92
     ; T0 = lat + 96 (24*4), T1 = +100, T2 = +104, T3 = +108
@@ -4213,29 +4190,6 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r0, #0
     from r0
     stw (r7)
-
-    ; 1. Floor Quad at y=0 (C0, C1, C2, C3, uv_mode=0, tex_id=0 [top_tex_id])
-    iwt r7, #gsu_map_render_frame + 4
-    ldw (r7)
-    move r1, r0         ; C0
-    inc r0
-    inc r0
-    inc r0
-    inc r0
-    move r2, r0         ; C1
-    inc r0
-    inc r0
-    inc r0
-    inc r0
-    move r3, r0         ; C2
-    inc r0
-    inc r0
-    inc r0
-    inc r0
-    move r4, r0         ; C3
-    iwt r5, #UV_MODE_HORIZONTAL
-    iwt r6, #0          ; top_tex_id
-    call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
     ; 2. Emit 4 fins in Yaw-Quadrant Back-to-Front order:
     ; (The 2 receding fins first, then the 2 camera-facing fins)
@@ -5958,6 +5912,139 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
 @skirt_ew_done:
 
     ; --------------------------------------------------------------------------
+    ; Step 1B: Flat Cell Floor (PRIM_FLAT, PRIM_PILLAR, PRIM_FOLIAGE_CROSS)
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + map_render_frame::archetype_id
+    ldw (r7)
+    iwt r1, #$001F
+    with r0
+    and r1              ; r0 = base archetype A
+    beq @stamp_step_1b_floor
+    nop
+    move r8, r0         ; preserve base archetype A in r8 for non-destructive comparisons
+    iwt r1, #PRIM_PILLAR
+    from r8
+    sub r1
+    beq @stamp_step_1b_floor
+    nop
+    iwt r1, #PRIM_FOLIAGE_CROSS
+    from r8
+    sub r1
+    beq @stamp_step_1b_floor
+    nop
+    iwt r13, #@step_1b_done
+    jmp r13
+    nop
+
+@stamp_step_1b_floor:
+    iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
+    ldw (r7)
+    move r2, r0         ; r2 = arch_traps_ptr
+    ldw (r2)
+    move r9, r0         ; r9 = flat_count
+    with r9
+    add #0
+    bne @flat_count_ok
+    nop
+    iwt r13, #@step_1b_done
+    jmp r13
+    nop
+@flat_count_ok:
+
+    ; Pointer to first cached_trap in flat_traps:
+    inc r2
+    inc r2
+    move r1, r2         ; r1 = arch_traps_ptr + flat_traps (+2)
+
+    ; u_offset = (i_cur * 32) << 8 = i_cur << 13:
+    iwt r7, #gsu_map_render_frame + map_render_frame::i_cur
+    ldw (r7)
+    swap                ; r0 = i_cur << 8
+    with r0
+    add r0              ; << 9
+    with r0
+    add r0              ; << 10
+    with r0
+    add r0              ; << 11
+    with r0
+    add r0              ; << 12
+    with r0
+    add r0              ; << 13
+    move r5, r0         ; r5 = u_offset in Q8.8
+
+    ; v_offset = (j_cur * 32) << ATLAS_STRIDE_SHIFT = j_cur << 11:
+    iwt r7, #gsu_map_render_frame + map_render_frame::j_cur
+    ldw (r7)
+    swap                ; r0 = j_cur << 8
+    with r0
+    add r0              ; << 9
+    with r0
+    add r0              ; << 10
+    with r0
+    add r0              ; << 11
+    move r6, r0         ; r6 = v_offset
+
+    ; Load cell top_tex_id:
+    iwt r7, #gsu_map_render_frame + map_render_frame::top_tex_id
+    to r11
+    ldw (r7)            ; r11 = top_tex_id
+
+    move r14, r9        ; r14 = trap counter
+@flat_trap_loop:
+    ; Set trap tex_id (+24) to top_tex_id
+    move r7, r1
+    iwt r2, #24
+    with r7
+    add r2
+    from r11
+    stw (r7)
+
+    gsu_stack_push r14
+    gsu_stack_push r1
+    gsu_stack_push r11
+    gsu_stack_push r9
+    gsu_stack_push r6
+    gsu_stack_push r5
+
+    iwt r7, #gsu_map_render_frame + map_render_frame::anchor_x
+    ldw (r7)
+    move r3, r0         ; anchor_x
+    inc r7
+    inc r7
+    ldw (r7)
+    move r4, r0         ; anchor_y
+
+    iwt r7, #gsu_map_render_frame + map_render_frame::frame_half
+    ldw (r7)
+    move r7, r0         ; frame_half
+
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    gsu_stack_pop r5
+    gsu_stack_pop r6
+    gsu_stack_pop r9
+    gsu_stack_pop r11
+    gsu_stack_pop r1
+    gsu_stack_pop r14
+
+    ; Restore template surface type (0) to trap (+24)
+    move r7, r1
+    iwt r2, #24
+    with r7
+    add r2
+    iwt r0, #0
+    stw (r7)
+
+    iwt r7, #.sizeof(cached_trap)
+    with r1
+    add r7
+    dec r14
+    bne @flat_trap_loop
+    nop
+
+@step_1b_done:
+
+    ; --------------------------------------------------------------------------
     ; Step 2: Back Edge Panels (receding edges in current yaw quadrant)
     ; --------------------------------------------------------------------------
     iwt r7, #gsu_map_render_frame + map_render_frame::panel_flags
@@ -5982,6 +6069,9 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     call map_stamp_edge_panel r1
 
 @check_back_ew:
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_flags
+    ldw (r7)
+    move r8, r0         ; reload panel_flags (clobbered by map_stamp_edge_panel)
     iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
     ldw (r7)
     with r0
@@ -6005,6 +6095,17 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     iwt r2, #$001F
     with r1
     and r2              ; r1 = A
+
+    ; If PRIM_FLAT (A == 0), skip Step 3 (already stamped in Step 1B before Step 2)
+    with r1
+    add #0
+    bne @step_3_not_flat
+    nop
+    iwt r13, #@step_4_unit_hook
+    jmp r13
+    nop
+@step_3_not_flat:
+
     with r1
     add r1
     with r1
@@ -6219,6 +6320,9 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     call map_stamp_edge_panel r1
 
 @check_front_ew:
+    iwt r7, #gsu_map_render_frame + map_render_frame::panel_flags
+    ldw (r7)
+    move r8, r0         ; reload panel_flags (clobbered by map_stamp_edge_panel)
     iwt r7, #gsu_map_render_frame + map_render_frame::front_ew_mask
     ldw (r7)
     with r0

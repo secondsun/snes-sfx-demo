@@ -1,8 +1,8 @@
 -- test.lua - Mesen test script for Face-to-Scanline Trapezoid Setup & Interpolation Core
 test_setup = 0x0007
 test_stop  = 0x05CD
-TEST_CASE_IDX = 0x1AE8
-TEST_RESULT   = 0x1AEA
+TEST_CASE_IDX = 0x1B4A
+TEST_RESULT   = 0x1B4C
 
 local index = 1
 local fail_count = 0
