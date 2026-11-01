@@ -1,7 +1,7 @@
 test_setup = 0x0003
 test_stop  = 0x0020
-INPUT      = 0x0EC8
-OUTPUT     = 0x0ECC
+INPUT      = 0x0EBC
+OUTPUT     = 0x0EC0
 
 -- Test 400 (0x00000190), expected sqrt = 20 (0x0014)
 local input_high = 0x0000

@@ -476,6 +476,19 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     ;   r8  = v_mask_shifted
     ;   r9  = rom_offset
     ; --------------------------------------------------------------------------
+    ; Check lines_left for sliver trapezoids (< 3 scanlines): skip cache
+    from r10
+    to r1
+    sub #11
+    with r1
+    sub #11             ; r1 = frame_base
+    ldw (r1)            ; r0 = lines_left
+    from r0
+    sub #3
+    blt scanline_loop
+    nop
+
+    .align 16, $01
     cache
 scanline_loop:
     from r10

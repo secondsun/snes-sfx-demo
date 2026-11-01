@@ -97,6 +97,7 @@ function draw_triangle points, col
         if_gte xMin, r0, { return }
         nop
         ;cache the loop
+        .align 16, $01
         startCache:
         backuploop
         cache
@@ -533,11 +534,101 @@ endfunction
 ; Clobbers: All
 function draw_textured_triangle points, table_index
     register curr_y = r2, u_val = r4, f_reg = r6
-    register xMin, xMax, v0_ptr, v1_ptr, dy
+    register xMin = r7, xMax = r8, v0_ptr = r9, v1_ptr = r11, dy = r3
+    register points = r5
+
+    iwt r0, #TEX_TRI_POINTS_PTR
+    from points
+    stw (r0)
 
     iwt r0, #TEX_TRI_TBL_IDX
     from table_index
     stw (r0)
+
+    ; Hoist invariant texture setup outside the horizontal X loop:
+    ; texture table entry address = TEXTURE_TABLE + table_index * 8
+    iwt r0, #(.loword(TEXTURE_TABLE))
+    to r1
+    move r1, table_index
+    with r1
+    mult #8
+    with r1
+    add r0              ; r1 = TEXTURE_TABLE + (table_index * 8)
+
+    bpl @load_tex_ram
+    nop
+        with table_index
+        add #0
+        bne :+
+        nop
+            iwt r0, #0
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #8
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #32
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #16
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #2080
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #24
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #2048
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #40
+        from table_index
+        cmp r0
+        bne :+
+        nop
+            iwt r0, #4096
+            bra @tex_offset_ready
+            nop
+        :
+        ibt r0, #3
+        romb
+        move r14, r1
+        getbl
+        inc r14
+        getbh
+        move r1, r0
+        ibt r0, #4
+        romb
+        move r0, r1
+        bra @tex_offset_ready
+        nop
+@load_tex_ram:
+    ldw (r1)
+@tex_offset_ready:
+    iwt r1, #TEX_TRI_ROM_OFFSET
+    stw (r1)
+
+    iwt r0, #31
+    iwt r1, #TEX_TRI_U_MASK
+    stw (r1)
+
+    iwt r0, #(31 << 6)
+    iwt r1, #TEX_TRI_V_MASK_SHIFTED
+    stw (r1)
+
+    ibt r0, #4
+    romb
 
     ; yPoints[0] is at points + 2
     from points
@@ -618,6 +709,9 @@ function draw_textured_triangle points, table_index
     sub v0_ptr
 
 yLoop:
+    iwt r0, #TEX_TRI_POINTS_PTR
+    to points
+    ldw (r0)
     iwt xMin, #$0FFF
     iwt xMax, #$F000
     ibt dy, #0
@@ -1025,11 +1119,12 @@ plotXLoop:
 :
     ; Precompute 1 / dx in Q0.15 for the scanline and restore ROM bank 4
     from xMax
-    sub xMin
-    reciprocal_lookup_rom r0, f_reg
-    ibt dy, #1
-    from r0
-    cmp dy
+    sub xMin            ; r0 = dx
+    move r5, r0         ; r5 = dx
+    reciprocal_lookup_rom r5, f_reg
+    ibt r0, #1
+    from r5
+    cmp r0
     beq :+
     nop
         dec f_reg
@@ -1042,64 +1137,132 @@ plotXLoop:
     ibt r0, #4
     romb
 
-xLoop:
-    iwt r0, #TEX_TRI_RECIP_DX
-    to f_reg
+    ; Compute du_dx (Q8.8):
+    iwt r0, #TEX_TRI_MIN_U
     ldw (r0)
+    to r3
+    move r3, r0         ; r3 = minU
+    iwt r0, #TEX_TRI_MAX_U
+    ldw (r0)            ; r0 = maxU
+    with r0
+    sub r3              ; r0 = delta_u = maxU - minU
+    add r0              ; r0 = 2 * delta_u
+    fmult               ; r0 = ((2 * delta_u) * f_reg) >> 16
+    to r5
+    move r5, r0         ; r5 = du_dx (Q8.8)
+
+    ; Compute dv_dx (Q10.6):
+    iwt r0, #TEX_TRI_MIN_V
+    ldw (r0)
+    to r4
+    move r4, r0         ; r4 = minV
+    iwt r0, #TEX_TRI_MAX_V
+    ldw (r0)            ; r0 = maxV
+    with r0
+    sub r4              ; r0 = delta_v = maxV - minV
+    add r0              ; r0 = 2 * delta_v
+    fmult               ; r0 = dv_dx in Q8.8
+    with r0
+    asr
+    with r0
+    asr                 ; r0 = dv_dx in Q10.6
+    to r6
+    move r6, r0         ; r6 = dv_dx (Q10.6)
+
+    ; Initial u_cur = minU (already in r3!), v_cur = minV >> 2
+    from r4
+    asr
+    asr
+    to r4
+    move r4, r0         ; r4 = v_cur (Q10.6)
+
+    backuploop
+
+    ; Left clipping against screen edge (startX > xMin)
     from v0_ptr
     sub xMin
-    lmult
-    move f_reg, u_val
-
-    ; u = minU + (((maxU - minU) * f) >> 8)
-    iwt r0, #TEX_TRI_MIN_U
-    to u_val
-    ldw (r0)
-    iwt r0, #TEX_TRI_MAX_U
-    to dy
-    ldw (r0)
-    from dy
-    sub u_val
-    add r0
-    fmult
-    with u_val
-    add r0
-
-    ; v = minV + (((maxV - minV) * f) >> 8)
-    iwt r0, #TEX_TRI_MIN_V
-    to dy
-    ldw (r0)
-    iwt r0, #TEX_TRI_MAX_V
-    ldw (r0)
-    sub dy
-    add r0
-    fmult
-    to f_reg
-    add dy
-
-    ; tu = (u >> 8) & 31
-    with u_val
-    hib
-    ibt r0, #31
-    to u_val
-    and u_val
-
-    ; tv = (v >> 8) & 31
-    with f_reg
-    hib
-    to f_reg
-    and f_reg
-
-    iwt r0, #TEX_TRI_TBL_IDX
-    to dy
-    ldw (r0)
-    call plot_texel v0_ptr, curr_y, u_val, f_reg, dy
-
-    inc v0_ptr
-    from v1_ptr
-    cmp v0_ptr
-    bge xLoop
+    beq @no_clip_left
     nop
+    to r12
+    move r12, r0        ; r12 = clip_left
+    iwt r13, #@clip_u_loop
+@clip_u_loop:
+    with r3
+    add r5              ; u_cur += du_dx
+    with r4
+    add r6              ; v_cur += dv_dx
+    loop
+    nop
+@no_clip_left:
+
+    ; pixel_count = endX - startX + 1
+    from v1_ptr
+    sub v0_ptr
+    inc r0
+    to r12
+    move r12, r0        ; r12 = pixel_count
+
+    ; R1 = startX (plot_x)
+    to r1
+    move r1, v0_ptr
+
+    ; Load texture masks and offset
+    iwt r0, #TEX_TRI_U_MASK
+    ldw (r0)
+    to r7
+    move r7, r0
+
+    iwt r0, #TEX_TRI_V_MASK_SHIFTED
+    ldw (r0)
+    to r8
+    move r8, r0
+
+    iwt r0, #TEX_TRI_ROM_OFFSET
+    ldw (r0)
+    to r9
+    move r9, r0
+
+    ; Prime R14 with first texel ROM address:
+    from r3
+    to r11
+    hib                 ; r11 = u_cur >> 8
+    with r11
+    and r7              ; r11 = u_int & u_mask
+    from r4
+    to r0
+    and r8              ; r0 = v_cur & v_mask_shifted
+    with r11
+    add r0              ; r11 = col + row
+    with r11
+    add r9              ; r11 = col + row + rom_offset
+    to r14
+    move r14, r11       ; Prime R14
+
+    iwt r13, #@pixel_loop
+@pixel_loop:
+    getc                ; Color = RomBuf
+    plot                ; Plot Color at (R1, R2); R1 = R1 + 1
+    with r3
+    add r5              ; u_cur += du_dx
+    with r4
+    add r6              ; v_cur += dv_dx
+    from r3
+    to r11
+    hib
+    with r11
+    and r7
+    from r4
+    to r0
+    and r8
+    with r11
+    add r0
+    with r11
+    add r9
+    to r14
+    move r14, r11       ; R14 = next texel address
+    loop
+    nop
+    restoreloop
     bra nextY
     nop
 
@@ -1116,30 +1279,61 @@ singlePixelSpan:
     bge nextY
     nop
 
-    iwt r0, #TEX_TRI_MIN_U
-    to u_val
-    ldw (r0)
-    with u_val
-    hib
-    ibt r0, #31
-    to u_val
-    and u_val
-
-    iwt r0, #TEX_TRI_MIN_V
-    to f_reg
-    ldw (r0)
-    with f_reg
-    hib
-    to f_reg
-    and f_reg
+    ; Set R1 = xMin
+    to r1
+    move r1, xMin
 
     ibt r0, #4
     romb
 
-    iwt r0, #TEX_TRI_TBL_IDX
-    to dy
+    iwt r0, #TEX_TRI_MIN_U
     ldw (r0)
-    call plot_texel xMin, curr_y, u_val, f_reg, dy
+    to r3
+    move r3, r0         ; r3 = u_cur
+
+    iwt r0, #TEX_TRI_MIN_V
+    ldw (r0)
+    with r0
+    asr
+    with r0
+    asr
+    to r4
+    move r4, r0         ; r4 = v_cur
+
+    iwt r0, #TEX_TRI_U_MASK
+    ldw (r0)
+    to r7
+    move r7, r0
+
+    iwt r0, #TEX_TRI_V_MASK_SHIFTED
+    ldw (r0)
+    to r8
+    move r8, r0
+
+    iwt r0, #TEX_TRI_ROM_OFFSET
+    ldw (r0)
+    to r9
+    move r9, r0
+
+    ; Prime R14 and plot single texel:
+    from r3
+    to r11
+    hib
+    with r11
+    and r7
+    from r4
+    to r0
+    and r8
+    with r11
+    add r0
+    with r11
+    add r9
+    to r14
+    move r14, r11
+    getc
+    plot
+    bra nextY
+    nop
 
 nextY:
     loop
@@ -1150,6 +1344,8 @@ nextY:
 endfunction
 
 .segment "GSURAM"
+TEX_TRI_POINTS_PTR:
+    .res 2
 TEX_TRI_MIN_U:
     .res 2
 TEX_TRI_MAX_U:
@@ -1161,6 +1357,12 @@ TEX_TRI_MAX_V:
 TEX_TRI_RECIP_DX:
     .res 2
 TEX_TRI_TBL_IDX:
+    .res 2
+TEX_TRI_ROM_OFFSET:
+    .res 2
+TEX_TRI_U_MASK:
+    .res 2
+TEX_TRI_V_MASK_SHIFTED:
     .res 2
 
 .segment "GSUCODE"

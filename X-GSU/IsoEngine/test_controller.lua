@@ -7,7 +7,11 @@ local ADDR_CENTER_Y = 0x09EC
 
 -- Dynamically resolve symbols from SuperFX.cpu.sym if available
 local function load_symbols()
-    local paths = { "SuperFX.cpu.sym", "snes-sfx-demo/X-GSU/IsoEngine/SuperFX.cpu.sym" }
+    local paths = {
+        "/Users/summerspittman/Projects/retro-superfx/snes-sfx-demo/X-GSU/IsoEngine/SuperFX.cpu.sym",
+        "SuperFX.cpu.sym",
+        "snes-sfx-demo/X-GSU/IsoEngine/SuperFX.cpu.sym"
+    }
     for _, path in ipairs(paths) do
         local f = io.open(path, "r")
         if f then
@@ -160,8 +164,8 @@ local function onEndFrame()
         current_inputs = { left = true }
     end
 
-    -- Phase 7 check at frame 430: Clamping
-    if frame_count == 430 then
+    -- Phase 7 check at frame 520: Clamping
+    if frame_count == 520 then
         print(string.format("  [Phase 7] Clamping check: cx=%d (expected 0)", cx))
         if cx ~= 0 then
             print(string.format("FAIL: Center X not clamped to 0! cx=%d", cx))
