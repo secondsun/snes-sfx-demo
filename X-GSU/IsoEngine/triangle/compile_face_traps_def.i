@@ -105,6 +105,11 @@ UV_MODE_SLOPE           = 3         ; Mode 3: Sloped faces (wedges, ramps, roofs
     sort_ret_flag  .word ; +86: 0 = mode_123, 1 = process_triangle
     split_ret_flag .word ; +88: 0 = mode_123, 1 = process_triangle
     half_index     .word ; +90: 0 = top half, 1 = bottom half
+
+    ; Sub-pixel split point: M.x in Q8.8 so the long edge T0-T2 continues
+    ; seamlessly from the top half into the bottom half (and matches the same
+    ; edge emitted by a neighboring triangle).
+    m_xq           .word ; +92
 .endstruct
 
 .segment "GSURAM"
@@ -114,6 +119,14 @@ gsu_compile_frame: .res .sizeof(compile_frame)
 ; Helper macro: puts address of (gsu_compile_frame + off) into dest register
 .macro frame_ptr off, dest
     iwt dest, #gsu_compile_frame + off
+.endmacro
+
+; Helper macro: r0 = r0 << 8 (integer pixel -> Q8.8) for |r0| < 128.
+; Clobbers: r4
+.macro cft_to_q88
+    swap
+    iwt r4, #$FF00
+    and r4
 .endmacro
 
 .endif ; ::__COMPILE_FACE_TRAPS_DEF_DEFINED__

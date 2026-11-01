@@ -9,6 +9,14 @@
 ;   - Foliage clusters (PRIM_FOLIAGE_CROSS)
 ;   - Multi-story cliff drops (drop_ns, drop_ew)
 ;   - Perimeter battlements & parapets (PANEL_N, PANEL_S, PANEL_W, PANEL_E, PANEL_TALL_2H)
+;
+; Pool basin: liquid archetypes have no side walls, so every water surface must be
+; flush with all of its neighbors. The basin is raised to the terrace height (2h):
+; sand shore at h=2, shallow beds at h=1 (+1h surface = 2h), deep bed at h=0
+; (+2h surface = 2h).
+;
+; Cell skirts are derived at render time from neighbor base_height on the
+; camera-facing faces (see map_grid_render); drop_ns / drop_ew are not read.
 ; ==============================================================================
 .ifndef ::__SHOWCASE_MAP_I_DEFINED__
 ::__SHOWCASE_MAP_I_DEFINED__ = 1
@@ -32,19 +40,19 @@ SHOWCASE_MAP_ROM:
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (0,0) Lawn
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (1,0) Lawn
     def_cell 0, PRIM_FOLIAGE_CROSS,        TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, TEXTURE_ID_FOLIAGE, PANEL_NONE,            0, 0 ; (2,0) Foliage
-    def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (3,0) Lawn
-    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_N | PANEL_W),  2, 2 ; (4,0) Terrace N+W
-    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_N,              2, 0 ; (5,0) Terrace N
-    def_cell 2, PRIM_PILLAR,               TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_N,              2, 0 ; (6,0) Pillar N
-    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_N | PANEL_E),  2, 0 ; (7,0) Terrace N+E
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,0) Sand shore
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_N | PANEL_W),  0, 2 ; (4,0) Terrace N+W
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_N,              0, 0 ; (5,0) Terrace N
+    def_cell 2, PRIM_PILLAR,               TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_N,              0, 0 ; (6,0) Pillar N
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_N | PANEL_E),  0, 0 ; (7,0) Terrace N+E
 
     ; --------------------------------------------------------------------------
     ; Row 1 (j = 1): Shallow pool, sand shore, foliage, terrace courtyard
     ; --------------------------------------------------------------------------
     def_cell 0, PRIM_FOLIAGE_CROSS,        TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, TEXTURE_ID_FOLIAGE, PANEL_NONE,            0, 0 ; (0,1) Foliage
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (1,1) Lawn
-    def_cell 0, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (2,1) Sand shore
-    def_cell 0, PRIM_LIQUID_SHALLOW,       TEXTURE_ID_WATER, TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,1) Shallow water
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (2,1) Sand shore
+    def_cell 1, PRIM_LIQUID_SHALLOW,       TEXTURE_ID_WATER, TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,1) Shallow water (bed 1h, surface 2h)
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_W,              0, 2 ; (4,1) Terrace W
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (5,1) Courtyard
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (6,1) Courtyard
@@ -54,9 +62,9 @@ SHOWCASE_MAP_ROM:
     ; Row 2 (j = 2): Deep & shallow pool, sand shore, tall 2H facade, ruined pillar
     ; --------------------------------------------------------------------------
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (0,2) Lawn
-    def_cell 0, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (1,2) Sand shore
-    def_cell 0, PRIM_LIQUID_DEEP,          TEXTURE_ID_WATER_DEEP, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (2,2) Deep water
-    def_cell 0, PRIM_LIQUID_SHALLOW,       TEXTURE_ID_WATER, TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,2) Shallow water
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (1,2) Sand shore
+    def_cell 0, PRIM_LIQUID_DEEP,          TEXTURE_ID_WATER_DEEP, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (2,2) Deep water (bed 0h, surface 2h)
+    def_cell 1, PRIM_LIQUID_SHALLOW,       TEXTURE_ID_WATER, TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,2) Shallow water (bed 1h, surface 2h)
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_W | PANEL_TALL_2H), 0, 2 ; (4,2) Tall 2H facade W
     def_cell 2, PRIM_PILLAR,               TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (5,2) Ruined pillar
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (6,2) Courtyard
@@ -66,11 +74,11 @@ SHOWCASE_MAP_ROM:
     ; Row 3 (j = 3): Pillar in lawn, shallow pool shore, south terrace battlements
     ; --------------------------------------------------------------------------
     def_cell 0, PRIM_PILLAR,               TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (0,3) Ruined pillar
-    def_cell 0, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (1,3) Sand shore
-    def_cell 0, PRIM_LIQUID_SHALLOW,       TEXTURE_ID_WATER, TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (2,3) Shallow pool
-    def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (3,3) Lawn
-    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_S | PANEL_W),  0, 2 ; (4,3) Terrace S+W
-    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_S,              0, 0 ; (5,3) Terrace S
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (1,3) Sand shore
+    def_cell 1, PRIM_LIQUID_SHALLOW,       TEXTURE_ID_WATER, TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (2,3) Shallow pool (bed 1h, surface 2h)
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,3) Sand shore
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_S | PANEL_W),  2, 2 ; (4,3) Terrace S+W
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_S,              1, 0 ; (5,3) Terrace S
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (6,3) Terrace
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_S | PANEL_E),  0, 0 ; (7,3) Terrace S+E
 
@@ -79,7 +87,7 @@ SHOWCASE_MAP_ROM:
     ; --------------------------------------------------------------------------
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (0,4) Lawn
     def_cell 0, PRIM_FOLIAGE_CROSS,        TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, TEXTURE_ID_FOLIAGE, PANEL_NONE,            0, 0 ; (1,4) Foliage
-    def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (2,4) Lawn
+    def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (2,4) Sand shore
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (3,4) Lawn
     def_cell 0, (PRIM_STAIRS | ROT_0),     TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_NONE,            0, 0 ; (4,4) Ceremonial stairs
     def_cell 1, (PRIM_WEDGE_STRAIGHT | ROT_0), TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,             PANEL_NONE,            1, 0 ; (5,4) Straight ramp

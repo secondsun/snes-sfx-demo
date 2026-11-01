@@ -159,6 +159,15 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
     front_ew_mask   .word ; +168: PANEL_E or PANEL_W
     front_ew_edge   .word ; +170: 1 or 3
     panel_lut       .res 8 * 2 ; +172..+187: offsets in arch_traps_ptr for the 8 panel templates
+    sx_x_q5         .word ; +188
+    sx_y_q5         .word ; +190
+    sz_x_q5         .word ; +192
+    sz_y_q5         .word ; +194
+    origin_x_q5     .word ; +196
+    origin_z_q5     .word ; +198
+    quad_table      .res 64 ; +200..+263: active quadrant cell index sequence
+    is_8x8          .word ; +264: 1 if cols==8 and rows==8, else 0
+    cell_idx        .word ; +266: current cell index in 8x8 mode (0..63)
 .endstruct
 
 .segment "GSURAM"
@@ -1525,6 +1534,53 @@ function compile_edge_panels
 endfunction
 
 ; ==============================================================================
+; mg_cover_round src, kind, neg
+; Converts a Q2.14 trig value to a template basis component rounded AWAY from
+; zero (ceil of magnitude) and stores it at (r3), then advances r3 by 2.
+;   kind = 1: value = src / 2^9  (32 * trig)
+;   kind = 2: value = src / 2^10 (16 * trig)
+;   neg  = 1: store the negated result
+; Clobbers: r0, r4
+; ==============================================================================
+.macro mg_cover_round src, kind, neg
+    from src
+    add #0
+    bpl :+
+    nop
+    ; negative: -ceil(-src / 2^k)
+    not
+    inc r0
+    iwt r4, #((1 << (8 + kind)) - 1)
+    add r4
+    hib
+    lsr
+  .if kind = 2
+    lsr
+  .endif
+    not
+    inc r0
+    bra :++
+    nop
+:
+    ; non-negative: ceil(src / 2^k)
+    iwt r4, #((1 << (8 + kind)) - 1)
+    add r4
+    hib
+    lsr
+  .if kind = 2
+    lsr
+  .endif
+:
+  .if neg
+    not
+    inc r0
+  .endif
+    stw (r3)
+    inc r3
+    inc r3
+.endmacro
+
+; ==============================================================================
 ; map_grid_compile_archetypes
 ; Compares cam_ptr->yaw with cached_yaw_ptr.
 ; When unchanged: returns 0 immediately (zero compilation cycles).
@@ -1578,6 +1634,33 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
 
     ; Compute basis vectors (Sx, Sz, Sy) into basis_ptr
     call iso_compute_basis r6, r2
+
+    ; --------------------------------------------------------------------------
+    ; Re-round the template basis away from zero (ceil of magnitude).
+    ;   map_grid_render places cell anchors at round(exact position) (Q11.5), so
+    ;   the spacing between neighboring anchors is floor(a) or ceil(a) of the
+    ;   exact step a. A template edge of round(a) can be 1px shorter than the
+    ;   spacing and leave a crack; ceil(|a|) is never shorter, so neighbors
+    ;   overlap by < 1px instead and painter's order resolves the overlap.
+    ;     Sx = ( cm(32 cos), cm(16 sin) ),  Sz = ( -cm(32 sin), cm(16 cos) )
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame
+    ldw (r7)            ; r0 = cam_ptr
+    add #2
+    move r8, r0
+    to r1
+    ldw (r8)            ; r1 = sin_yaw (Q2.14)
+    inc r8
+    inc r8
+    to r2
+    ldw (r8)            ; r2 = cos_yaw (Q2.14)
+    iwt r7, #gsu_map_render_frame + 2
+    to r3
+    ldw (r7)            ; r3 = basis_ptr
+    mg_cover_round r2, 1, 0   ; Sx.x = cm(cos >> 9)
+    mg_cover_round r1, 2, 0   ; Sx.y = cm(sin >> 10)
+    mg_cover_round r1, 1, 1   ; Sz.x = -cm(sin >> 9)
+    mg_cover_round r2, 2, 0   ; Sz.y = cm(cos >> 10)
 
     ; Populate 28-point canonical lattice into lattice_ptr
     iwt r7, #gsu_map_render_frame
@@ -2561,30 +2644,32 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r6, #1          ; skirt_tex
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
-    ; Face 3: Left cheek tri: E1_0, B_0, B_3
+    ; Face 3: Left (west-side) cheek tri: E1_0, B_3, B_0
+    ;   Wound like every other vertical face (top-near, bottom-far, bottom-near)
+    ;   so it survives backface culling when it faces the camera.
     iwt r7, #gsu_map_render_frame + 108
     ldw (r7)
     move r1, r0         ; E1_0
-    iwt r7, #gsu_map_render_frame + 100
-    ldw (r7)
-    move r2, r0         ; B_0
     iwt r7, #gsu_map_render_frame + 106
     ldw (r7)
-    move r3, r0         ; B_3
+    move r2, r0         ; B_3
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0         ; B_0
     iwt r4, #UV_MODE_WALL_EW
     iwt r5, #1          ; skirt_tex
     call map_compile_tri_face r1, r2, r3, r4, r5
 
-    ; Face 4: Right cheek tri: E1_1, B_2, B_1
+    ; Face 4: Right (east-side) cheek tri: E1_1, B_1, B_2 (same winding as other walls)
     iwt r7, #gsu_map_render_frame + 110
     ldw (r7)
     move r1, r0         ; E1_1
-    iwt r7, #gsu_map_render_frame + 104
-    ldw (r7)
-    move r2, r0         ; B_2
     iwt r7, #gsu_map_render_frame + 102
     ldw (r7)
-    move r3, r0         ; B_1
+    move r2, r0         ; B_1
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0         ; B_2
     iwt r4, #UV_MODE_WALL_EW
     iwt r5, #1          ; skirt_tex
     call map_compile_tri_face r1, r2, r3, r4, r5
@@ -2684,28 +2769,30 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r6, #1
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
-    ; Left cheek tri: E2_0, B_0, B_3
+    ; Left (west-side) cheek tri: E2_0, B_3, B_0
+    ;   Wound like every other vertical face (top-near, bottom-far, bottom-near)
+    ;   so it survives backface culling when it faces the camera.
     iwt r7, #gsu_map_render_frame + 116
     ldw (r7)
-    move r1, r0
-    iwt r7, #gsu_map_render_frame + 100
-    ldw (r7)
-    move r2, r0
+    move r1, r0         ; E2_0
     iwt r7, #gsu_map_render_frame + 106
     ldw (r7)
-    move r3, r0
+    move r2, r0         ; B_3
+    iwt r7, #gsu_map_render_frame + 100
+    ldw (r7)
+    move r3, r0         ; B_0
     iwt r4, #UV_MODE_WALL_EW
     iwt r5, #1
     call map_compile_tri_face r1, r2, r3, r4, r5
 
-    ; Right cheek tri: E2_1, B_2, B_1
+    ; Right (east-side) cheek tri: E2_1, B_1, B_2 (same winding as other walls)
     iwt r7, #gsu_map_render_frame + 118
     ldw (r7)
     move r1, r0
-    iwt r7, #gsu_map_render_frame + 104
+    iwt r7, #gsu_map_render_frame + 102
     ldw (r7)
     move r2, r0
-    iwt r7, #gsu_map_render_frame + 102
+    iwt r7, #gsu_map_render_frame + 104
     ldw (r7)
     move r3, r0
     iwt r4, #UV_MODE_WALL_EW
@@ -3064,6 +3151,34 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r6, #1
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
+    ; Low-side cheek (south face, corner 3 high -> corner 2 low): E1_3, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 114
+    ldw (r7)
+    move r1, r0         ; E1_3
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0         ; B_2
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0         ; B_3
+    iwt r4, #UV_MODE_WALL_NS
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Low-side cheek (east face, corner 1 high -> corner 2 low): E1_1, B_1, B_2
+    iwt r7, #gsu_map_render_frame + 110
+    ldw (r7)
+    move r1, r0         ; E1_1
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r2, r0         ; B_1
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0         ; B_2
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
     ; Store trap count
     iwt r7, #gsu_map_render_frame + 66
     ldw (r7)
@@ -3185,6 +3300,34 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r5, #UV_MODE_WALL_EW
     iwt r6, #1
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
+
+    ; Low-side cheek (south face, corner 3 high -> corner 2 low): E2_3, B_2, B_3
+    iwt r7, #gsu_map_render_frame + 122
+    ldw (r7)
+    move r1, r0         ; E2_3
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r2, r0         ; B_2
+    iwt r7, #gsu_map_render_frame + 106
+    ldw (r7)
+    move r3, r0         ; B_3
+    iwt r4, #UV_MODE_WALL_NS
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
+
+    ; Low-side cheek (east face, corner 1 high -> corner 2 low): E2_1, B_1, B_2
+    iwt r7, #gsu_map_render_frame + 118
+    ldw (r7)
+    move r1, r0         ; E2_1
+    iwt r7, #gsu_map_render_frame + 102
+    ldw (r7)
+    move r2, r0         ; B_1
+    iwt r7, #gsu_map_render_frame + 104
+    ldw (r7)
+    move r3, r0         ; B_2
+    iwt r4, #UV_MODE_WALL_EW
+    iwt r5, #1
+    call map_compile_tri_face r1, r2, r3, r4, r5
 
     ; Store trap count
     iwt r7, #gsu_map_render_frame + 66
@@ -3335,19 +3478,23 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r6, #1
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
-    ; West Cheek Lower Tri: M1_W, B_3, MB_W
+    ; West Cheek Lower Quad: M1_W, E1_3, B_3, MB_W
+    ;   (full rectangle under the lower tread; a triangle left half of it open)
     iwt r7, #gsu_map_render_frame + 128
     ldw (r7)
-    move r1, r0
+    move r1, r0         ; M1_W
+    iwt r7, #gsu_map_render_frame + 114
+    ldw (r7)
+    move r2, r0         ; E1_3
     iwt r7, #gsu_map_render_frame + 106
     ldw (r7)
-    move r2, r0
+    move r3, r0         ; B_3
     iwt r7, #gsu_map_render_frame + 124
     ldw (r7)
-    move r3, r0
-    iwt r4, #UV_MODE_WALL_EW
-    iwt r5, #1
-    call map_compile_tri_face r1, r2, r3, r4, r5
+    move r4, r0         ; MB_W
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
     ; West Cheek Upper Quad: E2_0, M2_W, MB_W, B_0
     iwt r7, #gsu_map_render_frame + 116
@@ -3366,19 +3513,22 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     iwt r6, #1
     call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
-    ; East Cheek Lower Tri: M1_E, MB_E, B_2
+    ; East Cheek Lower Quad: E1_2, M1_E, MB_E, B_2
+    iwt r7, #gsu_map_render_frame + 112
+    ldw (r7)
+    move r1, r0         ; E1_2
     iwt r7, #gsu_map_render_frame + 130
     ldw (r7)
-    move r1, r0
+    move r2, r0         ; M1_E
     iwt r7, #gsu_map_render_frame + 126
     ldw (r7)
-    move r2, r0
+    move r3, r0         ; MB_E
     iwt r7, #gsu_map_render_frame + 104
     ldw (r7)
-    move r3, r0
-    iwt r4, #UV_MODE_WALL_EW
-    iwt r5, #1
-    call map_compile_tri_face r1, r2, r3, r4, r5
+    move r4, r0         ; B_2
+    iwt r5, #UV_MODE_WALL_EW
+    iwt r6, #1
+    call map_compile_quad_face r1, r2, r3, r4, r5, r6
 
     ; East Cheek Upper Quad: E2_1, B_1, MB_E, M2_E
     iwt r7, #gsu_map_render_frame + 118
@@ -4343,6 +4493,50 @@ function map_stamp_edge_panel edge_idx
     return
 endfunction
 
+.segment "GSUDATA"
+
+; 256-byte quadrant diagonal index tables (each entry is (j << 3) | i)
+.export map_quadrant_tables
+map_quadrant_tables:
+    ; Q0: cos >= 0, sin >= 0
+    .byte $00, $08, $01, $10, $09, $02, $18, $11
+    .byte $0A, $03, $20, $19, $12, $0B, $04, $28
+    .byte $21, $1A, $13, $0C, $05, $30, $29, $22
+    .byte $1B, $14, $0D, $06, $38, $31, $2A, $23
+    .byte $1C, $15, $0E, $07, $39, $32, $2B, $24
+    .byte $1D, $16, $0F, $3A, $33, $2C, $25, $1E
+    .byte $17, $3B, $34, $2D, $26, $1F, $3C, $35
+    .byte $2E, $27, $3D, $36, $2F, $3E, $37, $3F
+    ; Q1: cos >= 0, sin < 0
+    .byte $07, $0F, $06, $17, $0E, $05, $1F, $16
+    .byte $0D, $04, $27, $1E, $15, $0C, $03, $2F
+    .byte $26, $1D, $14, $0B, $02, $37, $2E, $25
+    .byte $1C, $13, $0A, $01, $3F, $36, $2D, $24
+    .byte $1B, $12, $09, $00, $3E, $35, $2C, $23
+    .byte $1A, $11, $08, $3D, $34, $2B, $22, $19
+    .byte $10, $3C, $33, $2A, $21, $18, $3B, $32
+    .byte $29, $20, $3A, $31, $28, $39, $30, $38
+    ; Q2: cos < 0, sin >= 0
+    .byte $38, $30, $39, $28, $31, $3A, $20, $29
+    .byte $32, $3B, $18, $21, $2A, $33, $3C, $10
+    .byte $19, $22, $2B, $34, $3D, $08, $11, $1A
+    .byte $23, $2C, $35, $3E, $00, $09, $12, $1B
+    .byte $24, $2D, $36, $3F, $01, $0A, $13, $1C
+    .byte $25, $2E, $37, $02, $0B, $14, $1D, $26
+    .byte $2F, $03, $0C, $15, $1E, $27, $04, $0D
+    .byte $16, $1F, $05, $0E, $17, $06, $0F, $07
+    ; Q3: cos < 0, sin < 0
+    .byte $3F, $37, $3E, $2F, $36, $3D, $27, $2E
+    .byte $35, $3C, $1F, $26, $2D, $34, $3B, $17
+    .byte $1E, $25, $2C, $33, $3A, $0F, $16, $1D
+    .byte $24, $2B, $32, $39, $07, $0E, $15, $1C
+    .byte $23, $2A, $31, $38, $06, $0D, $14, $1B
+    .byte $22, $29, $30, $05, $0C, $13, $1A, $21
+    .byte $28, $04, $0B, $12, $19, $20, $03, $0A
+    .byte $11, $18, $02, $09, $10, $01, $08, $00
+
+.segment "GSUCODE"
+
 ; ==============================================================================
 ; map_grid_render
 ; Renders the Map Grid in back-to-front yaw-quadrant Painter's order,
@@ -4388,9 +4582,11 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ; 1. Read header fields: cols (+0), rows (+1), origin_x (+2), origin_z (+4)
     move r7, map_ptr
     ldb (r7)
+    lob
     move r8, r0         ; r8 = cols
     inc r7
     ldb (r7)
+    lob
     move r9, r0         ; r9 = rows
     inc r7
     ldw (r7)
@@ -4584,8 +4780,269 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     stw (r7)            ; front_ew_edge
 
     ; --------------------------------------------------------------------------
+    ; 2C. Compute Q11.5 basis vectors and screen origins:
+    ;     Sx.x_q5 = cos_yaw >> 4,  Sx.y_q5 = sin_yaw >> 5
+    ;     Sz.x_q5 = -(sin_yaw >> 4), Sz.y_q5 = cos_yaw >> 5
+    ;     origin_x_q5 = origin_x << 5, origin_z_q5 = origin_z << 5
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + map_render_frame::cam_ptr
+    ldw (r7)
+    inc r0
+    inc r0
+    move r7, r0
+    ldw (r7)            ; sin_yaw
+    move r11, r0        ; r11 = sin_yaw
+    inc r7
+    inc r7
+    ldw (r7)            ; cos_yaw
+    move r12, r0        ; r12 = cos_yaw
+
+    ; Sx.x_q5 = cos_yaw >> 4
+    move r1, r12
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    iwt r7, #gsu_map_render_frame + map_render_frame::sx_x_q5
+    from r1
+    stw (r7)
+
+    ; Sx.y_q5 = sin_yaw >> 5
+    move r1, r11
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    inc r7
+    inc r7
+    from r1
+    stw (r7)
+
+    ; Sz.x_q5 = - (sin_yaw >> 4)
+    move r1, r11
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    not
+    inc r1
+    inc r7
+    inc r7
+    from r1
+    stw (r7)
+
+    ; Sz.y_q5 = cos_yaw >> 5
+    move r1, r12
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    inc r7
+    inc r7
+    from r1
+    stw (r7)
+
+    ; origin_x_q5 = origin_x << 5
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_x
+    ldw (r7)
+    move r1, r0
+    with r1
+    add r1
+    with r1
+    add r1
+    with r1
+    add r1
+    with r1
+    add r1
+    with r1
+    add r1
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_x_q5
+    from r1
+    stw (r7)
+
+    ; origin_z_q5 = origin_z << 5
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_z
+    ldw (r7)
+    move r1, r0
+    with r1
+    add r1
+    with r1
+    add r1
+    with r1
+    add r1
+    with r1
+    add r1
+    with r1
+    add r1
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_z_q5
+    from r1
+    stw (r7)
+
+    ; Check if map is 8x8:
+    iwt r7, #gsu_map_render_frame + map_render_frame::cols
+    ldw (r7)
+    with r0
+    sub #8
+    bne @setup_generic_loops
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::rows
+    ldw (r7)
+    with r0
+    sub #8
+    bne @setup_generic_loops
+    nop
+
+    ; --- 8x8 Grid Fast Path: Setup 64-byte diagonal quadrant table ---
+    iwt r7, #gsu_map_render_frame + map_render_frame::is_8x8
+    iwt r0, #1
+    from r0
+    stw (r7)
+
+    ; Determine quad_idx = (cos_neg << 1) | sin_neg
+    iwt r8, #0          ; r8 = quad_idx
+    with r12            ; cos_yaw
+    add #0
+    bge :+
+    nop
+    iwt r8, #2          ; bit 1 = 1
+:
+    with r11            ; sin_yaw
+    add #0
+    bge :+
+    nop
+    inc r8              ; bit 0 = 1
+:
+    ; Table ROM address = map_quadrant_tables + (quad_idx << 6)
+    move r0, r8
+    with r0
+    add r0              ; << 1
+    with r0
+    add r0              ; << 2
+    with r0
+    add r0              ; << 3
+    with r0
+    add r0              ; << 4
+    with r0
+    add r0              ; << 5
+    with r0
+    add r0              ; << 6
+    iwt r14, #map_quadrant_tables
+    with r14
+    add r0              ; r14 = table source in ROM (bank 4)
+
+    iwt r1, #gsu_map_render_frame + map_render_frame::quad_table
+    iwt r12, #64
+    cache
+    move r13, r15
+    getb
+    inc r14
+    from r0
+    stb (r1)
+    nop
+    loop
+    inc r1
+    nop
+
+    ; Reset cell_idx = 0
+    iwt r7, #gsu_map_render_frame + map_render_frame::cell_idx
+    iwt r0, #0
+    from r0
+    stw (r7)
+    iwt r13, #@loop_8x8_top
+    jmp r13
+    nop
+
+@setup_generic_loops:
+    iwt r7, #gsu_map_render_frame + map_render_frame::is_8x8
+    iwt r0, #0
+    from r0
+    stw (r7)
+    iwt r13, #@generic_loops_start
+    jmp r13
+    nop
+
+@loop_8x8_top:
+    ; Read cell_idx (0..63)
+    iwt r7, #gsu_map_render_frame + map_render_frame::cell_idx
+    ldw (r7)
+    move r8, r0         ; r8 = cell_idx
+
+    ; Read packed_index from quad_table + cell_idx
+    iwt r7, #gsu_map_render_frame + map_render_frame::quad_table
+    with r7
+    add r8
+    ldb (r7)
+    lob
+    move r14, r0        ; r14 = packed_index = (j << 3) | i
+
+    ; i_cur = packed_index & 7
+    move r12, r14
+    with r12
+    and #7              ; r12 = i_cur
+
+    ; j_cur = packed_index >> 3
+    move r9, r14
+    with r9
+    asr
+    with r9
+    asr
+    with r9
+    asr                 ; r9 = j_cur
+
+    ; Save i_cur and j_cur in frame
+    iwt r7, #gsu_map_render_frame + map_render_frame::i_cur
+    from r12
+    stw (r7)
+    iwt r7, #gsu_map_render_frame + map_render_frame::j_cur
+    from r9
+    stw (r7)
+
+    ; cell_offset = packed_index << 3
+    move r8, r14
+    with r8
+    add r8
+    with r8
+    add r8
+    with r8
+    add r8              ; r8 = packed_index << 3
+
+    ; cell_ptr = map_ptr + 8 + r8
+    iwt r7, #gsu_map_render_frame + map_render_frame::map_ptr
+    ldw (r7)
+    with r0
+    add #8
+    with r0
+    add r8
+    move r7, r0         ; r7 = cell_ptr
+    iwt r13, #@read_cell_fields
+    jmp r13
+    nop
+
+    ; --------------------------------------------------------------------------
     ; 3. Outer J Loop (Rows)
     ; --------------------------------------------------------------------------
+@generic_loops_start:
     iwt r7, #gsu_map_render_frame + map_render_frame::j_start
     ldw (r7)
     move r9, r0         ; r9 = j_cur = j_start
@@ -4655,15 +5112,19 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     add r8
     move r7, r0         ; r7 = cell_ptr
 
+@read_cell_fields:
+
     ; Read cell fields:
     ; base_height (+0)
     ldb (r7)
+    lob
     iwt r11, #gsu_map_render_frame + map_render_frame::base_height
     stw (r11)
 
     ; archetype_id (+1)
     inc r7
     ldb (r7)
+    lob
     inc r11
     inc r11
     stw (r11)
@@ -4671,6 +5132,7 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ; top_tex_id (+2)
     inc r7
     ldb (r7)
+    lob
     inc r11
     inc r11
     stw (r11)
@@ -4678,6 +5140,7 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ; skirt_tex_id (+3)
     inc r7
     ldb (r7)
+    lob
     inc r11
     inc r11
     stw (r11)
@@ -4685,85 +5148,213 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ; panel_tex_id (+4)
     inc r7
     ldb (r7)
+    lob
     iwt r8, #gsu_map_render_frame + map_render_frame::panel_tex_id
     stw (r8)
 
     ; panel_flags (+5)
     inc r7
     ldb (r7)
+    lob
     iwt r8, #gsu_map_render_frame + map_render_frame::panel_flags
     stw (r8)
 
-    ; drop_ns (+6)
-    inc r7
-    ldb (r7)
-    iwt r8, #gsu_map_render_frame + map_render_frame::drop_ns
-    stw (r8)
-
-    ; drop_ew (+7)
-    inc r7
-    ldb (r7)
-    iwt r8, #gsu_map_render_frame + map_render_frame::drop_ew
-    stw (r8)
-
     ; --------------------------------------------------------------------------
-    ; 6. Calculate 2D Screen Anchor(i, j, base_height):
-    ;    Anchor.x = origin_x + i * Sx.x + j * Sz.x
-    ;    Anchor.y = origin_z + i * Sx.y + j * Sz.y + base_height * (-14)
+    ; Derive camera-facing skirt drops from neighbor floor heights.
+    ;   Skirt templates (ARCH_SKIRT_NS / ARCH_SKIRT_EW) are compiled for the
+    ;   camera-facing face only (S or N, E or W, chosen by yaw quadrant), so the
+    ;   drop must be measured against the neighbor on that same face:
+    ;     drop = max(0, base_height - neighbor.base_height)
+    ;   Neighbors outside the map count as height 0 (diorama plinth base).
+    ;   The baked drop_ns / drop_ew bytes cannot describe both N and S (or E and
+    ;   W) faces with one value, so they are not used here.
+    ;   Preserves r9 (j_cur) and r12 (i_cur).
     ; --------------------------------------------------------------------------
-    iwt r7, #gsu_map_render_frame + map_render_frame::origin_x
+    iwt r7, #gsu_map_render_frame + map_render_frame::base_height
     to r1
-    ldw (r7)            ; r1 = anchor_x
+    ldw (r7)            ; r1 = h
+
+    ; --- NS neighbor: j_nb = j + 1 (front = South) or j - 1 (front = North) ---
+    move r2, r9         ; r2 = j_cur
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ns_edge
+    ldw (r7)            ; 2 = South, 0 = North
+    add #0
+    bne :+
+    nop
+    dec r2
+    dec r2
+:
+    inc r2              ; r2 = j_nb
+    iwt r3, #0          ; r3 = neighbor height (0 when out of bounds)
+    from r2
+    add #0
+    bmi @ns_nb_done
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::rows
+    ldw (r7)
+    from r2
+    sub r0              ; j_nb - rows
+    bge @ns_nb_done
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::cols
+    ldw (r7)            ; r0 = cols
+    mult r2             ; r0 = cols * j_nb
+    add r12             ; + i_cur
+    add r0
+    add r0
+    add r0              ; * 8 (sizeof map_cell)
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::map_ptr
+    ldw (r7)
+    add #8              ; skip map_header
+    add r3
+    move r7, r0
+    ldb (r7)            ; neighbor base_height
+    lob
+    move r3, r0
+@ns_nb_done:
+    from r1
+    sub r3              ; h - h_nb
+    bpl :+
+    nop
+    iwt r0, #0
+:
+    iwt r7, #gsu_map_render_frame + map_render_frame::drop_ns
+    stw (r7)
+
+    ; --- EW neighbor: i_nb = i + 1 (front = East) or i - 1 (front = West) ---
+    move r2, r12        ; r2 = i_cur
+    iwt r7, #gsu_map_render_frame + map_render_frame::front_ew_edge
+    ldw (r7)            ; 1 = East, 3 = West
+    sub #1
+    beq :+
+    nop
+    dec r2
+    dec r2
+:
+    inc r2              ; r2 = i_nb
+    iwt r3, #0
+    from r2
+    add #0
+    bmi @ew_nb_done
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::cols
+    ldw (r7)
+    from r2
+    sub r0              ; i_nb - cols
+    bge @ew_nb_done
+    nop
+    iwt r7, #gsu_map_render_frame + map_render_frame::cols
+    ldw (r7)            ; r0 = cols
+    mult r9             ; r0 = cols * j_cur
+    add r2              ; + i_nb
+    add r0
+    add r0
+    add r0              ; * 8
+    move r3, r0
+    iwt r7, #gsu_map_render_frame + map_render_frame::map_ptr
+    ldw (r7)
+    add #8
+    add r3
+    move r7, r0
+    ldb (r7)
+    lob
+    move r3, r0
+@ew_nb_done:
+    from r1
+    sub r3
+    bpl :+
+    nop
+    iwt r0, #0
+:
+    iwt r7, #gsu_map_render_frame + map_render_frame::drop_ew
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; 6. Calculate 2D Screen Anchor(i, j, base_height) using Q11.5 fixed point:
+    ;    Anchor.x = (origin_x_q5 + i * sx_x_q5 + j * sz_x_q5 + 16) >> 5
+    ;    Anchor.y = (origin_z_q5 + i * sx_y_q5 + j * sz_y_q5 + base_height * (-448) + 16) >> 5
+    ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_x_q5
+    to r1
+    ldw (r7)            ; r1 = anchor_x_q5
     inc r7
     inc r7
     to r2
-    ldw (r7)            ; r2 = anchor_y
+    ldw (r7)            ; r2 = anchor_y_q5
 
-    iwt r7, #gsu_map_render_frame + map_render_frame::basis_ptr
-    ldw (r7)
-    move r7, r0         ; r7 = basis_ptr
-
-    ; + i * Sx:
+    ; + i * sx:
     move r6, r12        ; mul_b = i_cur
-    ldw (r7)            ; r0 = Sx.x
+    iwt r7, #gsu_map_render_frame + map_render_frame::sx_x_q5
+    ldw (r7)            ; sx_x_q5
     to r8
     lmult
     with r1
     add r4
+
     inc r7
     inc r7
-    ldw (r7)            ; r0 = Sx.y
+    ldw (r7)            ; sx_y_q5
     to r8
     lmult
     with r2
     add r4
 
-    ; + j * Sz:
-    inc r7
-    inc r7
+    ; + j * sz:
     move r6, r9         ; mul_b = j_cur
-    ldw (r7)            ; r0 = Sz.x
+    inc r7
+    inc r7
+    ldw (r7)            ; sz_x_q5
     to r8
     lmult
     with r1
     add r4
+
     inc r7
     inc r7
-    ldw (r7)            ; r0 = Sz.y
+    ldw (r7)            ; sz_y_q5
     to r8
     lmult
     with r2
     add r4
 
-    ; + base_height * (-14):
+    ; + base_height * (-448):
     iwt r7, #gsu_map_render_frame + map_render_frame::base_height
     ldw (r7)
     move r6, r0         ; mul_b = base_height
-    iwt r0, #$FFF2      ; -14 ($FFF2)
+    iwt r0, #$FE40      ; -448
     to r8
     lmult
     with r2
     add r4
+
+    ; Round to integer screen pixels (+16, asr 5):
+    iwt r0, #16
+    with r1
+    add r0
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+    with r1
+    asr
+
+    with r2
+    add r0
+    with r2
+    asr
+    with r2
+    asr
+    with r2
+    asr
+    with r2
+    asr
+    with r2
+    asr
 
     ; Save anchor_x and anchor_y in frame
     iwt r7, #gsu_map_render_frame + map_render_frame::anchor_x
@@ -4983,13 +5574,15 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ldw (r7)
     with r0
     add #0
-    bne @skirt_ns_drop_ok
+    bne @skirt_ns_drop_nonzero
     nop
     iwt r13, #@skirt_ns_done
     jmp r13
     nop
+@skirt_ns_drop_nonzero:
+    move r8, r0         ; r8 = drop_ns (camera-facing NS face, derived above)
+
 @skirt_ns_drop_ok:
-    move r8, r0         ; r8 = drop_ns
 
     iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
     ldw (r7)
@@ -5131,13 +5724,15 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ldw (r7)
     with r0
     add #0
-    bne @skirt_ew_drop_ok
+    bne @skirt_ew_drop_nonzero
     nop
     iwt r13, #@skirt_ew_done
     jmp r13
     nop
+@skirt_ew_drop_nonzero:
+    move r8, r0         ; r8 = drop_ew (camera-facing EW face, derived above)
+
 @skirt_ew_drop_ok:
-    move r8, r0         ; r8 = drop_ew
 
     iwt r7, #gsu_map_render_frame + map_render_frame::arch_traps_ptr
     ldw (r7)
@@ -5553,6 +6148,28 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     nop
 
 @cull_cell:
+    iwt r7, #gsu_map_render_frame + map_render_frame::is_8x8
+    ldw (r7)
+    with r0
+    add #0
+    beq @advance_generic_i_loop
+    nop
+
+    ; 8x8 Mode: Advance cell_idx
+    iwt r7, #gsu_map_render_frame + map_render_frame::cell_idx
+    ldw (r7)
+    inc r0
+    stw (r7)
+    iwt r1, #64
+    from r0
+    sub r1
+    beq @render_done
+    nop
+    iwt r13, #@loop_8x8_top
+    jmp r13
+    nop
+
+@advance_generic_i_loop:
     ; --------------------------------------------------------------------------
     ; 10. Advance I Loop
     ; --------------------------------------------------------------------------

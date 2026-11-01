@@ -54,6 +54,7 @@ scene_initialized:
     ; Pass 1 (right half, X in 128..255): render right half using cached archetypes
     iwt tmp, #GSU_FRAME_HALF
     ldb (tmp)
+    lob
     with r0
     add #0
     beq @do_pass0
@@ -76,68 +77,160 @@ scene_initialized:
     call map_grid_compile_archetypes cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr
 
     ; Compute centered origin_x / origin_z from camera focus (center_x, center_y):
-    ;   mid_i = cols / 2, mid_j = rows / 2
-    ;   offset_x = mid_i * Sx.x + mid_j * Sz.x
-    ;   offset_y = mid_i * Sx.y + mid_j * Sz.y
-    ;   origin_x = center_x - offset_x
-    ;   origin_z = center_y - offset_y
-    iwt cam_ptr, #ISO_CAM
-    from cam_ptr
-    add #6
-    move tmp, r0
+    ;   Uses Q11.5 basis vectors to center the grid at (cols/2, rows/2). Cell anchors
+    ;   are the (0,0) corner of each cell, so the grid footprint spans corners
+    ;   0..cols x 0..rows and its geometric center is (cols/2, rows/2):
+    ;   offset_x_q5 = (cols * Sx.x_q5 + rows * Sz.x_q5) >> 1
+    ;   offset_y_q5 = (cols * Sx.y_q5 + rows * Sz.y_q5) >> 1
+    ;   origin_x = center_x - ((offset_x_q5 + 16) >> 5)
+    ;   origin_z = center_y - ((offset_y_q5 + 16) >> 5)
+    iwt tmp, #ISO_CAM + 2
     ldw (tmp)
-    move cx_val, r0     ; cx_val = center_x
+    move lat_ptr, r0    ; lat_ptr = sin_yaw (Q2.14)
     inc tmp
     inc tmp
     ldw (tmp)
-    move cy_val, r0     ; cy_val = center_y
+    move yaw_ptr, r0    ; yaw_ptr = cos_yaw (Q2.14)
 
+    ; sx_x_q5 = cos_yaw >> 4
+    move tmp, yaw_ptr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+
+    ; sx_y_q5 = sin_yaw >> 5
+    move basis_ptr, lat_ptr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+
+    ; cols (cell anchors are cell corners, so the grid spans corners 0..cols)
     iwt map_ptr, #MAP_BUF
-    ldb (map_ptr)       ; r0 = cols
-    lsr
-    move r6, r0         ; mul_b = cols >> 1 (mid_i)
+    ldb (map_ptr)       ; cols
+    lob
+    move r6, r0         ; mul_b = cols
 
-    iwt basis_ptr, #ISO_BASIS
-    ldw (basis_ptr)     ; Sx.x
+    ; cols * sx_x_q5:
+    from tmp
     to r8
     lmult
-    move yaw_ptr, r4    ; yaw_ptr = off_x = mid_i * Sx.x
+    move arch_ptr, r4   ; arch_ptr = off_x_q5 = cols * sx_x_q5
 
-    inc basis_ptr
-    inc basis_ptr
-    ldw (basis_ptr)     ; Sx.y
+    ; cols * sx_y_q5:
+    from basis_ptr
     to r8
     lmult
-    move lat_ptr, r4    ; lat_ptr = off_y = mid_i * Sx.y
+    move fb_ptr, r4     ; fb_ptr = off_y_q5 = cols * sx_y_q5
 
+    ; sz_x_q5 = - (sin_yaw >> 4)
+    move tmp, lat_ptr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    not
+    inc tmp
+
+    ; sz_y_q5 = cos_yaw >> 5
+    move basis_ptr, yaw_ptr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+
+    ; rows
     iwt map_ptr, #MAP_BUF + 1
-    ldb (map_ptr)       ; r0 = rows
-    lsr
-    move r6, r0         ; mul_b = rows >> 1 (mid_j)
+    ldb (map_ptr)       ; rows
+    lob
+    move r6, r0         ; mul_b = rows
 
-    inc basis_ptr
-    inc basis_ptr
-    ldw (basis_ptr)     ; Sz.x
+    ; rows * sz_x_q5:
+    from tmp
     to r8
     lmult
-    with yaw_ptr
-    add r4              ; off_x += mid_j * Sz.x
+    with arch_ptr
+    add r4              ; off_x_q5 += rows * sz_x_q5
 
-    inc basis_ptr
-    inc basis_ptr
-    ldw (basis_ptr)     ; Sz.y
+    ; rows * sz_y_q5:
+    from basis_ptr
     to r8
     lmult
-    with lat_ptr
-    add r4              ; off_y += mid_j * Sz.y
+    with fb_ptr
+    add r4              ; off_y_q5 += rows * sz_y_q5
+
+    ; Divide by 2:
+    with arch_ptr
+    asr
+    with fb_ptr
+    asr
+
+    ; Round to integer (+16, >> 5):
+    iwt r0, #16
+    with arch_ptr
+    add r0
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr                 ; arch_ptr = off_x in integer pixels
+
+    with fb_ptr
+    add r0
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr                 ; fb_ptr = off_y in integer pixels
+
+    ; Load center_x (+6) and center_y (+8)
+    iwt cam_ptr, #ISO_CAM + 6
+    ldw (cam_ptr)
+    move cx_val, r0     ; center_x
+    inc cam_ptr
+    inc cam_ptr
+    ldw (cam_ptr)
+    move cy_val, r0     ; center_y
 
     from cx_val
-    sub yaw_ptr
-    move cx_val, r0
+    sub arch_ptr
+    move cx_val, r0     ; origin_x = center_x - off_x
 
     from cy_val
-    sub lat_ptr
-    move cy_val, r0
+    sub fb_ptr
+    move cy_val, r0     ; origin_z = center_y - off_y
 
     iwt map_ptr, #MAP_BUF + 2
     from cx_val
@@ -189,8 +282,22 @@ shutdown:
 function init_iso_scene
     register cam_ptr, val
 
-    ; Copy 520 bytes of SHOWCASE_MAP_ROM from ROM bank 4 to MAP_BUF in GSURAM
-    rom_to_ram SHOWCASE_MAP_ROM, #4, MAP_BUF, 520
+    ; Copy 520 bytes of SHOWCASE_MAP_ROM from ROM bank 4 to MAP_BUF in GSURAM using cached loop
+    ibt r0, #4
+    romb
+    iwt r14, #SHOWCASE_MAP_ROM
+    iwt r1, #MAP_BUF
+    iwt r12, #520
+    cache
+    move r13, r15
+    getb
+    inc r14
+    from r0
+    stb (r1)
+    nop
+    loop
+    inc r1
+    nop
 
     ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80, cam_x = 0, cam_z = 0
     iwt cam_ptr, #ISO_CAM

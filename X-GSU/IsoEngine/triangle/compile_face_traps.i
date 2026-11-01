@@ -980,6 +980,11 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     inc r7
     from r3
     stw (r7)
+    ; m_xq = t0_x << 8
+    move r0, r1
+    cft_to_q88
+    frame_ptr compile_frame::m_xq, r7
+    stw (r7)
     iwt r13, #@split_m_done
     jmp r13
     nop
@@ -1015,6 +1020,11 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     inc r7
     inc r7
     from r3
+    stw (r7)
+    ; m_xq = t2_x << 8
+    move r0, r1
+    cft_to_q88
+    frame_ptr compile_frame::m_xq, r7
     stw (r7)
     iwt r13, #@split_m_done
     jmp r13
@@ -1086,6 +1096,24 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     add r2              ; m_v
     frame_ptr compile_frame::m_v, r7
     stw (r7)
+
+    ; m_xq = (t0_x << 8) + fmult((t2_x - t0_x) << 8, t)   [Q8.8, r6 = t]
+    frame_ptr compile_frame::t2_x, r7
+    ldw (r7)
+    move r1, r0
+    frame_ptr compile_frame::t0_x, r7
+    ldw (r7)
+    move r2, r0
+    from r1
+    sub r2              ; delta_x (integer)
+    cft_to_q88
+    fmult               ; r0 = fmult(delta_x << 8, t)
+    move r3, r0
+    move r0, r2
+    cft_to_q88
+    add r3
+    frame_ptr compile_frame::m_xq, r7
+    stw (r7)
     iwt r13, #@split_m_done
     jmp r13
     nop
@@ -1141,6 +1169,24 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     with r0
     add r1              ; m_v
     frame_ptr compile_frame::m_v, r7
+    stw (r7)
+
+    ; m_xq = (t2_x << 8) + fmult((t2_x - t0_x) << 8, t)   [Q8.8, r6 = t]
+    frame_ptr compile_frame::t2_x, r7
+    ldw (r7)
+    move r1, r0
+    frame_ptr compile_frame::t0_x, r7
+    ldw (r7)
+    move r2, r0
+    from r1
+    sub r2              ; delta_x (integer)
+    cft_to_q88
+    fmult               ; r0 = fmult(delta_x << 8, t)
+    move r3, r0
+    move r0, r1
+    cft_to_q88
+    add r3
+    frame_ptr compile_frame::m_xq, r7
     stw (r7)
 
 @split_m_done:
@@ -1243,11 +1289,12 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     nop
 @top_half_has_height:
 
-    ; Top vertex is T0:
+    ; Top vertex is T0 (x edges are passed in Q8.8):
     frame_ptr compile_frame::t0_x, r7
     ldw (r7)
-    move r5, r0         ; r5 = xTL = t0_x
-    move r6, r0         ; r6 = xTR = t0_x
+    cft_to_q88
+    move r5, r0         ; r5 = xTL = t0_x << 8
+    move r6, r0         ; r6 = xTR = t0_x << 8
 
     frame_ptr compile_frame::t0_u, r7
     ldw (r7)
@@ -1265,14 +1312,15 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     nop
 
     ; T1 is Right, M is Left:
-    ; xBL = m_x, uBL = m_u, vBL = m_v
-    ; xBR = t1_x
-    frame_ptr compile_frame::m_x, r9
+    ; xBL = m_xq, uBL = m_u, vBL = m_v
+    ; xBR = t1_x << 8
+    frame_ptr compile_frame::m_xq, r9
     ldw (r9)
     move r9, r0
 
     frame_ptr compile_frame::t1_x, r11
     ldw (r11)
+    cft_to_q88
     move r12, r0
 
     frame_ptr compile_frame::m_u, r11
@@ -1288,13 +1336,14 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
 
 @top_t1_left:
     ; T1 is Left, M is Right:
-    ; xBL = t1_x, uBL = t1_u, vBL = t1_v
-    ; xBR = m_x
+    ; xBL = t1_x << 8, uBL = t1_u, vBL = t1_v
+    ; xBR = m_xq
     frame_ptr compile_frame::t1_x, r9
     ldw (r9)
+    cft_to_q88
     move r9, r0
 
-    frame_ptr compile_frame::m_x, r11
+    frame_ptr compile_frame::m_xq, r11
     ldw (r11)
     move r12, r0
 
@@ -1318,9 +1367,11 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     ;   r8  = vTL
     ;   r13 = uBL
     ;   r14 = vBL
-    frame_ptr compile_frame::half_index, r7
+    ; NOTE: r7 holds uTL here, so half_index must be addressed via r11
+    ; (clobbering r7 corrupts delta_u and therefore du_dy).
+    frame_ptr compile_frame::half_index, r11
     iwt r0, #0
-    stw (r7)
+    stw (r11)
     iwt r11, #@emit_half_logic
     jmp r11
     nop
@@ -1359,14 +1410,15 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     nop
 
     ; T1 is Right, M is Left:
-    ; xTL = m_x, uTL = m_u, vTL = m_v
-    ; xTR = t1_x
-    frame_ptr compile_frame::m_x, r9
+    ; xTL = m_xq, uTL = m_u, vTL = m_v
+    ; xTR = t1_x << 8
+    frame_ptr compile_frame::m_xq, r9
     ldw (r9)
     move r5, r0
 
     frame_ptr compile_frame::t1_x, r9
     ldw (r9)
+    cft_to_q88
     move r6, r0
 
     frame_ptr compile_frame::m_u, r9
@@ -1382,13 +1434,14 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
 
 @bot_t1_left:
     ; T1 is Left, M is Right:
-    ; xTL = t1_x, uTL = t1_u, vTL = t1_v
-    ; xTR = m_x
+    ; xTL = t1_x << 8, uTL = t1_u, vTL = t1_v
+    ; xTR = m_xq
     frame_ptr compile_frame::t1_x, r9
     ldw (r9)
+    cft_to_q88
     move r5, r0
 
-    frame_ptr compile_frame::m_x, r9
+    frame_ptr compile_frame::m_xq, r9
     ldw (r9)
     move r6, r0
 
@@ -1406,8 +1459,9 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     ; uBL = t2_u, vBL = t2_v
     frame_ptr compile_frame::t2_x, r9
     ldw (r9)
-    move r9, r0         ; r9 = xBL = t2_x
-    move r12, r0        ; r12 = xBR = t2_x
+    cft_to_q88
+    move r9, r0         ; r9 = xBL = t2_x << 8
+    move r12, r0        ; r12 = xBR = t2_x << 8
 
     frame_ptr compile_frame::t2_u, r11
     ldw (r11)
@@ -1428,9 +1482,10 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     ;   r8  = vTL
     ;   r13 = uBL
     ;   r14 = vBL
-    frame_ptr compile_frame::half_index, r7
+    ; NOTE: r7 holds uTL here, so half_index must be addressed via r11.
+    frame_ptr compile_frame::half_index, r11
     iwt r0, #1
-    stw (r7)
+    stw (r11)
     iwt r11, #@emit_half_logic
     jmp r11
     nop
@@ -1469,15 +1524,17 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
 ;   r14 = vBL
 ; ==============================================================================
 @emit_half_logic:
+    ; x edges arrive in Q8.8 (sub-pixel split point M), so the deltas are
+    ; already Q8.8 and need no conversion.
     ; delta_xL = xBL - xTL = r9 - r5
     from r9
     sub r5
-    move r9, r0         ; r9 = delta_xL (integer pixels)
+    move r2, r0         ; r2 = delta_xL (Q8.8)
 
     ; delta_xR = xBR - xTR = r12 - r6
     from r12
     sub r6
-    move r12, r0        ; r12 = delta_xR (integer pixels)
+    move r9, r0         ; r9 = delta_xR (Q8.8)
 
     ; delta_u = uBL - uTL = r13 - r7
     from r13
@@ -1488,20 +1545,6 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     from r14
     sub r8
     move r14, r0        ; r14 = delta_v (Q(16-S).S)
-
-    ; Convert delta_xL and delta_xR to Q8.8 (<< 8):
-    to r2
-    from r9
-    swap
-    iwt r5, #$FF00
-    with r2
-    and r5              ; r2 = delta_xL in Q8.8
-
-    to r9
-    from r12
-    swap
-    with r9
-    and r5              ; r9 = delta_xR in Q8.8
 
     ; Check height r3 (line_count):
     from r3
@@ -1601,15 +1644,11 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     bne @bot_t1_left_reload
     nop
 
-    ; T1 is Right, M is Left: xTL = m_x, xTR = t1_x, uTL = m_u, vTL = m_v
-    frame_ptr compile_frame::m_x, r7
-    ldw (r7)
+    ; T1 is Right, M is Left: xTL = m_xq, xTR = t1_x, uTL = m_u, vTL = m_v
+    frame_ptr compile_frame::m_xq, r7
     to r5
-    from r0
-    swap
+    ldw (r7)            ; r5 = xL_start (Q8.8 sub-pixel M)
     iwt r8, #$FF00
-    with r5
-    and r8              ; r5 = xL_start
 
     frame_ptr compile_frame::t1_x, r7
     ldw (r7)
@@ -1641,13 +1680,9 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     with r5
     and r8              ; r5 = xL_start
 
-    frame_ptr compile_frame::m_x, r7
-    ldw (r7)
+    frame_ptr compile_frame::m_xq, r7
     to r6
-    from r0
-    swap
-    with r6
-    and r8              ; r6 = xR_start
+    ldw (r7)            ; r6 = xR_start (Q8.8 sub-pixel M)
 
     frame_ptr compile_frame::t1_u, r7
     ldw (r7)

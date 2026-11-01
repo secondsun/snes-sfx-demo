@@ -625,10 +625,11 @@ clear_screen_c4:
     nop
     nop
 
-    ; Sample upper facade at (X=78, Y=52):
-    ; High facade pixel that only exists in 2h mode
+    ; Sample upper facade at (X=74, Y=52):
+    ; High facade pixel that only exists in 2h mode (inside the left merlon,
+    ; clear of the transparent crenel gap at X=78..85)
     iwt r8, #TEST_RESULT
-    iwt r1, #78
+    iwt r1, #74
     iwt r2, #52
     rpix
     from r0
