@@ -10,7 +10,7 @@ This guide documents the architecture, mathematical foundations, binary layout, 
 
 On the SNES, tactical RPG maps serve two fundamentally different consumers:
 1. **S-CPU (65816 in WRAM)**: Runs turn order, A* pathfinding, line-of-sight, height-advantage combat math, and elemental terrain effects. It needs compact logical state (walkability, movement cost, water depth, unit occupancy ID) that never touches the 3D rasterizer.
-2. **GSU (SuperFX in GSURAM / ROM)**: Runs back-to-front painter's traversal, trapezoid scanline edge setup, and affine UV texture rasterization at 21.47 MHz. It needs pre-baked visual indices, elevation drops, and texture IDs with zero pointer chasing.
+2. **GSU (SuperFX in GSURAM / ROM)**: Runs back-to-front painter's traversal, trapezoid scanline edge setup, and affine UV texture rasterization at 21.47 MHz. It needs pre-baked visual indices, floor heights, and texture IDs with zero pointer chasing.
 
 ```
 +-----------------------------------+       +-----------------------------------+
@@ -20,7 +20,7 @@ On the SNES, tactical RPG maps serve two fundamentally different consumers:
 | - Move cost / walkability flags   |       | - 8-byte MapHeader                |
 | - Terrain elemental type          |       | - 8-byte MapCell[cols * rows]     |
 | - Unit occupancy index            |       |   (height, archetype, tex IDs,    |
-| - Event / trigger IDs             |       |    edge panels, baked drops)      |
+| - Event / trigger IDs             |       |    edge panels, base height)      |
 +-----------------------------------+       +-----------------------------------+
                   |                                           |
                   +-----> Synchronized by (i, j) Grid <-------+
@@ -38,7 +38,7 @@ $$\text{Project}(\vec{v}_{\text{local}} + \vec{P}_{\text{cell}}) = \text{Project
 
 Because of this linearity, the engine **never transforms or projects vertices per map cell**:
 1. **Once per camera `yaw` angle**, the engine projects a small fixed pool of local **`Shape Archetypes`** (`PRIM_FLAT`, `PRIM_WEDGE`, `PRIM_STAIRS`, `PRIM_LIQUID`, `PRIM_PILLAR`, `PRIM_FOLIAGE_CROSS`) into pre-sliced screen-space trapezoid templates (`ARCH_TRAPS`).
-2. **During grid traversal** ($4 \times 4$ up to $12 \times 12$ cells), each `MapCell` simply computes its integer screen-space anchor $(X_{\text{cell}}, Y_{\text{cell}})$ and stamps the pre-built trapezoids of its assigned `Shape Archetype` by adding $(X_{\text{cell}}, Y_{\text{cell}})$ to the trapezoid X-intercepts and Y-bounds.
+2. **During grid traversal** ($4 \times 4$ up to $12 \times 12$ cells), each `MapCell` computes its screen-space anchor $(X_{\text{cell}}, Y_{\text{cell}})$ in `Q11.5` fixed point, rounds it once to integer pixels, and stamps the pre-built trapezoids of its assigned `Shape Archetype` by adding $(X_{\text{cell}}, Y_{\text{cell}})$ to the trapezoid X-intercepts and Y-bounds (see §1.4).
 
 ---
 
@@ -71,18 +71,30 @@ Because $1\text{h} = 16$ world units and $2\text{h} = 32$ world units, a standar
 
 ---
 
-### 1.4 Integer Basis Vectors & The 28-Point Canonical Lattice (`LATTICE_V2`)
+### 1.4 Cell Anchors, Template Basis & The 28-Point Canonical Lattice (`LATTICE_V2`)
 
-Independent floating-point rounding of shared vertices between adjacent cells or sub-cell wedges causes 1-pixel cracks during rotation. `IsoEngine` eliminates all T-junctions and seams by defining cell origins and intra-cell geometry strictly on a **Discrete Integer Basis** for every yaw step $\theta$:
+Two separate quantities are derived from the camera yaw $\theta$ (Q2.14 $\sin\theta$, $\cos\theta$):
 
-$$\vec{S}_x = \bigl(\text{round}(32\cos\theta),\; \text{round}(16\sin\theta)\bigr), \qquad \vec{S}_z = \bigl(\text{round}(-32\sin\theta),\; \text{round}(16\cos\theta)\bigr), \qquad \vec{S}_y = (0, -14)$$
+**1. Cell anchors (where a cell is placed): exact, rounded once.**
+The ideal per-cell screen step is $\vec{a}_x = (32\cos\theta,\; 16\sin\theta)$ and $\vec{a}_z = (-32\sin\theta,\; 16\cos\theta)$. `map_grid_render` keeps these in `Q11.5` (`cos >> 4`, `sin >> 5`) and computes every anchor directly rather than by accumulating rounded integer steps:
 
-A map cell at grid coordinate $(i, j)$ with elevation $h$ (in $1\text{h}$ units) resolves its screen anchor purely via integer addition:
+$$(X_{\text{cell}}, Y_{\text{cell}}) = \operatorname{round}\Bigl(\vec{O} + i\,\vec{a}_x + j\,\vec{a}_z\Bigr) + h \cdot (0, -14)$$
 
-$$(X_{\text{cell}}, Y_{\text{cell}}) = (X_{\text{origin}}, Y_{\text{origin}}) + i \cdot \vec{S}_x + j \cdot \vec{S}_z + h \cdot \vec{S}_y$$
+Multiplying an already-rounded integer step by $i$ accumulates up to $\pm 0.5\,i$ px of error (about $\pm 3.5$ px at the far corners of an $8 \times 8$ grid), which shows up as tiles bobbing up and down while the camera rotates. Rounding once keeps every anchor within $\pm 0.6$ px of the ideal projection at all 120 yaw steps.
 
-Within each cell, all vertices of all `Shape Archetypes` snap to the **28-Point Canonical Lattice (`LATTICE_V2`)**, derived purely by halving (`>> 1`) and quartering (`>> 2`) the integer cell basis vectors $\vec{S}_x$ and $\vec{S}_z$:
-- **Corners $\{0, 32\} \times \{0, 32\}$**: Exact multiples of $\vec{S}_x, \vec{S}_z$ (shared seamlessly across cell boundaries).
+**2. Orbit center.** Anchors are the $(0, 0)$ corner of each cell, so the grid footprint spans corners $0..\text{cols} \times 0..\text{rows}$ and its geometric center is $(\text{cols}/2,\ \text{rows}/2)$, **not** $((\text{cols}-1)/2, (\text{rows}-1)/2)$. Each pass-0 frame, `SuperFX.sgs` recomputes the header origin so this point lands on the camera center:
+
+$$\vec{O} = \vec{C}_{\text{camera}} - \operatorname{round}\Bigl(\tfrac{\text{cols}}{2}\,\vec{a}_x + \tfrac{\text{rows}}{2}\,\vec{a}_z\Bigr)$$
+
+**3. Template basis (how big each cell's geometry is): rounded away from zero.**
+Archetype templates are compiled once per yaw from an integer basis whose components are rounded **away from zero** (ceil of magnitude):
+
+$$\vec{S}_x = \bigl(\operatorname{cm}(32\cos\theta),\; \operatorname{cm}(16\sin\theta)\bigr), \qquad \vec{S}_z = \bigl(-\operatorname{cm}(32\sin\theta),\; \operatorname{cm}(16\cos\theta)\bigr), \qquad \vec{S}_y = (0, -14)$$
+
+where $\operatorname{cm}(v) = \operatorname{sign}(v)\lceil |v| \rceil$. Because anchors are rounded independently, the spacing between neighboring anchors is either $\lfloor a \rfloor$ or $\lceil a \rceil$. A template edge of $\operatorname{round}(a)$ can be one pixel shorter than that spacing and opens a 1 px crack; $\operatorname{cm}(a)$ is never shorter, so neighbors overlap by less than one pixel instead, and painter's order resolves the overlap. (`iso_compute_basis` still produces the nearest-rounded basis for other callers; `map_grid_compile_archetypes` re-rounds it with `mg_cover_round`.)
+
+Within each cell, all vertices of all `Shape Archetypes` snap to the **28-Point Canonical Lattice (`LATTICE_V2`)**, derived purely by halving (`>> 1`) and quartering (`>> 2`) the template basis vectors $\vec{S}_x$ and $\vec{S}_z$:
+- **Corners $\{0, 32\} \times \{0, 32\}$**: Exact multiples of $\vec{S}_x, \vec{S}_z$.
 - **Edge Midpoints ($16$)**: Exact integer halves $\vec{S}_{x/2} = \vec{S}_x \gg 1$ and $\vec{S}_{z/2} = \vec{S}_z \gg 1$ (used by `PRIM_STAIRS` and `PRIM_FOLIAGE_CROSS`).
 - **Quarter Insets ($8, 24$)**: Exact quarter steps (used by `PRIM_PILLAR` $[8..24] \times [8..24]$).
 
@@ -98,8 +110,8 @@ All map data is stored in little-endian format with an 8-byte header followed im
 | :---: | :--- | :---: | :---: | :--- |
 | `+0` | `cols` | `u8` | 1 B | Map width in cells ($i \in [0, \text{cols}-1]$, supported range $4..12$) |
 | `+1` | `rows` | `u8` | 1 B | Map depth in cells ($j \in [0, \text{rows}-1]$, supported range $4..12$) |
-| `+2` | `origin_x` | `s16` | 2 B | Screen-space X pixel anchor for cell $(0, 0, h=0)$ |
-| `+4` | `origin_z` | `s16` | 2 B | Screen-space Y pixel anchor for cell $(0, 0, h=0)$ |
+| `+2` | `origin_x` | `s16` | 2 B | Screen-space X pixel anchor for cell $(0, 0, h=0)$. Recomputed every frame from the camera center (§1.4); the authored value is only an initial placeholder |
+| `+4` | `origin_z` | `s16` | 2 B | Screen-space Y pixel anchor for cell $(0, 0, h=0)$. Recomputed every frame from the camera center (§1.4) |
 | `+6` | `reserved` | `u16` | 2 B | Reserved padding (set to `$0000` for 8-byte alignment) |
 
 ---
@@ -114,8 +126,8 @@ All map data is stored in little-endian format with an 8-byte header followed im
 | `+3` | `skirt_tex_id` | `u8` | 1 B | Texture ID for `Cell Skirts`, stair risers, pillar sides, or submerged riverbed |
 | `+4` | `panel_tex_id` | `u8` | 1 B | Texture ID for vertical `Edge Panels` or `PRIM_FOLIAGE_CROSS` cutout fins |
 | `+5` | `panel_flags` | `u8` | 1 B | Edge panel placement bitmask, height flag, and future UV mode bits |
-| `+6` | `drop_ns` | `u8` | 1 B | Baked vertical skirt drop ($\Delta h$ in $1\text{h}$ steps) on the North or South face |
-| `+7` | `drop_ew` | `u8` | 1 B | Baked vertical skirt drop ($\Delta h$ in $1\text{h}$ steps) on the East or West face |
+| `+6` | `drop_ns` | `u8` | 1 B | **Reserved / ignored by the renderer.** Legacy baked N/S skirt drop; skirts are derived at render time from neighbor `base_height` (§2.4). Author as `0` |
+| `+7` | `drop_ew` | `u8` | 1 B | **Reserved / ignored by the renderer.** Legacy baked E/W skirt drop (§2.4). Author as `0` |
 
 #### Bitfield Breakdown: `archetype_id` (Offset `+1`) & `panel_flags` (Offset `+5`)
 
@@ -145,8 +157,8 @@ All map data is stored in little-endian format with an 8-byte header followed im
 .struct map_header
     cols            .byte   ; +0: Grid width (4..12)
     rows            .byte   ; +1: Grid depth (4..12)
-    origin_x        .word   ; +2: Screen X anchor (signed 16-bit)
-    origin_z        .word   ; +4: Screen Y anchor (signed 16-bit)
+    origin_x        .word   ; +2: Screen X anchor (signed 16-bit, rewritten per frame)
+    origin_z        .word   ; +4: Screen Y anchor (signed 16-bit, rewritten per frame)
     reserved        .word   ; +6: Alignment padding ($0000)
 .endstruct
 
@@ -157,8 +169,8 @@ All map data is stored in little-endian format with an 8-byte header followed im
     skirt_tex_id    .byte   ; +3: Skirt/cliff/riser/riverbed texture ID
     panel_tex_id    .byte   ; +4: Edge panel / foliage cutout texture ID
     panel_flags     .byte   ; +5: [3:0] W/S/E/N mask, [4] 2h tall flag, [7:5] reserved
-    drop_ns         .byte   ; +6: Baked North/South skirt drop in 1h units
-    drop_ew         .byte   ; +7: Baked East/West skirt drop in 1h units
+    drop_ns         .byte   ; +6: Reserved (legacy N/S drop, ignored; author 0)
+    drop_ew         .byte   ; +7: Reserved (legacy E/W drop, ignored; author 0)
 .endstruct
 
 ; Rotation encodings for archetype_id bits [7:6]
@@ -178,27 +190,27 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
 
 ---
 
-### 2.4 Elevation Invariants: `base_height` & Baked Skirt Drops (`drop_ns`, `drop_ew`)
-
-To prevent vertical gaps without performing neighbor lookups at runtime, map compilers enforce two elevation invariants when baking a `map_cell`:
+### 2.4 Elevation Invariants: `base_height` & Render-Time Skirt Drops
 
 1. **Lowest-Opaque-Floor Invariant (`base_height`)**:
    `base_height` always records the **lowest opaque horizontal surface** of the cell in $1\text{h}$ units:
    - For flat blocks (`PRIM_FLAT`), pillars (`PRIM_PILLAR`), and foliage (`PRIM_FOLIAGE_CROSS`), `base_height` is the floor height $h$.
    - For ramps (`PRIM_WEDGE`) and stairs (`PRIM_STAIRS`) rising from $h$ to $h+1$ or $h+2$, `base_height` is the **bottom** elevation $h$ (the ramp/stair geometry itself rises $+1\text{h}$ or $+2\text{h}$ above `base_height`).
-   - For water (`PRIM_LIQUID`), `base_height` is the **opaque riverbed** elevation $h_{\text{bed}}$, while the translucent water surface floats at $+1\text{h}$ (shallow) or $+2\text{h}$ (deep) above `base_height`.
+   - For water (`PRIM_LIQUID`), `base_height` is the **opaque riverbed** elevation $h_{\text{bed}}$, while the water surface sits at $+1\text{h}$ (shallow) or $+2\text{h}$ (deep) above `base_height`.
 
-2. **Baked Neighbor Skirt Drop Formula**:
-   For any cell $(i, j)$ with lowest opaque floor $h_{\text{cell}} = \text{base\_height}(i, j)$, the vertical `Cell Skirt` drop toward an adjacent neighbor $(i', j')$ is pre-computed as:
-   $$\Delta h = \max\bigl(0,\; h_{\text{cell}} - h_{\text{neighbor}}\bigr)$$
-   On the outer boundaries of the map ($i=0, i=\text{cols}-1, j=0, j=\text{rows}-1$), $h_{\text{neighbor}} = 0$, so the outer diorama walls automatically drop all the way to the base of the plinth ($\Delta h = h_{\text{cell}}$).
+2. **Render-Time Skirt Drop Formula**:
+   Skirt templates are compiled only for the **camera-facing** faces (§3.3), and which face that is changes with yaw: South when $\cos\theta \ge 0$, otherwise North; East when $\sin\theta \ge 0$, otherwise West. A single baked byte cannot describe both the N and S (or E and W) drops of a cell, so `map_grid_render` derives each drop while reading the cell, from the neighbor on the camera-facing side:
+   $$\Delta h_{ns} = \max\bigl(0,\; h_{\text{cell}} - h(i,\; j \pm 1)\bigr), \qquad \Delta h_{ew} = \max\bigl(0,\; h_{\text{cell}} - h(i \pm 1,\; j)\bigr)$$
+   where $h(\cdot)$ is the neighbor's `base_height`. Neighbors outside the map count as $h = 0$, so the outer diorama walls automatically drop to the base of the plinth. This costs two extra `ldb` reads per cell and requires no authoring; the cell's `drop_ns` / `drop_ew` bytes are not read.
+
+   Because the drop is measured against the neighbor's *lowest* floor, a skirt may extend below geometry that a front neighbor (a ramp, stair, or water surface) draws later; painter's order covers that part correctly.
 
 ---
 
 ## 3. Universal `Shape Archetypes`, `Cell Skirts`, and `Edge Panels`
 
 Every cell in the `Map Grid` is composed from up to three modular visual layers:
-1. **`Cell Skirts`**: Vertical cliff/wall faces extending downward from `base_height` by `drop_ns` / `drop_ew`.
+1. **`Cell Skirts`**: Vertical cliff/wall faces extending downward from `base_height` on the camera-facing N/S and E/W faces, down to the neighbor's floor (§2.4).
 2. **`Shape Archetype`**: The primary 3D terrain primitive occupying the cell above `base_height`.
 3. **`Edge Panels`**: Optional vertical cutout billboards ($1\text{h}$ or $2\text{h}$) along the cell's N/E/S/W perimeter.
 
@@ -209,7 +221,7 @@ Every cell in the `Map Grid` is composed from up to three modular visual layers:
 | `PRIM_FLAT` | `0` | $+0\text{h}$ | `top_tex_id` | Flat tiles, half/full blocks, bridges, false-archway gates |
 | `PRIM_WEDGE_STRAIGHT` | `1..2` | $+1\text{h}$ or $+2\text{h}$ | `top_tex_id`, `skirt_tex_id` | Sloped ramps, pitched roofs, angled buttresses |
 | `PRIM_WEDGE_OUTER` | `3..4` | $+1\text{h}$ or $+2\text{h}$ | `top_tex_id`, `skirt_tex_id` | Convex hillside corners, hipped roof corners |
-| `PRIM_WEDGE_INNER` | `5..6` | $+1\text{h}$ or $+2\text{h}$ | `top_tex_id` | Concave valley corners, roof valleys |
+| `PRIM_WEDGE_INNER` | `5..6` | $+1\text{h}$ or $+2\text{h}$ | `top_tex_id`, `skirt_tex_id` | Concave valley corners, roof valleys |
 | `PRIM_STAIRS` | `7` | $+2\text{h}$ (2 steps) | `top_tex_id`, `skirt_tex_id` | Stone/wood staircases ($+1\text{h}$ at $z=16$, $+2\text{h}$ at $z=0$) |
 | `PRIM_LIQUID_SHALLOW` | `8` | $+0\text{h}$ bed, $+1\text{h}$ top | `skirt_tex_id` (bed), `top_tex_id` (water) | Fordable rivers, canals, fountains, shallow marshes |
 | `PRIM_LIQUID_DEEP` | `9` | $+0\text{h}$ bed, $+2\text{h}$ top | `skirt_tex_id` (bed), `top_tex_id` (water) | Deep swamps, castle moats, flooded caverns |
@@ -232,7 +244,15 @@ Renders a single horizontal $32 \times 32$ quad at $y = \text{base\_height}$ usi
 ```
 
 #### 2. `PRIM_WEDGE` (`STRAIGHT`, `OUTER`, `INNER` + Rotations `ROT_0..ROT_270`)
-Sloped terrain primitives rising $+1\text{h}$ ($16$ units / $14\text{px}$) or $+2\text{h}$ ($32$ units / $28\text{px}$) above `base_height`. `WEDGE_STRAIGHT` includes two vertical triangular side cheeks (`skirt_tex_id`) that are back-face culled depending on camera `yaw`.
+Sloped terrain primitives rising $+1\text{h}$ ($16$ units / $14\text{px}$) or $+2\text{h}$ ($32$ units / $28\text{px}$) above `base_height`. Every vertical face whose top edge is above `base_height` is emitted with `skirt_tex_id` and back-face culled by camera `yaw`, so the solid is closed from every direction (for `ROT_0`; other rotations rotate the corner indices):
+
+| Variant | High corners | Vertical faces emitted |
+| :--- | :--- | :--- |
+| `WEDGE_STRAIGHT` | C0, C1 (north edge) | North back quad; West and East triangular cheeks |
+| `WEDGE_OUTER` | C0 | North and West triangular cheeks |
+| `WEDGE_INNER` | C0, C1, C3 | North and West back quads; South (C3→C2) and East (C1→C2) triangular low-side cheeks |
+
+All vertical faces use one winding convention (viewed from outside: top edge left to right, then down), which is what the screen-space back-face test expects.
 
 ```
   WEDGE_STRAIGHT (ROT_0: rises South->North)    WEDGE_OUTER (Convex)     WEDGE_INNER (Concave)
@@ -244,7 +264,7 @@ Sloped terrain primitives rising $+1\text{h}$ ($16$ units / $14\text{px}$) or $+
 ```
 
 #### 3. `PRIM_STAIRS` (2-Step Monolithic Staircase)
-Splits the cell along the canonical midpoint ($16$) into two horizontal treads (`top_tex_id` at $+1\text{h}$ and $+2\text{h}$), two vertical risers (`skirt_tex_id`), and stepped side cheeks (`skirt_tex_id`). All interior faces are pre-sorted into `ARCH_TRAPS` per yaw angle.
+Splits the cell along the canonical midpoint ($16$) into two horizontal treads (`top_tex_id` at $+1\text{h}$ and $+2\text{h}$), two vertical risers (`skirt_tex_id`), and stepped side cheeks (`skirt_tex_id`). Each side cheek is two quads: a lower $16 \times 1\text{h}$ quad under the lower tread and an upper $16 \times 2\text{h}$ quad under the upper tread. All interior faces are pre-sorted into `ARCH_TRAPS` per yaw angle.
 
 ```
               (0,32,0) +-----------+ (32,32,0)   <- Upper Tread (+2h = +32 units, top_tex_id)
@@ -270,6 +290,9 @@ Renders two stacked horizontal $32 \times 32$ quads inside a single cell without
       /  bed_tex  /     <- Opaque Riverbed (y = base_height): skirt_tex_id
      +-----------+
 ```
+
+> [!IMPORTANT]
+> `PRIM_LIQUID` emits **no vertical side walls**. Author every water surface flush with all of its neighbors' visible tops: the surface height ($\text{base\_height} + 1\text{h}$ or $+2\text{h}$) must equal the neighboring floors. A surface higher than a neighbor appears to float, and what shows through underneath changes with draw order as the camera rotates. For a deep pool next to a shore at $h$, use a riverbed of $h - 2$ (raise the surrounding terrain if needed). The showcase map raises its pool basin to $2\text{h}$ for this reason: shore at $h=2$, shallow beds at $h=1$, deep bed at $h=0$.
 
 #### 5. `PRIM_PILLAR` (Floor + Inset $[8..24] \times [8..24]$ Convex Column)
 Renders the full $32 \times 32$ floor quad (`top_tex_id`) at $y = \text{base\_height}$, followed by a central $16 \times 16$ square column spanning $x \in [8, 24], z \in [8, 24]$ and rising $+2\text{h}$ ($32$ units). Because the column is strictly convex, only its two camera-facing vertical walls (`skirt_tex_id`) and its $16 \times 16$ cap (`top_tex_id`) are emitted for any yaw angle.
@@ -301,11 +324,17 @@ Renders the $32 \times 32$ floor quad (`top_tex_id`) at $y = \text{base\_height}
 
 ### 3.3 `Cell Skirts` (`ARCH_SKIRT_NS`, `ARCH_SKIRT_EW`) & Half-Open Scanline Intervals
 
-For any camera yaw $\theta$, exactly two vertical cliff faces of a cell can face the viewer: one from $\{N, S\}$ (`drop_ns`) and one from $\{E, W\}$ (`drop_ew`). Rather than storing separate archetypes for every cliff height, the engine builds two unit-height ($1\text{h} = 14\text{px}$) vertical parallelogram templates (`ARCH_SKIRT_NS` and `ARCH_SKIRT_EW`) and scales their vertical body span by $\Delta h \times 14\text{px}$ at stamp time.
+For any camera yaw $\theta$, exactly two vertical cliff faces of a cell can face the viewer: one from $\{N, S\}$ and one from $\{E, W\}$. Rather than storing separate archetypes for every cliff height, the engine compiles two unit-height ($1\text{h} = 14\text{px}$) vertical parallelogram templates for those camera-facing faces (`ARCH_SKIRT_NS`: South if $\cos\theta \ge 0$ else North; `ARCH_SKIRT_EW`: East if $\sin\theta \ge 0$ else West) and stamps them $\Delta h$ times, stepping down $14\text{px}$ each time, using the render-time drops from §2.4.
 
 All trapezoids in `IsoEngine` use **half-open vertical scanline intervals** $[y_{\text{top}}, y_{\text{bot}})$:
 - The bottom scanline of a `Shape Archetype` ($y_{\text{top}} + \text{height}$) equals the exact top scanline of the `Cell Skirt` below it.
 - Because the upper trapezoid stops at $y_{\text{bot}} - 1$ and the skirt starts at $y_{\text{bot}}$, every screen pixel along a horizontal seam is rasterized **once and only once** (zero gaps, zero double-draw).
+
+#### Face-to-Trapezoid Compilation (`compile_face_traps`)
+- Quads are split along the $V_0 V_2$ diagonal into two triangles; each triangle is split at the middle vertex's scanline into a top and bottom trapezoid.
+- The split point $M$ on the long edge is kept in `Q8.8` (`m_xq`), and all trapezoid X edges are set up in `Q8.8`. The long edge therefore continues exactly from the top half into the bottom half, and the shared diagonal of a quad lands on the same pixels for both triangles (snapping $M$ to whole pixels left 1 px diagonal cracks).
+- Spans are drawn over $[\lfloor x_L \rfloor, \lfloor x_R \rfloor)$, so two faces sharing an edge never both claim the same pixel.
+- Each trapezoid stores its left-edge texture gradient (`du_dy`, `dv_dy`) from the edge's end-point UVs, plus the per-scanline gradient (`du_dx`, `dv_dx`). Horizontal faces derive the scanline gradient directly from yaw ($du/dx = \cos\theta$, $dv/dx = -\sin\theta$ in texels per pixel), so textures stay locked to world $x/z$ as the camera rotates.
 
 ---
 
@@ -316,7 +345,7 @@ All trapezoids in `IsoEngine` use **half-open vertical scanline intervals** $[y_
 When rendering a cell $(i, j)$, the GSU executes a deterministic **5-step intra-cell painter's pipeline**:
 
 ```
-  Step 1: Cell Skirts        (drop_ns, drop_ew below base_height using skirt_tex_id)
+  Step 1: Cell Skirts        (render-time N/S + E/W drops below base_height, skirt_tex_id)
             |
             v
   Step 2: Back Edge Panels   (panels on the 2 receding edges of the cell using panel_tex_id)
@@ -389,6 +418,9 @@ To streamline map authoring in `ca65`, define a helper macro `def_cell` that emi
     .byte h, arch, top_tex, skirt_tex, panel_tex, pflags, drop_ns, drop_ew
 .endmacro
 ```
+
+> [!NOTE]
+> The `drop_ns` / `drop_ew` arguments in the examples below predate render-time skirt derivation (§2.4). The renderer ignores them, so the skirts follow from neighbor heights alone and new maps should pass `0, 0`.
 
 ---
 
