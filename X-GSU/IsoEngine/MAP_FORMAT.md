@@ -339,28 +339,42 @@ Because **Step 5 (`Front Edge Panels`)** executes *after* the floor (`Step 3`) a
 
 ### 4.1 `TEXTURE_TABLE` & Pre-Shifted Fixed-Point $V$ Coordinates
 
-All textures live in a linear ROM atlas with power-of-two row stride $2^{\text{ATLAS\_STRIDE\_SHIFT}}$ (typically $128$ or $256$ bytes/row). Each `tex_id` (`0..255`) indexes a 4-byte descriptor in `TEXTURE_TABLE`:
+All textures live in a linear ROM atlas with power-of-two row stride $2^{\text{ATLAS\_STRIDE\_SHIFT}}$ (typically $64$, $128$, or $256$ bytes/row in Bank 4). Each `tex_id` (`0..255`) indexes an **8-byte `Texture Descriptor`** (4 16-bit words) in `TEXTURE_TABLE`:
 
-| Offset | Field | Type | Description |
-| :---: | :--- | :---: | :--- |
-| `+0` | `rom_offset` | `u16` | Base pointer `(V_atlas_base << ATLAS_STRIDE_SHIFT) \| U_atlas_base` |
-| `+2` | `u_mask` | `u8` | Horizontal power-of-two wrap mask ($2^W - 1$: `$0F`, `$1F`, `$3F`) |
-| `+3` | `v_mask` | `u8` | Vertical power-of-two wrap mask ($2^H - 1$: `$0F`, `$1F`, `$3F`) |
+| Offset | Field | Type | Size | Description |
+| :---: | :--- | :---: | :---: | :--- |
+| `+0` | `rom_offset` | `u16` | 2 B | Base link-time pointer in Bank 4: `.loword(textures_binary + (Y_base * ATLAS_WIDTH + X_base))` |
+| `+2` | `u_mask` | `u16` | 2 B | Horizontal coordinate wrap mask ($W - 1$: `$000F` for 16, `$001F` for 32, `$003F` for 64) |
+| `+4` | `v_mask` | `u16` | 2 B | Vertical coordinate wrap mask ($H - 1$: `$000F` for 16, `$001F` for 32, `$003F` for 64) |
+| `+6` | `stride_shift` | `u16` | 2 B | Power-of-two atlas row stride ($\log_2(\text{ATLAS\_WIDTH})$, e.g. 6 for 64, 7 for 128) |
 
-During inner-loop scanline rasterization, $U$ is maintained in standard `Q8.8` fixed-point, while $V$ is maintained in **pre-shifted `Q(16 - ATLAS_STRIDE_SHIFT).(ATLAS_STRIDE_SHIFT)` fixed-point**. Extracting the integer row offset and wrapping by `v_mask` requires only a single bitwise `AND` before `OR`-combining with `U_int` and adding `rom_offset`.
+```ca65
+.struct texture_descriptor
+    rom_offset    .word ; Base 16-bit address of texture (0,0) in Bank 4
+    u_mask        .word ; Horizontal coordinate bitmask (width - 1)
+    v_mask        .word ; Vertical coordinate bitmask (height - 1)
+    stride_shift  .word ; Shift count (log2(ATLAS_WIDTH)) to multiply V by atlas pitch
+.endstruct
+```
+
+During inner-loop scanline rasterization, $U$ is maintained in standard `Q8.8` fixed-point, while $V$ is maintained in **pre-shifted `Q(16 - ATLAS_STRIDE_SHIFT).(ATLAS_STRIDE_SHIFT)` fixed-point**. Extracting the integer row offset and wrapping by `v_mask_shifted = (v_mask << stride_shift)` requires only a single bitwise `AND` before `ADD`-combining with `U_int` and adding `rom_offset`.
 
 ---
 
-### 4.2 Seamless World-Space UV Alignment
+### 4.2 Seamless World-Space UV Alignment & Non-Square Dimensions
 
 Rather than resetting UV coordinates to $(0, 0)$ on every cell, `IsoEngine` shifts each cell's starting $(U_0, V_0)$ by its world-space grid coordinates masked by `(u_mask, v_mask)`:
 
-$$U_{\text{base}} = (i \times 32) \;\ \&\;\ \text{u\_mask}, \qquad V_{\text{base}} = \begin{cases} (j \times 32) \;\ \&\;\ \text{v\_mask} & \text{(Horizontal surfaces)} \\ (h \times 16) \;\ \&\;\ \text{v\_mask} & \text{(Vertical skirts / panels)} \end{cases}$$
+$$U_{\text{base}} = (i \times 32) \;\ \&\;\ \text{u\_mask}, \qquad V_{\text{base}} = \begin{cases} (j \times 32) \;\ \&\;\ \text{v\_mask} & \text{(Horizontal surfaces)} \\ (s \times 16) \;\ \&\;\ \text{v\_mask} & \text{(Vertical skirts / panels)} \end{cases}$$
 
-This single formula automatically supports three texture tiling scales out of the box:
-- **$16 \times 16$ Micro-Tile (`mask = $0F`)**: Repeats $2 \times 2$ times across a $32 \times 32$ cell floor or $2 \times 1$ across a $1\text{h}$ skirt.
-- **$32 \times 32$ Standard Tile (`mask = $1F`)**: Maps $1:1$ onto a single cell floor or a $2\text{h}$ ($32$-unit) full-block wall.
-- **$64 \times 64+$ Macro-Tile (`mask = $3F`)**: Seamlessly spans a $2 \times 2$ block of cells horizontally or a $4\text{h}$ ($64$-unit) vertical cliff face—allowing large stone arches, rose windows, or multi-tile mosaics without splitting geometry.
+Individual textures support independent power-of-two dimensions $W, H \in \{16, 32, 64, 128, 256\}$, maintaining strict **1:1 World-to-Texel scaling**:
+- **$32 \times 32$ Standard Tile (`u_mask = $1F, v_mask = $1F`)**: Maps $1:1$ onto a single cell floor, slope, or a $2\text{h}$ ($32$-unit) full-block wall.
+- **$32 \times 16$ Non-Square Parapet (`u_mask = $1F, v_mask = $0F`)**: Maps $1:1$ onto a $1\text{h}$ (16-unit) parapet `Edge Panel` along a 32-unit cell edge with zero vertical stretching.
+- **$16 \times 32$ Non-Square Foliage Fin (`u_mask = $0F, v_mask = $1F`)**: Maps $1:1$ onto a half-cell $16 \times 32$ cutout fin radiating from cell center $(16, 16)$ in `PRIM_FOLIAGE_CROSS`.
+- **$16 \times 16$ Micro-Tile (`u_mask = $0F, v_mask = $0F`)**: Repeats $2 \times 2$ times across a $32 \times 32$ cell floor or $2 \times 1$ across a $1\text{h}$ skirt.
+- **$64 \times 64+$ Macro-Tile (`u_mask = $3F, v_mask = $3F`)**: Seamlessly spans a $2 \times 2$ block of cells horizontally or a $4\text{h}$ ($64$-unit) vertical cliff face.
+
+Because 32 is an exact integer multiple of 16 ($32 \pmod{16} \equiv 0$), non-square $16$-pixel boundaries wrap cleanly to 0 at cell borders ($(i \times 32) \ \& \ 15 \equiv 0$) with zero sub-pixel seam or alignment drift.
 
 > **Future UV Wrapping Modes (`panel_flags` bits `5..7`)**: Bits `5..7` of `panel_flags` are reserved (`000` in v1) for future per-cell UV mapping overrides, including **tile/repeat** (default), **fill/stretch** (scaling a $16\times 16$ texture across a $32\times 32$ face), and **clamp** (single non-repeating decal placement).
 

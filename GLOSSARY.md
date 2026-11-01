@@ -78,4 +78,8 @@ _Avoid_: Tile pixel, byte pixel
 The symbolic metadata manifest describing the Texture Atlas dimensions and each Source Texture's identifier, coordinates, dimensions, and byte offset for use by the engine.
 _Avoid_: Index file, texture header
 
+### Texture Descriptor
+An 8-byte record within the Texture Table (`TEXTURE_TABLE`) defining a Source Texture's base ROM offset, horizontal coordinate bitmask (`u_mask`), vertical coordinate bitmask (`v_mask`), and power-of-two row stride shift (`stride_shift`) within the Texture Atlas.
+_Avoid_: Texture entry, texture header, slot struct
+
 
