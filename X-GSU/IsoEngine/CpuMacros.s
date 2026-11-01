@@ -66,12 +66,11 @@
 
 ; Checks if the GSU is currently running (Z flag = 1 if idle, 0 if running)
 ; In:       None
-; Out:      Z flag set if GSU is idle (R15 == 0), clear if running
-; Clobbers: Flags (registers preserved via RW_push/RW_pull)
+; Out:      Z flag set if GSU is idle (SFR bit 5 == 0), clear if running (SFR bit 5 == 1)
+; Clobbers: A, Flags
 .macro gsuRunning
-  RW_push set:a16
-  lda GSU_R15
-  RW_pull
+  lda GSU_SFR
+  and #%00100000
 .endmac
 
 ; Exits the VBlank interrupt handler via RTL

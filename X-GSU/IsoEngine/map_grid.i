@@ -508,6 +508,177 @@ function map_compile_panel_quad v0_p, v1_p, v2_p, v3_p, uv_m, v_ht
 endfunction
 
 ; ==============================================================================
+; map_compile_fin_quad
+; Compiles a 16x32 vertical foliage cutout fin quad face into cached_traps
+; at compile_out_ptr (+64).
+; In:
+;   r1 = v0_ptr
+;   r2 = v1_ptr
+;   r3 = v2_ptr
+;   r4 = v3_ptr
+;   r5 = uv_mode
+;   r6 = tex_id (2 for panel_tex_id slot)
+; Modifies:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
+    register v0_p = r1, v1_p = r2, v2_p = r3, v3_p = r4, uv_m = r5, tex_i = r6
+
+    iwt r7, #gsu_map_face_def
+    iwt r0, #(FACE_DEF_FLAG_QUAD | FACE_DEF_FLAG_PTRS)
+    stw (r7)            ; flags (+0)
+    inc r7
+    inc r7
+    from uv_m
+    stw (r7)            ; uv_mode (+2)
+    inc r7
+    inc r7
+    from tex_i
+    stw (r7)            ; tex_id (+4)
+    inc r7
+    inc r7
+    iwt r0, #ATLAS_STRIDE_SHIFT
+    stw (r7)            ; stride_shift (+6)
+    inc r7
+    inc r7
+
+    ; Read cos_yaw and sin_yaw from cam_ptr (gsu_map_render_frame + 0)
+    iwt r8, #gsu_map_render_frame
+    ldw (r8)
+    inc r0
+    inc r0
+    move r8, r0
+    ldw (r8)            ; sin_yaw
+    move r9, r0
+    inc r8
+    inc r8
+    ldw (r8)            ; cos_yaw
+    from r0
+    stw (r7)            ; cos_yaw (+8)
+    inc r7
+    inc r7
+    from r9
+    stw (r7)            ; sin_yaw (+10)
+    inc r7
+    inc r7
+
+    ; V0: Top-Left (u0=0, v0=0)
+    from v0_p
+    stw (r7)            ; v0.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u0 = 0
+    inc r7
+    inc r7
+    stw (r7)            ; v0 = 0
+    inc r7
+    inc r7
+
+    ; V1: Top-Right (u1 = 16 << 8 = $1000, v1 = 0)
+    from v1_p
+    stw (r7)            ; v1.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$1000      ; 16 << 8
+    stw (r7)            ; u1
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; v1 = 0
+    inc r7
+    inc r7
+
+    ; V2: Bottom-Right (u2 = 16 << 8 = $1000, v2 = 32 << ATLAS_STRIDE_SHIFT)
+    from v2_p
+    stw (r7)            ; v2.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    iwt r0, #$1000      ; 16 << 8
+    stw (r7)            ; u2
+    inc r7
+    inc r7
+    iwt r0, #(32 << ATLAS_STRIDE_SHIFT)
+    stw (r7)            ; v2
+    inc r7
+    inc r7
+
+    ; V3: Bottom-Left (u3 = 0, v3 = 32 << ATLAS_STRIDE_SHIFT)
+    from v3_p
+    stw (r7)            ; v3.x_or_ptr
+    inc r7
+    inc r7
+    iwt r0, #0
+    stw (r7)            ; pad
+    inc r7
+    inc r7
+    stw (r7)            ; u3 = 0
+    inc r7
+    inc r7
+    iwt r0, #(32 << ATLAS_STRIDE_SHIFT)
+    stw (r7)            ; v3
+
+    ; Call compile_face_traps:
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    move r2, r0         ; r2 = compile_out_ptr
+    iwt r1, #gsu_map_face_def
+    call compile_face_traps r1, r2
+
+    ; If r3 == 0 (culled): return
+    with r3
+    add #0
+    beq @fin_done
+    nop
+
+    ; Add r3 to arch_trap_count (+66)
+    iwt r7, #gsu_map_render_frame + 66
+    ldw (r7)
+    with r0
+    add r3
+    from r0
+    stw (r7)
+
+    ; Advance compile_out_ptr by r3 * 26:
+    ; 26 = (r3 << 4) + (r3 << 3) + (r3 << 1)
+    move r1, r3
+    with r1
+    add r1              ; r3 * 2
+    move r2, r1         ; * 2
+    with r1
+    add r1              ; * 4
+    with r1
+    add r1              ; * 8
+    move r4, r1         ; * 8
+    with r1
+    add r1              ; * 16
+    with r1
+    add r4              ; * 24
+    with r1
+    add r2              ; * 26
+    iwt r7, #gsu_map_render_frame + 64
+    ldw (r7)
+    with r0
+    add r1
+    from r0
+    stw (r7)            ; compile_out_ptr += r3 * 26
+
+@fin_done:
+    return
+endfunction
+
+; ==============================================================================
 ; map_compile_tri_face
 ; Compiles a triangular face into cached_traps at compile_out_ptr (+64).
 ; In:
@@ -704,7 +875,7 @@ function compile_fin_n
 @fin_n_compile:
     iwt r5, #UV_MODE_WALL_NS
     iwt r6, #2          ; panel_tex_id
-    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+    call map_compile_fin_quad r1, r2, r3, r4, r5, r6
     return
 endfunction
 
@@ -751,7 +922,7 @@ function compile_fin_s
 @fin_s_compile:
     iwt r5, #UV_MODE_WALL_NS
     iwt r6, #2          ; panel_tex_id
-    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+    call map_compile_fin_quad r1, r2, r3, r4, r5, r6
     return
 endfunction
 
@@ -799,7 +970,7 @@ function compile_fin_e
 @fin_e_compile:
     iwt r5, #UV_MODE_WALL_EW
     iwt r6, #2          ; panel_tex_id
-    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+    call map_compile_fin_quad r1, r2, r3, r4, r5, r6
     return
 endfunction
 
@@ -847,7 +1018,7 @@ function compile_fin_w
 @fin_w_compile:
     iwt r5, #UV_MODE_WALL_EW
     iwt r6, #2          ; panel_tex_id
-    call map_compile_quad_face r1, r2, r3, r4, r5, r6
+    call map_compile_fin_quad r1, r2, r3, r4, r5, r6
     return
 endfunction
 

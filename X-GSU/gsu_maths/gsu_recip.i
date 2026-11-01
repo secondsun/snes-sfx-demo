@@ -21,6 +21,7 @@
 .ifndef ::__GSU_RECIP_DEFINED__
 ::__GSU_RECIP_DEFINED__ = 1   
 
+.segment "GSUCODE"
 
 .include "libSFX.i"
 .include "../common/stack.i"

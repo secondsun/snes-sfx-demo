@@ -27,7 +27,9 @@ ATLAS_SIZE_BYTES   = 8192
 ;;   fast bitwise shifts compute the row byte offset in the atlas:
 ;;     row_offset = V << ATLAS_STRIDE_SHIFT   (e.g. V << 6 for width 64)
 ;;     texel_offset = row_offset + U
+.ifndef ATLAS_STRIDE_SHIFT
 ATLAS_STRIDE_SHIFT = 6
+.endif
 
 ;; ==============================================================================
 ;; Per-Texture Symbolic Constants
@@ -77,19 +79,8 @@ TEXTURE_WATER_U_MASK = 31
 TEXTURE_WATER_V_MASK = 31
 TEXTURE_WATER_WIDTH_SHIFT = 5 ; log2(32): V << 5
 
-TEXTURE_ID_STONE = 3
-TEXTURE_STONE_BYTE_OFFSET = 24
-TEXTURE_STONE_X = 0
-TEXTURE_STONE_Y = 64
-TEXTURE_STONE_WIDTH = 32
-TEXTURE_STONE_HEIGHT = 32
-TEXTURE_STONE_OFFSET = 4096
-TEXTURE_STONE_U_MASK = 31
-TEXTURE_STONE_V_MASK = 31
-TEXTURE_STONE_WIDTH_SHIFT = 5 ; log2(32): V << 5
-
-TEXTURE_ID_SAND = 4
-TEXTURE_SAND_BYTE_OFFSET = 32
+TEXTURE_ID_SAND = 3
+TEXTURE_SAND_BYTE_OFFSET = 24
 TEXTURE_SAND_X = 0
 TEXTURE_SAND_Y = 32
 TEXTURE_SAND_WIDTH = 32
@@ -99,17 +90,67 @@ TEXTURE_SAND_U_MASK = 31
 TEXTURE_SAND_V_MASK = 31
 TEXTURE_SAND_WIDTH_SHIFT = 5 ; log2(32): V << 5
 
+TEXTURE_ID_WATER_DEEP = 4
+TEXTURE_WATER_DEEP_BYTE_OFFSET = 32
+TEXTURE_WATER_DEEP_X = 32
+TEXTURE_WATER_DEEP_Y = 32
+TEXTURE_WATER_DEEP_WIDTH = 32
+TEXTURE_WATER_DEEP_HEIGHT = 32
+TEXTURE_WATER_DEEP_OFFSET = 2080
+TEXTURE_WATER_DEEP_U_MASK = 31
+TEXTURE_WATER_DEEP_V_MASK = 31
+TEXTURE_WATER_DEEP_WIDTH_SHIFT = 5 ; log2(32): V << 5
+
+TEXTURE_ID_STONE = 5
+TEXTURE_STONE_BYTE_OFFSET = 40
+TEXTURE_STONE_X = 0
+TEXTURE_STONE_Y = 64
+TEXTURE_STONE_WIDTH = 32
+TEXTURE_STONE_HEIGHT = 32
+TEXTURE_STONE_OFFSET = 4096
+TEXTURE_STONE_U_MASK = 31
+TEXTURE_STONE_V_MASK = 31
+TEXTURE_STONE_WIDTH_SHIFT = 5 ; log2(32): V << 5
+
+TEXTURE_ID_PARAPET = 6
+TEXTURE_PARAPET_BYTE_OFFSET = 48
+TEXTURE_PARAPET_X = 0
+TEXTURE_PARAPET_Y = 64
+TEXTURE_PARAPET_WIDTH = 32
+TEXTURE_PARAPET_HEIGHT = 16
+TEXTURE_PARAPET_OFFSET = 4096
+TEXTURE_PARAPET_U_MASK = 31
+TEXTURE_PARAPET_V_MASK = 15
+TEXTURE_PARAPET_WIDTH_SHIFT = 5
+
+TEXTURE_ID_FOLIAGE = 7
+TEXTURE_FOLIAGE_BYTE_OFFSET = 56
+TEXTURE_FOLIAGE_X = 32
+TEXTURE_FOLIAGE_Y = 0
+TEXTURE_FOLIAGE_WIDTH = 16
+TEXTURE_FOLIAGE_HEIGHT = 32
+TEXTURE_FOLIAGE_OFFSET = 32
+TEXTURE_FOLIAGE_U_MASK = 15
+TEXTURE_FOLIAGE_V_MASK = 31
+TEXTURE_FOLIAGE_WIDTH_SHIFT = 4
+
 ;; ==============================================================================
 ;; Texture Table for runtime descriptor lookup
 ;; Indexed at runtime via: TEXTURE_TABLE + TEXTURE_<NAME>_BYTE_OFFSET
 ;; Format per entry: rom_offset, u_mask, v_mask, stride_shift (8 bytes total)
 ;; ==============================================================================
+.segment "GSUDATA"
+.import textures_binary
+.export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word 0, 31, 31, 6 ; 0: roof
-    .word 32, 31, 31, 6 ; 1: grass
-    .word 2080, 31, 31, 6 ; 2: water
-    .word 2048, 31, 31, 6 ; 3: sand
-    .word 2080, 31, 31, 6 ; 4: water
-    .word 4096, 31, 31, 6 ; 5: stone
+    .word .loword(textures_binary + TEXTURE_ROOF_OFFSET),    31, 31, ATLAS_STRIDE_SHIFT ; 0: roof (32x32)
+    .word .loword(textures_binary + TEXTURE_GRASS_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 1: grass (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 2: water (32x32)
+    .word .loword(textures_binary + TEXTURE_SAND_OFFSET),    31, 31, ATLAS_STRIDE_SHIFT ; 3: sand (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 4: water deep (32x32)
+    .word .loword(textures_binary + TEXTURE_STONE_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 5: stone (32x32)
+    .word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, 15, ATLAS_STRIDE_SHIFT ; 6: parapet (32x16)
+    .word .loword(textures_binary + TEXTURE_FOLIAGE_OFFSET), 15, 31, ATLAS_STRIDE_SHIFT ; 7: foliage fin (16x32)
+.segment "GSUCODE"
 
 .endif ; __TEXTURES_I_DEFINED__

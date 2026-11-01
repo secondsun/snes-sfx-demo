@@ -2,22 +2,21 @@
 .include "libSFX.i"
 .include "../common/stack.i"
 .include "../common/function.i"
+.include "../common/control.i"
 .include "../common/structs.i"
 .include "../common/var.i"
 .include "../common/util.i"
-.include "./macros/geometry.i"
-.include "./constants.i"
 
-.segment "GSUCODE"
-.include "../gsu_maths/gsu_recip.i"
-.include "../gsu_maths/gsu_iso_camera.i"
+.include "map_grid.i"
+.include "Data/TEXTURES.i"
+.include "Data/showcase_map.i"
 
 .segment "GSUCODE"
 GSU_Code:
 .export GSU_Code
 
     init_stack
-    register fb_ptr, cam_ptr, v3_ptr, v2_ptr, cnt, yaw_val, tri_ptr, tri_color, tmp
+    register fb_ptr, cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr, map_ptr, frame_half, debug_ptr, tmp, cx_val, cy_val
 
 resetFrameBuffer:
     iwt r0, #0
@@ -51,58 +50,73 @@ init_gsu_main:
 scene_initialized:
 
     ; Check GSU_FRAME_HALF:
-    ; Pass 0 (left half, X in 0..127): update camera yaw, project 8 cube vertices, cull faces, cache 2D triangles
-    ; Pass 1 (right half, X in 128..255): reuse cached 2D triangles directly
+    ; Pass 0 (left half, X in 0..127): update camera controls, compile archetypes if yaw is dirty, render left half
+    ; Pass 1 (right half, X in 128..255): render right half using cached archetypes
     iwt tmp, #GSU_FRAME_HALF
     ldb (tmp)
     with r0
     add #0
-    bne rasterize_cached_tris
+    beq @do_pass0
     nop
+    iwt r15, #do_pass1
+    nop
+@do_pass0:
 
     ; --- Pass 0: Update camera yaw (L/R) and translation (D-pad) from controller ---
     lm tmp, (GSU_JOYPAD)
     iwt cam_ptr, #ISO_CAM
     call iso_camera_update_controls cam_ptr, tmp
 
-    ; --- Pass 0: Project 72 unique model vertices to 2D screen coordinates ---
+    ; Synchronize camera center_x / center_y to map origin_x / origin_z
     iwt cam_ptr, #ISO_CAM
-    iwt v3_ptr, #MODEL_V3
-    iwt v2_ptr, #MODEL_V2
-    iwt cnt, #72
-    call iso_camera_project_mesh cam_ptr, v3_ptr, v2_ptr, cnt
+    from cam_ptr
+    add #6
+    move tmp, r0
+    ldw (tmp)
+    move cx_val, r0     ; cx_val = center_x
+    inc tmp
+    inc tmp
+    ldw (tmp)
+    move cy_val, r0     ; cy_val = center_y
 
-    ; --- Pass 0: Backface-cull and depth-sort scene faces into CACHED_TRIS ---
-    call build_visible_triangles
+    iwt map_ptr, #MAP_BUF
+    inc map_ptr
+    inc map_ptr
+    from cx_val
+    stw (map_ptr)       ; origin_x = center_x
+    inc map_ptr
+    inc map_ptr
+    from cy_val
+    stw (map_ptr)       ; origin_z = center_y
 
-rasterize_cached_tris:
-    lm cnt, (CACHED_TRI_COUNT)
-    with cnt
-    add #0
-    beq finish
+    ; Check if yaw is dirty; if dirty, compile archetypes
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt lat_ptr, #LATTICE_V2
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt yaw_ptr, #CACHED_YAW
+    call map_grid_compile_archetypes cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr
+
+    ; Render Pass 0 (frame_half = 0)
+    iwt map_ptr, #MAP_BUF
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt frame_half, #0
+    iwt debug_ptr, #0
+    call map_grid_render map_ptr, cam_ptr, basis_ptr, arch_ptr, frame_half, debug_ptr
+    bra finish
     nop
-    iwt tri_ptr, #CACHED_TRIS
-    forR cnt
-        from tri_ptr
-        to tmp
-        add #12
-        to tri_color
-        ldw (tmp)
-        with tri_color
-        add #0
-        bmi @draw_tex_tri
-        nop
-            call draw_triangle tri_ptr, tri_color
-            bra @next_cached_tri
-            nop
-@draw_tex_tri:
-            call draw_cached_textured_triangle tri_ptr, tri_color
-@next_cached_tri:
-        with tri_ptr
-        add #8
-        with tri_ptr
-        add #8
-    endfor
+
+do_pass1:
+    ; Render Pass 1 (frame_half = 1)
+    iwt map_ptr, #MAP_BUF
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt frame_half, #1
+    iwt debug_ptr, #0
+    call map_grid_render map_ptr, cam_ptr, basis_ptr, arch_ptr, frame_half, debug_ptr
 
 finish:
 shutdown:
@@ -121,145 +135,12 @@ shutdown:
     nop
     nop
 
-; Unpacks a cached 2D triangle and its quad UV coordinates into TEX_TRI_VERTS and calls draw_textured_triangle.
-function draw_cached_textured_triangle tri_ptr, tri_color
-    register src_ptr, dst_ptr, tex_id, tri_part, tmp
-
-    move src_ptr, tri_ptr
-    iwt r0, #$7FFF
-    to tex_id
-    and tri_color
-
-    from src_ptr
-    add #14
-    move tmp, r0
-    to tri_part
-    ldw (tmp)
-
-    iwt dst_ptr, #TEX_TRI_VERTS
-
-    ; Vertex 0 (v0): (x0, y0, u0 = $0000, v0 = $1F00)
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$0000
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$1F00
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-
-    with tri_part
-    add #0
-    bne @tri_part_2
-    nop
-
-    ; Triangle 1 (v0, v1, v2):
-    ; Vertex 1 (v1): (x1, y1, u1 = $0000, v1 = $0000)
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$0000
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-
-    ; Vertex 2 (v2): (x2, y2, u2 = $1F00, v2 = $0000)
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$1F00
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$0000
-    stw (dst_ptr)
-    bra @do_draw
-    nop
-
-@tri_part_2:
-    ; Triangle 2 (v0, v2, v3):
-    ; Vertex 1 (v2): (x1, y1, u1 = $1F00, v1 = $0000)
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$1F00
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$0000
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-
-    ; Vertex 2 (v3): (x2, y2, u2 = $1F00, v2 = $1F00)
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc src_ptr
-    inc src_ptr
-    inc dst_ptr
-    inc dst_ptr
-    ldw (src_ptr)
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    iwt r0, #$1F00
-    stw (dst_ptr)
-    inc dst_ptr
-    inc dst_ptr
-    stw (dst_ptr)
-
-@do_draw:
-    iwt dst_ptr, #TEX_TRI_VERTS
-    call draw_textured_triangle dst_ptr, tex_id
-    return
-endfunction
-
-; Initializes MODEL_V3, MODEL_FACES, and ISO_CAM once on boot.
+; Initializes MAP_BUF, CACHED_YAW, and ISO_CAM once on boot.
 function init_iso_scene
     register cam_ptr, val
 
-    ; Copy 872 bytes (432 bytes MODEL_V3 + 440 bytes MODEL_FACES) from ROM bank 3 to GSURAM
-    rom_to_ram scene_vertices_rom, #3, MODEL_V3, 872
+    ; Copy 520 bytes of SHOWCASE_MAP_ROM from ROM bank 4 to MAP_BUF in GSURAM
+    rom_to_ram SHOWCASE_MAP_ROM, #4, MAP_BUF, 520
 
     ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80, cam_x = 0, cam_z = 0
     iwt cam_ptr, #ISO_CAM
@@ -289,443 +170,18 @@ function init_iso_scene
     from val
     stw (cam_ptr) ; cam_z = 0
 
+    ; Mark CACHED_YAW as invalid ($FFFF) so first frame recompiles archetypes
+    iwt val, #$FFFF
+    sm (CACHED_YAW), val
+
     iwt val, #1
     sm (GSU_INIT_FLAG), val
 
     return
 endfunction
 
-; Backface-culls a contiguous slice of faces and writes visible triangles into CACHED_TRIS.
-function cull_and_emit_faces face_list_ptr, face_count
-    register face_ptr, cache_ptr, v_ptr, x0, y0, dx1, dy1, dx2, tmp, cnt
-
-    move face_ptr, face_list_ptr
-    move cnt, face_count
-
-    lm cache_ptr, (CACHED_TRI_WRITE_PTR)
-
-    forR cnt
-        ; Load v0 -> (x0, y0)
-        ldw (face_ptr)
-        move v_ptr, r0
-        to x0
-        ldw (v_ptr)
-        inc v_ptr
-        inc v_ptr
-        to y0
-        ldw (v_ptr)
-
-        ; Load v1 -> dx1 = x1 - x0, dy1 = y1 - y0
-        inc face_ptr
-        inc face_ptr
-        ldw (face_ptr)
-        move v_ptr, r0
-        ldw (v_ptr)
-        to dx1
-        sub x0
-        inc v_ptr
-        inc v_ptr
-        ldw (v_ptr)
-        to dy1
-        sub y0
-
-        ; Load v2 -> dx2 = x2 - x0, r0 = y2 - y0
-        inc face_ptr
-        inc face_ptr
-        ldw (face_ptr)
-        move v_ptr, r0
-        ldw (v_ptr)
-        to dx2
-        sub x0
-        inc v_ptr
-        inc v_ptr
-        ldw (v_ptr)
-        sub y0
-
-        ; 2D cross product: cross = dx1 * (y2 - y0) - dy1 * dx2
-        to dx1
-        mult dx1
-        from dy1
-        mult dx2
-        from dx1
-        sub r0
-
-        beq do_skip_face
-        nop
-        bmi do_skip_face
-        nop
-        bra emit_face
-        nop
-
-do_skip_face:
-        with face_ptr
-        add #6
-        iwt r15, #face_done
-        nop
-
-emit_face:
-        ; Face is front-facing (cross > 0): rewind face_ptr to +0 and load color into dx2
-        with face_ptr
-        sub #4
-        from face_ptr
-        add #8
-        move v_ptr, r0
-        to dx2
-        ldw (v_ptr)
-
-        ; Emit Triangle 1: (v0, v1, v2, color, pad)
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v0
-        inc face_ptr
-        inc face_ptr
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v1
-        inc face_ptr
-        inc face_ptr
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v2
-        from dx2
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        iwt r0, #0
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-
-        ; Check if this face is a triangle (v3 == v2):
-        ; Currently face_ptr is at +4 (pointing to v2).
-        ldw (face_ptr)
-        move tmp, r0
-        inc face_ptr
-        inc face_ptr
-        ldw (face_ptr)
-        with r0
-        sub tmp
-        beq skip_triangle_2
-        nop
-
-        ; Emit Triangle 2: (v0, v2, v3, color, pad=1)
-        ; face_ptr is currently at +6 (pointing to v3).
-        with face_ptr
-        sub #6
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v0 (+0)
-        with face_ptr
-        add #4
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v2 (+4)
-        inc face_ptr
-        inc face_ptr
-        _copy_vertex_to_cache face_ptr, v_ptr, cache_ptr ; v3 (+6)
-        from dx2
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-        iwt r0, #1
-        stw (cache_ptr)
-        inc cache_ptr
-        inc cache_ptr
-
-        ; Advance face_ptr from +6 past color (+8) to start of next face (+10)
-        with face_ptr
-        add #4
-        iwt r15, #face_done
-        nop
-
-skip_triangle_2:
-        ; Advance face_ptr from +6 past color (+8) to start of next face (+10)
-        with face_ptr
-        add #4
-
-face_done:
-    endfor
-
-    sm (CACHED_TRI_WRITE_PTR), cache_ptr
-    return
-endfunction
-
-; Dispatches face pointer and face count for an object ID (0..4) and culls/emits its faces
-function emit_object_by_id obj_id
-    register face_ptr, face_count, tmp
-
-    ; obj_id == 0: House (offset 130, count 14)
-    iwt tmp, #0
-    from obj_id
-    cmp tmp
-    bne not_house
-    nop
-    iwt face_ptr, #(MODEL_FACES + 130)
-    iwt face_count, #14
-    bra do_emit
-    nop
-
-not_house:
-    ; obj_id == 1: Tree 1 (offset 270, count 4)
-    iwt tmp, #1
-    from obj_id
-    cmp tmp
-    bne not_tree1
-    nop
-    iwt face_ptr, #(MODEL_FACES + 270)
-    iwt face_count, #4
-    bra do_emit
-    nop
-
-not_tree1:
-    ; obj_id == 2: Tree 2 (offset 310, count 4)
-    iwt tmp, #2
-    from obj_id
-    cmp tmp
-    bne not_tree2
-    nop
-    iwt face_ptr, #(MODEL_FACES + 310)
-    iwt face_count, #4
-    bra do_emit
-    nop
-
-not_tree2:
-    ; obj_id == 3: Tree 3 (offset 350, count 4)
-    iwt tmp, #3
-    from obj_id
-    cmp tmp
-    bne not_tree3
-    nop
-    iwt face_ptr, #(MODEL_FACES + 350)
-    iwt face_count, #4
-    bra do_emit
-    nop
-
-not_tree3:
-    ; obj_id == 4: Well (offset 390, count 5)
-    iwt face_ptr, #(MODEL_FACES + 390)
-    iwt face_count, #5
-
-do_emit:
-    call cull_and_emit_faces face_ptr, face_count
-    return
-endfunction
-
-; Depth-sorts scene objects and populates CACHED_TRIS with visible triangles.
-function build_visible_triangles
-    register cam_ptr, face_ptr, face_count, s_yaw, c_yaw, mul_b = r6
-    register depth0, depth1, depth2, depth3, depth4
-    register pass_cnt, pair_idx, order_ptr, obj_a, obj_b, depth_a, depth_b
-    register dptr, tmp, obj_id
-
-    ; Reset cache write pointer to start of CACHED_TRIS
-    iwt tmp, #CACHED_TRIS
-    sm (CACHED_TRI_WRITE_PTR), tmp
-
-    ; 1. Always emit terrain first (13 faces at MODEL_FACES + 0)
-    iwt face_ptr, #MODEL_FACES
-    iwt face_count, #13
-    call cull_and_emit_faces face_ptr, face_count
-
-    ; 2. Load sin_yaw and cos_yaw from ISO_CAM
-    iwt cam_ptr, #(ISO_CAM + 2)
-    to s_yaw
-    ldw (cam_ptr)
-    inc cam_ptr
-    inc cam_ptr
-    to c_yaw
-    ldw (cam_ptr)
-
-    ; Obj 0 (House) is at (0, 0), depth = 0
-    iwt depth0, #0
-
-    ; For Objects 1..4: depth = cx * sin_yaw + cz * cos_yaw
-    ; Obj 1 (Tree 1): cx = -58 ($C600), cz = 42 ($2A00)
-    ; Obj 2 (Tree 2): cx =  58 ($3A00), cz = -44 ($D400)
-    ; Obj 3 (Tree 3): cx = -58 ($C600), cz = -44 ($D400)
-    ; Obj 4 (Well):   cx =  50 ($3200), cz =  38 ($2600)
-
-    ; Multiply with sin_yaw (r6 = s_yaw)
-    move mul_b, s_yaw
-    iwt r0, #$C600
-    fmult
-    move depth1, r0
-
-    iwt r0, #$3A00
-    fmult
-    move depth2, r0
-
-    iwt r0, #$C600
-    fmult
-    move depth3, r0
-
-    iwt r0, #$3200
-    fmult
-    move depth4, r0
-
-    ; Multiply with cos_yaw (r6 = c_yaw) and add
-    move mul_b, c_yaw
-    iwt r0, #$2A00
-    fmult
-    with depth1
-    add r0
-
-    iwt r0, #$D400
-    fmult
-    with depth2
-    add r0
-
-    iwt r0, #$D400
-    fmult
-    with depth3
-    add r0
-
-    iwt r0, #$2600
-    fmult
-    with depth4
-    add r0
-
-    ; Store depths into OBJ_DEPTHS[0..4]
-    iwt dptr, #OBJ_DEPTHS
-    from depth0
-    stw (dptr)
-    inc dptr
-    inc dptr
-    from depth1
-    stw (dptr)
-    inc dptr
-    inc dptr
-    from depth2
-    stw (dptr)
-    inc dptr
-    inc dptr
-    from depth3
-    stw (dptr)
-    inc dptr
-    inc dptr
-    from depth4
-    stw (dptr)
-
-    ; Initialize OBJ_ORDER = [0, 1, 2, 3, 4]
-    iwt order_ptr, #OBJ_ORDER
-    iwt tmp, #0
-    from tmp
-    stw (order_ptr)
-    inc order_ptr
-    inc order_ptr
-    iwt tmp, #1
-    from tmp
-    stw (order_ptr)
-    inc order_ptr
-    inc order_ptr
-    iwt tmp, #2
-    from tmp
-    stw (order_ptr)
-    inc order_ptr
-    inc order_ptr
-    iwt tmp, #3
-    from tmp
-    stw (order_ptr)
-    inc order_ptr
-    inc order_ptr
-    iwt tmp, #4
-    from tmp
-    stw (order_ptr)
-
-    ; Bubble sort OBJ_ORDER (5 elements) by OBJ_DEPTHS
-    iwt pass_cnt, #4
-sort_outer_loop:
-    iwt order_ptr, #OBJ_ORDER
-    iwt pair_idx, #4
-sort_inner_loop:
-    ; Load obj_a and obj_b
-    ldw (order_ptr)
-    move obj_a, r0
-    inc order_ptr
-    inc order_ptr
-    ldw (order_ptr)
-    move obj_b, r0
-
-    ; Load depth_a = OBJ_DEPTHS[obj_a * 2]
-    from obj_a
-    to dptr
-    add obj_a
-    iwt tmp, #OBJ_DEPTHS
-    with dptr
-    add tmp
-    ldw (dptr)
-    move depth_a, r0
-
-    ; Load depth_b = OBJ_DEPTHS[obj_b * 2]
-    from obj_b
-    to dptr
-    add obj_b
-    with dptr
-    add tmp
-    ldw (dptr)
-    move depth_b, r0
-
-    ; Compare: if depth_b >= depth_a, no swap
-    from depth_b
-    cmp depth_a
-    bge sort_no_swap
-    nop
-
-    ; Swap in OBJ_ORDER:
-    from obj_a
-    stw (order_ptr)
-    dec order_ptr
-    dec order_ptr
-    from obj_b
-    stw (order_ptr)
-    inc order_ptr
-    inc order_ptr
-
-sort_no_swap:
-    with pair_idx
-    dec pair_idx
-    bne sort_inner_loop
-    nop
-
-    with pass_cnt
-    dec pass_cnt
-    bne sort_outer_loop
-    nop
-
-    ; 3. Emit the 5 scene objects in depth-sorted order
-    lm obj_id, (OBJ_ORDER + 0)
-    call emit_object_by_id obj_id
-
-    lm obj_id, (OBJ_ORDER + 2)
-    call emit_object_by_id obj_id
-
-    lm obj_id, (OBJ_ORDER + 4)
-    call emit_object_by_id obj_id
-
-    lm obj_id, (OBJ_ORDER + 6)
-    call emit_object_by_id obj_id
-
-    lm obj_id, (OBJ_ORDER + 8)
-    call emit_object_by_id obj_id
-
-    ; Compute total cached triangles: CACHED_TRI_COUNT = (CACHED_TRI_WRITE_PTR - CACHED_TRIS) >> 4
-    lm tmp, (CACHED_TRI_WRITE_PTR)
-    iwt r0, #CACHED_TRIS
-    from tmp
-    sub r0
-    lsr
-    lsr
-    lsr
-    lsr
-    move tmp, r0
-    sm (CACHED_TRI_COUNT), tmp
-
-    return
-endfunction
-
-.align 2
-scene_vertices_rom:
-    scene_vertices
-scene_faces_rom:
-    scene_faces
-house_vertices_rom = scene_vertices_rom
-house_faces_rom = scene_faces_rom
-cube_vertices_rom = scene_vertices_rom
-cube_faces_rom = scene_faces_rom
-
-.include "./triangle/drawTriangle.i"
-
 .segment "GSURAM"
+.align 2
 GSU_INIT_FLAG:
     .res 2
 .export GSU_INIT_FLAG
@@ -737,28 +193,19 @@ GSU_JOYPAD:
 .export GSU_JOYPAD
 ISO_CAM:
     .tag iso_camera
-MODEL_V3:
-    .res 72 * .sizeof(vector3)
-MODEL_FACES:
-    .res 44 * 10
-MODEL_V2:
-    .res 72 * .sizeof(vector2)
-CACHED_TRI_COUNT:
+.export ISO_CAM
+ISO_BASIS:
+    .tag iso_basis
+.export ISO_BASIS
+LATTICE_V2:
+    .res 28 * .sizeof(vector2)
+.export LATTICE_V2
+ARCH_TRAPS:
+    .tag arch_traps_table
+.export ARCH_TRAPS
+CACHED_YAW:
     .res 2
-CACHED_TRI_WRITE_PTR:
-    .res 2
-OBJ_DEPTHS:
-    .res 5 * 2
-OBJ_ORDER:
-    .res 5 * 2
-CACHED_TRIS:
-    .res 48 * 16
-TEX_TRI_VERTS:
-    .res 24
-
-CUBE_V3 = MODEL_V3
-CUBE_FACES = MODEL_FACES
-CUBE_V2 = MODEL_V2
-HOUSE_V3 = MODEL_V3
-HOUSE_FACES = MODEL_FACES
-HOUSE_V2 = MODEL_V2
+.export CACHED_YAW
+MAP_BUF:
+    .res .sizeof(map_header) + (8 * 8 * .sizeof(map_cell))
+.export MAP_BUF
