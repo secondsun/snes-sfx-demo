@@ -101,6 +101,13 @@ The GSU hardware uses write buffers with cycle delays for RAM stores (`stb`, `st
 - SuperFX `plot` buffers pixels in dual 8-pixel caches (primary and secondary).
 - Before the 8 settling `nop`s and `stop`, always execute **two `rpix` instructions** (`rpix; rpix`) so both pixel caches flush to Work RAM.
 
+### 512-Byte Instruction Cache Mechanics
+- Distinct from the dual 8-pixel plot cache, the SuperFX contains a 512-byte on-chip instruction cache (32 lines $\times$ 16 bytes).
+- When executing inside cache lines, opcodes run at single-cycle speed (21.47 MHz on FX3), freeing external buses for concurrent ROM prefetch (`r14` / `getb`) or RAM stores.
+- **Cache Invalidation & CBR**: Executing `cache` checks if `CBR == (R15 & $FFF0)`. If different, it resets `CBR` and invalidates all 32 cache line valid tags. Subsequent instruction fetches incur a 16-byte line-fill delay (~48–96 cycles).
+- **Subroutine Residency**: Subroutines (`call`, `jmp`, `bra`) **do not invalidate or clear cache tags**. Code outside the 512-byte window runs at normal bus speeds, and returning to the caller immediately resumes 1-cycle cache hits.
+- **Guideline**: Do not spray `cache` before short loops (<20 iterations) or inside loops/helpers. Reserve it for primary leaf compute kernels (e.g. `cache` followed by `move r13, r15`).
+
 ---
 
 ## 5. SuperFX 4bpp 160-Line Framebuffer Layout (Column-Major Tiles)
