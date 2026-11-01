@@ -571,7 +571,26 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     inc r7
     inc r7
 
-    ; V0: Top-Left (u0=0, v0=0)
+    ; Determine if v0_p is K_top (+148)
+    iwt r8, #gsu_map_render_frame + 148
+    from v0_p
+    cmp r8
+    bne @fin_rev_uv
+    nop
+
+    ; Normal: K at v0/v3 (u=0), M at v1/v2 (u=16<<8)
+    iwt r8, #0
+    iwt r9, #$1000
+    bra @fin_uv_set
+    nop
+
+@fin_rev_uv:
+    ; Reversed: M at v0/v3 (u=16<<8), K at v1/v2 (u=0)
+    iwt r8, #$1000
+    iwt r9, #0
+
+@fin_uv_set:
+    ; V0: Top-Left
     from v0_p
     stw (r7)            ; v0.x_or_ptr
     inc r7
@@ -580,14 +599,16 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     stw (r7)            ; pad
     inc r7
     inc r7
-    stw (r7)            ; u0 = 0
+    from r8
+    stw (r7)            ; u0
     inc r7
     inc r7
+    iwt r0, #0
     stw (r7)            ; v0 = 0
     inc r7
     inc r7
 
-    ; V1: Top-Right (u1 = 16 << 8 = $1000, v1 = 0)
+    ; V1: Top-Right
     from v1_p
     stw (r7)            ; v1.x_or_ptr
     inc r7
@@ -596,7 +617,7 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     stw (r7)            ; pad
     inc r7
     inc r7
-    iwt r0, #$1000      ; 16 << 8
+    from r9
     stw (r7)            ; u1
     inc r7
     inc r7
@@ -605,7 +626,7 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     inc r7
     inc r7
 
-    ; V2: Bottom-Right (u2 = 16 << 8 = $1000, v2 = 32 << ATLAS_STRIDE_SHIFT)
+    ; V2: Bottom-Right
     from v2_p
     stw (r7)            ; v2.x_or_ptr
     inc r7
@@ -614,7 +635,7 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     stw (r7)            ; pad
     inc r7
     inc r7
-    iwt r0, #$1000      ; 16 << 8
+    from r9
     stw (r7)            ; u2
     inc r7
     inc r7
@@ -623,7 +644,7 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     inc r7
     inc r7
 
-    ; V3: Bottom-Left (u3 = 0, v3 = 32 << ATLAS_STRIDE_SHIFT)
+    ; V3: Bottom-Left
     from v3_p
     stw (r7)            ; v3.x_or_ptr
     inc r7
@@ -632,7 +653,8 @@ function map_compile_fin_quad v0_p, v1_p, v2_p, v3_p, uv_m, tex_i
     stw (r7)            ; pad
     inc r7
     inc r7
-    stw (r7)            ; u3 = 0
+    from r8
+    stw (r7)            ; u3
     inc r7
     inc r7
     iwt r0, #(32 << ATLAS_STRIDE_SHIFT)
@@ -5164,15 +5186,35 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ;   Skirt templates (ARCH_SKIRT_NS / ARCH_SKIRT_EW) are compiled for the
     ;   camera-facing face only (S or N, E or W, chosen by yaw quadrant), so the
     ;   drop must be measured against the neighbor on that same face:
-    ;     drop = max(0, base_height - neighbor.base_height)
+    ;     drop = max(0, base_height - neighbor.surface_height)
     ;   Neighbors outside the map count as height 0 (diorama plinth base).
-    ;   The baked drop_ns / drop_ew bytes cannot describe both N and S (or E and
-    ;   W) faces with one value, so they are not used here.
+    ;   Liquid archetypes (PRIM_LIQUID_SHALLOW/DEEP) have no skirts and have surface
+    ;   elevations at base_height + 1h and + 2h respectively.
     ;   Preserves r9 (j_cur) and r12 (i_cur).
     ; --------------------------------------------------------------------------
     iwt r7, #gsu_map_render_frame + map_render_frame::base_height
     to r1
     ldw (r7)            ; r1 = h
+
+    ; If current cell is a liquid archetype, liquid has no side walls / skirts (force h=0):
+    iwt r7, #gsu_map_render_frame + map_render_frame::archetype_id
+    ldw (r7)
+    iwt r8, #$001F
+    with r0
+    and r8
+    iwt r8, #PRIM_LIQUID_SHALLOW
+    from r0
+    cmp r8
+    beq @cell_is_liquid
+    nop
+    iwt r8, #PRIM_LIQUID_DEEP
+    from r0
+    cmp r8
+    bne :+
+    nop
+@cell_is_liquid:
+    iwt r1, #0          ; liquid cells have 0 solid height for skirts
+:
 
     ; --- NS neighbor: j_nb = j + 1 (front = South) or j - 1 (front = North) ---
     move r2, r9         ; r2 = j_cur
@@ -5212,6 +5254,29 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ldb (r7)            ; neighbor base_height
     lob
     move r3, r0
+    inc r7
+    ldb (r7)            ; neighbor archetype_id
+    lob
+    iwt r8, #$001F
+    with r0
+    and r8
+    iwt r8, #PRIM_LIQUID_SHALLOW
+    from r0
+    cmp r8
+    bne :+
+    nop
+    inc r3              ; shallow liquid surface is base_height + 1
+    bra @ns_nb_done
+    nop
+:
+    iwt r8, #PRIM_LIQUID_DEEP
+    from r0
+    cmp r8
+    bne :+
+    nop
+    inc r3
+    inc r3              ; deep liquid surface is base_height + 2
+:
 @ns_nb_done:
     from r1
     sub r3              ; h - h_nb
@@ -5260,6 +5325,29 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ldb (r7)
     lob
     move r3, r0
+    inc r7
+    ldb (r7)            ; neighbor archetype_id
+    lob
+    iwt r8, #$001F
+    with r0
+    and r8
+    iwt r8, #PRIM_LIQUID_SHALLOW
+    from r0
+    cmp r8
+    bne :+
+    nop
+    inc r3              ; shallow liquid surface is base_height + 1
+    bra @ew_nb_done
+    nop
+:
+    iwt r8, #PRIM_LIQUID_DEEP
+    from r0
+    cmp r8
+    bne :+
+    nop
+    inc r3
+    inc r3              ; deep liquid surface is base_height + 2
+:
 @ew_nb_done:
     from r1
     sub r3
@@ -6025,11 +6113,11 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     add r2
     ldw (r7)
     move r8, r0         ; r8 = original template surface type (0 = top, 1 = skirt, 2 = panel)
-    with r8
+    from r8
     add #0
     beq @use_top_tex
     nop
-    with r8
+    from r8
     sub #1
     beq @use_skirt_tex
     nop

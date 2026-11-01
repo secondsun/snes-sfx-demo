@@ -48,7 +48,22 @@
         </dependency>
         <dependency>
             <groupId>org.jetbrains.skiko</groupId>
+            <artifactId>skiko-awt-runtime-macos-arm64</artifactId>
+            <version>${skiko.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.skiko</groupId>
+            <artifactId>skiko-awt-runtime-macos-x64</artifactId>
+            <version>${skiko.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.skiko</groupId>
             <artifactId>skiko-awt-runtime-linux-x64</artifactId>
+            <version>${skiko.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.skiko</groupId>
+            <artifactId>skiko-awt-runtime-windows-x64</artifactId>
             <version>${skiko.version}</version>
         </dependency>
         <dependency>
@@ -154,6 +169,30 @@
                 <configuration>
                     <mainClass>dev.secondsun.superx.tools.packer.MainKt</mainClass>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>dev.secondsun.superx.tools.packer.CliMainKt</mainClass>
+                        </manifest>
+                    </archive>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

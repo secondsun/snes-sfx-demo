@@ -82,4 +82,12 @@ _Avoid_: Index file, texture header
 An 8-byte record within the Texture Table (`TEXTURE_TABLE`) defining a Source Texture's base ROM offset, horizontal coordinate bitmask (`u_mask`), vertical coordinate bitmask (`v_mask`), and power-of-two row stride shift (`stride_shift`) within the Texture Atlas.
 _Avoid_: Texture entry, texture header, slot struct
 
+### Virtual Slice
+A secondary Texture Descriptor defined as a sub-rectangle of an existing Source Texture within the Texture Atlas, sharing texel data without allocating additional atlas space.
+_Avoid_: Sub-texture, texture slice, crop region
+
+### Descriptor Alias
+A symbolic identifier in an Atlas Index that maps directly to the index or byte offset of another existing Texture Descriptor without creating a new table entry.
+_Avoid_: Texture alias, duplicate ID, linked texture
+
 

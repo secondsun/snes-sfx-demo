@@ -1,6 +1,67 @@
 package dev.secondsun.superx.tools.packer.model
 
 /**
+ * A virtual sub-rectangle descriptor defined inside an existing [SourceTexture].
+ *
+ * Coordinates (x, y) are relative to the top-left of [sourceTexture].
+ * Dimensions must be independent powers of two within {16, 32, 64, 128, 256}.
+ */
+data class VirtualSlice(
+    val name: String,
+    val sourceTexture: String,
+    val x: Int = 0,
+    val y: Int = 0,
+    val width: Int,
+    val height: Int
+) {
+    init {
+        require(SourceTexture.isValidCa65Identifier(name)) {
+            "Slice name '$name' is not a valid ca65 identifier (must match [A-Za-z_][A-Za-z0-9_]*)"
+        }
+        require(width in SourceTexture.VALID_DIMENSIONS && SourceTexture.isPowerOfTwo(width)) {
+            "Slice width must be a power of two in ${SourceTexture.VALID_DIMENSIONS}, got $width"
+        }
+        require(height in SourceTexture.VALID_DIMENSIONS && SourceTexture.isPowerOfTwo(height)) {
+            "Slice height must be a power of two in ${SourceTexture.VALID_DIMENSIONS}, got $height"
+        }
+    }
+
+    val uMask: Int get() = width - 1
+    val vMask: Int get() = height - 1
+    val widthShift: Int get() = Integer.numberOfTrailingZeros(width)
+}
+
+/**
+ * An alternate symbolic identifier mapping to an existing texture or slice descriptor in TEXTURE_TABLE.
+ */
+data class DescriptorAlias(
+    val name: String,
+    val target: String
+) {
+    init {
+        require(SourceTexture.isValidCa65Identifier(name)) {
+            "Alias name '$name' is not a valid ca65 identifier (must match [A-Za-z_][A-Za-z0-9_]*)"
+        }
+    }
+}
+
+/**
+ * Complete resolved metadata for an 8-byte texture descriptor entry.
+ */
+data class TextureDescriptorInfo(
+    val name: String,
+    val x: Int,
+    val y: Int,
+    val width: Int,
+    val height: Int,
+    val romOffset: Int,
+    val uMask: Int,
+    val vMask: Int,
+    val widthShift: Int,
+    val comment: String
+)
+
+/**
  * The composite power-of-two graphics buffer into which multiple [SourceTexture]s are positioned and merged.
  *
  * Encoded as unpacked 1-byte-per-texel (values 0..15) in row-major order.
@@ -9,7 +70,10 @@ package dev.secondsun.superx.tools.packer.model
 data class TextureAtlas(
     val width: Int = 128,
     val height: Int = 128,
-    val textures: List<SourceTexture> = emptyList()
+    val textures: List<SourceTexture> = emptyList(),
+    val slices: List<VirtualSlice> = emptyList(),
+    val aliases: List<DescriptorAlias> = emptyList(),
+    val descriptorOrder: List<String>? = null
 ) {
     init {
         require(width in SourceTexture.VALID_DIMENSIONS && SourceTexture.isPowerOfTwo(width)) {
@@ -28,6 +92,75 @@ data class TextureAtlas(
 
     val sizeBytes: Int
         get() = width * height
+
+    /**
+     * Resolves all descriptors (base textures, virtual slices, and aliases) in deterministic order.
+     */
+    fun resolvedDescriptors(): List<TextureDescriptorInfo> {
+        val map = mutableMapOf<String, TextureDescriptorInfo>()
+
+        // 1. Base textures
+        for (tex in textures) {
+            val romOffset = tex.y * width + tex.x
+            map[tex.name] = TextureDescriptorInfo(
+                name = tex.name,
+                x = tex.x,
+                y = tex.y,
+                width = tex.width,
+                height = tex.height,
+                romOffset = romOffset,
+                uMask = tex.uMask,
+                vMask = tex.vMask,
+                widthShift = tex.widthShift,
+                comment = "${tex.name} (${tex.width}x${tex.height})"
+            )
+        }
+
+        // 2. Virtual slices
+        for (slice in slices) {
+            val parent = textures.find { it.name == slice.sourceTexture }
+                ?: error("Virtual slice '${slice.name}' references non-existent source texture '${slice.sourceTexture}'")
+            val sliceX = parent.x + slice.x
+            val sliceY = parent.y + slice.y
+            require(slice.x >= 0 && slice.y >= 0 && slice.x + slice.width <= parent.width && slice.y + slice.height <= parent.height) {
+                "Virtual slice '${slice.name}' is out of bounds of parent texture '${parent.name}'"
+            }
+            val romOffset = sliceY * width + sliceX
+            map[slice.name] = TextureDescriptorInfo(
+                name = slice.name,
+                x = sliceX,
+                y = sliceY,
+                width = slice.width,
+                height = slice.height,
+                romOffset = romOffset,
+                uMask = slice.uMask,
+                vMask = slice.vMask,
+                widthShift = slice.widthShift,
+                comment = "${slice.name} (${slice.width}x${slice.height})"
+            )
+        }
+
+        // 3. Aliases
+        for (alias in aliases) {
+            val target = map[alias.target]
+                ?: error("Descriptor alias '${alias.name}' references unknown target '${alias.target}'")
+            map[alias.name] = target.copy(
+                name = alias.name,
+                comment = "${alias.name} (${target.width}x${target.height})"
+            )
+        }
+
+        // Determine ordering
+        return if (descriptorOrder != null && descriptorOrder.isNotEmpty()) {
+            descriptorOrder.map { name ->
+                map[name] ?: error("Descriptor '$name' in descriptorOrder is not defined in textures, slices, or aliases")
+            }
+        } else {
+            textures.map { map[it.name]!! } +
+            aliases.map { map[it.name]!! } +
+            slices.map { map[it.name]!! }
+        }
+    }
 
     /**
      * Checks if placing a texture at (x, y) is within bounds and doesn't collide with other textures.
@@ -86,6 +219,14 @@ data class TextureAtlas(
         val list = textures.toMutableList()
         list.removeAt(index)
         return copy(textures = list)
+    }
+
+    fun withSlice(slice: VirtualSlice): TextureAtlas {
+        return copy(slices = slices + slice)
+    }
+
+    fun withAlias(alias: DescriptorAlias): TextureAtlas {
+        return copy(aliases = aliases + alias)
     }
 
     /**
@@ -175,4 +316,3 @@ data class TextureAtlas(
         }
     }
 }
-

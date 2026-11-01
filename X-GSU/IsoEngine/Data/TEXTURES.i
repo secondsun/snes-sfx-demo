@@ -115,24 +115,24 @@ TEXTURE_STONE_WIDTH_SHIFT = 5 ; log2(32): V << 5
 TEXTURE_ID_PARAPET = 6
 TEXTURE_PARAPET_BYTE_OFFSET = 48
 TEXTURE_PARAPET_X = 0
-TEXTURE_PARAPET_Y = 64
+TEXTURE_PARAPET_Y = 96
 TEXTURE_PARAPET_WIDTH = 32
 TEXTURE_PARAPET_HEIGHT = 16
-TEXTURE_PARAPET_OFFSET = 4096
+TEXTURE_PARAPET_OFFSET = 6144
 TEXTURE_PARAPET_U_MASK = 31
 TEXTURE_PARAPET_V_MASK = 15
-TEXTURE_PARAPET_WIDTH_SHIFT = 5
+TEXTURE_PARAPET_WIDTH_SHIFT = 5 ; log2(32): V << 5
 
 TEXTURE_ID_FOLIAGE = 7
 TEXTURE_FOLIAGE_BYTE_OFFSET = 56
 TEXTURE_FOLIAGE_X = 32
-TEXTURE_FOLIAGE_Y = 0
+TEXTURE_FOLIAGE_Y = 64
 TEXTURE_FOLIAGE_WIDTH = 16
 TEXTURE_FOLIAGE_HEIGHT = 32
-TEXTURE_FOLIAGE_OFFSET = 32
+TEXTURE_FOLIAGE_OFFSET = 4128
 TEXTURE_FOLIAGE_U_MASK = 15
 TEXTURE_FOLIAGE_V_MASK = 31
-TEXTURE_FOLIAGE_WIDTH_SHIFT = 4
+TEXTURE_FOLIAGE_WIDTH_SHIFT = 4 ; log2(16): V << 4
 
 ;; ==============================================================================
 ;; Texture Table for runtime descriptor lookup
@@ -143,14 +143,14 @@ TEXTURE_FOLIAGE_WIDTH_SHIFT = 4
 .import textures_binary
 .export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word .loword(textures_binary + TEXTURE_ROOF_OFFSET),    31, 31, ATLAS_STRIDE_SHIFT ; 0: roof (32x32)
-    .word .loword(textures_binary + TEXTURE_GRASS_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 1: grass (32x32)
-    .word .loword(textures_binary + TEXTURE_WATER_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 2: water (32x32)
-    .word .loword(textures_binary + TEXTURE_SAND_OFFSET),    31, 31, ATLAS_STRIDE_SHIFT ; 3: sand (32x32)
-    .word .loword(textures_binary + TEXTURE_WATER_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 4: water deep (32x32)
-    .word .loword(textures_binary + TEXTURE_STONE_OFFSET),   31, 31, ATLAS_STRIDE_SHIFT ; 5: stone (32x32)
+    .word .loword(textures_binary + TEXTURE_ROOF_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 0: roof (32x32)
+    .word .loword(textures_binary + TEXTURE_GRASS_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 1: grass (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 2: water (32x32)
+    .word .loword(textures_binary + TEXTURE_SAND_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 3: sand (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_DEEP_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 4: water_deep (32x32)
+    .word .loword(textures_binary + TEXTURE_STONE_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 5: stone (32x32)
     .word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, 15, ATLAS_STRIDE_SHIFT ; 6: parapet (32x16)
-    .word .loword(textures_binary + TEXTURE_FOLIAGE_OFFSET), 15, 31, ATLAS_STRIDE_SHIFT ; 7: foliage fin (16x32)
+    .word .loword(textures_binary + TEXTURE_FOLIAGE_OFFSET), 15, 31, ATLAS_STRIDE_SHIFT ; 7: foliage (16x32)
 .segment "GSUCODE"
 
 .endif ; __TEXTURES_I_DEFINED__

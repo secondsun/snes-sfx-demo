@@ -43,7 +43,7 @@ SHOWCASE_MAP_ROM:
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_SAND,  TEXTURE_ID_SAND,  0,                  PANEL_NONE,            0, 0 ; (3,0) Sand shore
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_N | PANEL_W),  0, 2 ; (4,0) Terrace N+W
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_N,              0, 0 ; (5,0) Terrace N
-    def_cell 2, PRIM_PILLAR,               TEXTURE_ID_STONE, TEXTURE_ID_STONE, 0,                  PANEL_N,              0, 0 ; (6,0) Pillar N
+    def_cell 2, PRIM_PILLAR,               TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, PANEL_N,              0, 0 ; (6,0) Pillar N
     def_cell 2, PRIM_FLAT,                 TEXTURE_ID_STONE, TEXTURE_ID_STONE, TEXTURE_ID_PARAPET, (PANEL_N | PANEL_E),  0, 0 ; (7,0) Terrace N+E
 
     ; --------------------------------------------------------------------------

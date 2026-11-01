@@ -41,7 +41,9 @@ object AtlasIndexGenerator {
         sb.appendLine(";;   fast bitwise shifts compute the row byte offset in the atlas:")
         sb.appendLine(";;     row_offset = V << ATLAS_STRIDE_SHIFT   (e.g. V << ${atlas.strideShift} for width ${atlas.width})")
         sb.appendLine(";;     texel_offset = row_offset + U")
+        sb.appendLine(".ifndef ATLAS_STRIDE_SHIFT")
         sb.appendLine("ATLAS_STRIDE_SHIFT = ${atlas.strideShift}")
+        sb.appendLine(".endif")
         sb.appendLine()
 
         sb.appendLine(";; ==============================================================================")
@@ -59,21 +61,22 @@ object AtlasIndexGenerator {
         sb.appendLine(";;                                V by texture width: local_offset = (V << WIDTH_SHIFT) + U")
         sb.appendLine(";; ==============================================================================")
         sb.appendLine()
-        for ((idx, tex) in atlas.textures.withIndex()) {
-            val upperName = tex.name.uppercase()
+
+        val descriptors = atlas.resolvedDescriptors()
+        for ((idx, desc) in descriptors.withIndex()) {
+            val upperName = SourceTexture.sanitizeToIdentifier(desc.name).uppercase()
             val byteOffset = idx * 8
-            val romOffset = tex.y * atlas.width + tex.x
 
             sb.appendLine("TEXTURE_ID_$upperName = $idx")
             sb.appendLine("TEXTURE_${upperName}_BYTE_OFFSET = $byteOffset")
-            sb.appendLine("TEXTURE_${upperName}_X = ${tex.x}")
-            sb.appendLine("TEXTURE_${upperName}_Y = ${tex.y}")
-            sb.appendLine("TEXTURE_${upperName}_WIDTH = ${tex.width}")
-            sb.appendLine("TEXTURE_${upperName}_HEIGHT = ${tex.height}")
-            sb.appendLine("TEXTURE_${upperName}_OFFSET = $romOffset")
-            sb.appendLine("TEXTURE_${upperName}_U_MASK = ${tex.uMask}")
-            sb.appendLine("TEXTURE_${upperName}_V_MASK = ${tex.vMask}")
-            sb.appendLine("TEXTURE_${upperName}_WIDTH_SHIFT = ${tex.widthShift} ; log2(${tex.width}): V << ${tex.widthShift}")
+            sb.appendLine("TEXTURE_${upperName}_X = ${desc.x}")
+            sb.appendLine("TEXTURE_${upperName}_Y = ${desc.y}")
+            sb.appendLine("TEXTURE_${upperName}_WIDTH = ${desc.width}")
+            sb.appendLine("TEXTURE_${upperName}_HEIGHT = ${desc.height}")
+            sb.appendLine("TEXTURE_${upperName}_OFFSET = ${desc.romOffset}")
+            sb.appendLine("TEXTURE_${upperName}_U_MASK = ${desc.uMask}")
+            sb.appendLine("TEXTURE_${upperName}_V_MASK = ${desc.vMask}")
+            sb.appendLine("TEXTURE_${upperName}_WIDTH_SHIFT = ${desc.widthShift} ; log2(${desc.width}): V << ${desc.widthShift}")
             sb.appendLine()
         }
 
@@ -82,15 +85,18 @@ object AtlasIndexGenerator {
         sb.appendLine(";; Indexed at runtime via: TEXTURE_TABLE + TEXTURE_<NAME>_BYTE_OFFSET")
         sb.appendLine(";; Format per entry: rom_offset, u_mask, v_mask, stride_shift (8 bytes total)")
         sb.appendLine(";; ==============================================================================")
+        sb.appendLine(".segment \"GSUDATA\"")
+        sb.appendLine(".import textures_binary")
+        sb.appendLine(".export TEXTURE_TABLE")
         sb.appendLine("TEXTURE_TABLE:")
-        for ((_, tex) in atlas.textures.withIndex()) {
-            val romOffset = tex.y * atlas.width + tex.x
-            sb.appendLine("    .word $romOffset, ${tex.uMask}, ${tex.vMask}, ${atlas.strideShift} ; ${tex.name}")
+        for ((idx, desc) in descriptors.withIndex()) {
+            val upperName = SourceTexture.sanitizeToIdentifier(desc.name).uppercase()
+            sb.appendLine("    .word .loword(textures_binary + TEXTURE_${upperName}_OFFSET), ${desc.uMask}, ${desc.vMask}, ATLAS_STRIDE_SHIFT ; $idx: ${desc.comment}")
         }
+        sb.appendLine(".segment \"GSUCODE\"")
         sb.appendLine()
 
         sb.appendLine(".endif ; $guard")
         return sb.toString()
     }
 }
-

@@ -103,7 +103,65 @@ class ModelTest {
         assertTrue(indexStr.contains("TEXTURE_ID_HERO = 0"))
         assertTrue(indexStr.contains("TEXTURE_HERO_OFFSET = 0"))
         assertTrue(indexStr.contains("TEXTURE_TABLE:"))
-        assertTrue(indexStr.contains(".word 0, 15, 15, 6 ; hero"))
+        assertTrue(indexStr.contains(".word .loword(textures_binary + TEXTURE_HERO_OFFSET), 15, 15, ATLAS_STRIDE_SHIFT ; 0: hero (16x16)"))
+    }
+
+    @Test
+    fun testVirtualSlicesAndAliases() {
+        val pixels = ByteArray(32 * 32)
+        val stone = SourceTexture("stone", 32, 32, 0, 64, pixels)
+        val slice = VirtualSlice("parapet", "stone", 0, 0, 32, 16)
+        val alias = DescriptorAlias("water_deep", "stone")
+
+        val atlas = TextureAtlas(
+            width = 64,
+            height = 128,
+            textures = listOf(stone),
+            slices = listOf(slice),
+            aliases = listOf(alias),
+            descriptorOrder = listOf("stone", "water_deep", "parapet")
+        )
+
+        val descriptors = atlas.resolvedDescriptors()
+        assertEquals(3, descriptors.size)
+        assertEquals("stone", descriptors[0].name)
+        assertEquals("water_deep", descriptors[1].name)
+        assertEquals("parapet", descriptors[2].name)
+
+        assertEquals(0, descriptors[2].x)
+        assertEquals(64, descriptors[2].y)
+        assertEquals(32, descriptors[2].width)
+        assertEquals(16, descriptors[2].height)
+        assertEquals(4096, descriptors[2].romOffset) // (64 * 64 + 0)
+
+        val indexStr = AtlasIndexGenerator.generate(atlas, "TEXTURES")
+        assertTrue(indexStr.contains("TEXTURE_ID_STONE = 0"))
+        assertTrue(indexStr.contains("TEXTURE_ID_WATER_DEEP = 1"))
+        assertTrue(indexStr.contains("TEXTURE_ID_PARAPET = 2"))
+        assertTrue(indexStr.contains(".word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, 15, ATLAS_STRIDE_SHIFT ; 2: parapet (32x16)"))
+    }
+
+    @Test
+    fun testAsciiPixelParsingAndFormatting() {
+        val asciiInput = """
+            123456789ABCDEF.
+            ................
+            1...............
+            ...............F
+        """.trimIndent()
+
+        // 16x4
+        val pixels = ProjectService.asciiToPixels(asciiInput, 16, 4)
+        assertEquals(16 * 4, pixels.size)
+        assertEquals(1.toByte(), pixels[0])
+        assertEquals(15.toByte(), pixels[14])
+        assertEquals(0.toByte(), pixels[15])
+        assertEquals(0.toByte(), pixels[16])
+        assertEquals(1.toByte(), pixels[32])
+        assertEquals(15.toByte(), pixels[63])
+
+        val formattedAscii = ProjectService.pixelsToAscii(pixels, 16, 4)
+        assertEquals(asciiInput, formattedAscii)
     }
 
     @Test

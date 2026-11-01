@@ -27,7 +27,9 @@ ATLAS_SIZE_BYTES   = 8192
 ;;   fast bitwise shifts compute the row byte offset in the atlas:
 ;;     row_offset = V << ATLAS_STRIDE_SHIFT   (e.g. V << 6 for width 64)
 ;;     texel_offset = row_offset + U
+.ifndef ATLAS_STRIDE_SHIFT
 ATLAS_STRIDE_SHIFT = 6
+.endif
 
 ;; ==============================================================================
 ;; Per-Texture Symbolic Constants
@@ -104,11 +106,15 @@ TEXTURE_SAND_WIDTH_SHIFT = 5 ; log2(32): V << 5
 ;; Indexed at runtime via: TEXTURE_TABLE + TEXTURE_<NAME>_BYTE_OFFSET
 ;; Format per entry: rom_offset, u_mask, v_mask, stride_shift (8 bytes total)
 ;; ==============================================================================
+.segment "GSUDATA"
+.import textures_binary
+.export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word 0, 31, 31, 6 ; roof
-    .word 32, 31, 31, 6 ; grass
-    .word 2080, 31, 31, 6 ; water
-    .word 4096, 31, 31, 6 ; stone
-    .word 2048, 31, 31, 6 ; sand
+    .word .loword(textures_binary + TEXTURE_ROOF_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 0: roof (32x32)
+    .word .loword(textures_binary + TEXTURE_GRASS_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 1: grass (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 2: water (32x32)
+    .word .loword(textures_binary + TEXTURE_STONE_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 3: stone (32x32)
+    .word .loword(textures_binary + TEXTURE_SAND_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 4: sand (32x32)
+.segment "GSUCODE"
 
 .endif ; __TEXTURES_I_DEFINED__

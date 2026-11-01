@@ -12,13 +12,28 @@ data class ProjectColorDto(
     val assigned: Boolean
 )
 
+data class ProjectSliceDto(
+    val name: String,
+    val sourceTexture: String,
+    val x: Int = 0,
+    val y: Int = 0,
+    val width: Int,
+    val height: Int
+)
+
+data class ProjectAliasDto(
+    val name: String,
+    val target: String
+)
+
 data class ProjectTextureDto(
     val name: String,
     val width: Int,
     val height: Int,
     val x: Int,
     val y: Int,
-    val pixelsHex: String
+    val pixelsHex: String = "",
+    val pixelsAscii: String? = null
 )
 
 data class ProjectDto(
@@ -27,7 +42,10 @@ data class ProjectDto(
     val atlasHeight: Int,
     val gridSnap: Int,
     val palette: List<ProjectColorDto>,
-    val textures: List<ProjectTextureDto>
+    val textures: List<ProjectTextureDto>,
+    val slices: List<ProjectSliceDto>? = null,
+    val aliases: List<ProjectAliasDto>? = null,
+    val descriptorOrder: List<String>? = null
 )
 
 data class ExportedAssets(
@@ -39,6 +57,63 @@ data class ExportedAssets(
 
 object ProjectService {
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
+
+    fun pixelsToHex(pixels: ByteArray): String {
+        val sb = StringBuilder(pixels.size * 2)
+        for (b in pixels) {
+            sb.append(String.format("%02X", b.toInt() and 0x0F))
+        }
+        return sb.toString()
+    }
+
+    fun hexToPixels(hex: String, width: Int, height: Int): ByteArray {
+        val pixels = ByteArray(width * height)
+        for (i in pixels.indices) {
+            val hexByte = if (i * 2 + 1 < hex.length) {
+                hex.substring(i * 2, i * 2 + 2).toIntOrNull(16) ?: 0
+            } else {
+                0
+            }
+            pixels[i] = (hexByte and 0x0F).toByte()
+        }
+        return pixels
+    }
+
+    fun pixelsToAscii(pixels: ByteArray, width: Int, height: Int): String {
+        val sb = StringBuilder()
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val p = pixels[y * width + x].toInt() and 0x0F
+                val c = when {
+                    p == 0 -> '.'
+                    p < 10 -> ('0' + p)
+                    else -> ('A' + (p - 10))
+                }
+                sb.append(c)
+            }
+            sb.append("\n")
+        }
+        return sb.toString().trimEnd()
+    }
+
+    fun asciiToPixels(ascii: String, width: Int, height: Int): ByteArray {
+        val clean = ascii.filter { !it.isWhitespace() }
+        require(clean.length == width * height) {
+            "ASCII pixel length must be ${width * height}, got ${clean.length}"
+        }
+        val pixels = ByteArray(clean.length)
+        for (i in clean.indices) {
+            val c = clean[i]
+            pixels[i] = when (c) {
+                '.' -> 0.toByte()
+                in '0'..'9' -> (c - '0').toByte()
+                in 'a'..'f' -> (c - 'a' + 10).toByte()
+                in 'A'..'F' -> (c - 'A' + 10).toByte()
+                else -> throw IllegalArgumentException("Invalid ASCII pixel character '$c' at index $i")
+            }
+        }
+        return pixels
+    }
 
     fun exportAssets(
         destinationDir: File,
@@ -97,17 +172,32 @@ object ProjectService {
         }
 
         val textureDtos = atlas.textures.map { tex ->
-            val hexSb = StringBuilder(tex.indexedPixels.size * 2)
-            for (b in tex.indexedPixels) {
-                hexSb.append(String.format("%02X", b.toInt() and 0x0F))
-            }
             ProjectTextureDto(
                 name = tex.name,
                 width = tex.width,
                 height = tex.height,
                 x = tex.x,
                 y = tex.y,
-                pixelsHex = hexSb.toString()
+                pixelsHex = pixelsToHex(tex.indexedPixels),
+                pixelsAscii = pixelsToAscii(tex.indexedPixels, tex.width, tex.height)
+            )
+        }
+
+        val sliceDtos = atlas.slices.map {
+            ProjectSliceDto(
+                name = it.name,
+                sourceTexture = it.sourceTexture,
+                x = it.x,
+                y = it.y,
+                width = it.width,
+                height = it.height
+            )
+        }
+
+        val aliasDtos = atlas.aliases.map {
+            ProjectAliasDto(
+                name = it.name,
+                target = it.target
             )
         }
 
@@ -117,32 +207,33 @@ object ProjectService {
             atlasHeight = atlas.height,
             gridSnap = gridSnap,
             palette = paletteDtos,
-            textures = textureDtos
+            textures = textureDtos,
+            slices = if (sliceDtos.isNotEmpty()) sliceDtos else null,
+            aliases = if (aliasDtos.isNotEmpty()) aliasDtos else null,
+            descriptorOrder = atlas.descriptorOrder
         )
 
         // Write .sfxproj JSON
         projectFile.parentFile?.mkdirs()
         projectFile.writeText(gson.toJson(dto))
 
-        // Write companion files:
+        // Write companion files
         val parentDir = projectFile.parentFile ?: File(".")
         val baseName = projectFile.nameWithoutExtension
 
         // Graphics binaries
-        val binFile = File(parentDir, "$baseName.bin")
-        binFile.writeBytes(atlas.generateBinary())
-        val graphicsBinFile = File(parentDir, "${baseName}_graphics.bin")
-        graphicsBinFile.writeBytes(atlas.generateBinary())
+        val binBytes = atlas.generateBinary()
+        File(parentDir, "$baseName.bin").writeBytes(binBytes)
+        File(parentDir, "${baseName}_graphics.bin").writeBytes(binBytes)
 
         // Palette binaries
-        val palFile = File(parentDir, "$baseName.pal")
-        palFile.writeBytes(palette.toBgr555Binary())
-        val paletteBinFile = File(parentDir, "${baseName}_palette.bin")
-        paletteBinFile.writeBytes(palette.toBgr555Binary())
+        val palBytes = palette.toBgr555Binary()
+        File(parentDir, "$baseName.pal").writeBytes(palBytes)
+        File(parentDir, "${baseName}_palette.bin").writeBytes(palBytes)
 
         // ca65 assembly index
-        val indexFile = File(parentDir, "$baseName.i")
-        indexFile.writeText(AtlasIndexGenerator.generate(atlas, baseName))
+        val indexText = AtlasIndexGenerator.generate(atlas, baseName)
+        File(parentDir, "$baseName.i").writeText(indexText)
 
         // Layout PNG
         val pngFile = File(parentDir, "${baseName}_atlas.png")
@@ -167,16 +258,12 @@ object ProjectService {
 
         // Reconstruct textures
         val textures = dto.textures.map { texDto ->
-            val pixels = ByteArray(texDto.width * texDto.height)
-            val hex = texDto.pixelsHex
-            for (i in pixels.indices) {
-                val hexByte = if (i * 2 + 1 < hex.length) {
-                    hex.substring(i * 2, i * 2 + 2).toIntOrNull(16) ?: 0
-                } else {
-                    0
-                }
-                pixels[i] = (hexByte and 0x0F).toByte()
+            val pixels = if (texDto.pixelsAscii != null && texDto.pixelsAscii.isNotBlank() && texDto.pixelsHex.isBlank()) {
+                asciiToPixels(texDto.pixelsAscii, texDto.width, texDto.height)
+            } else {
+                hexToPixels(texDto.pixelsHex, texDto.width, texDto.height)
             }
+
             SourceTexture(
                 name = texDto.name,
                 width = texDto.width,
@@ -187,13 +274,33 @@ object ProjectService {
             )
         }
 
+        val slices = dto.slices?.map {
+            VirtualSlice(
+                name = it.name,
+                sourceTexture = it.sourceTexture,
+                x = it.x,
+                y = it.y,
+                width = it.width,
+                height = it.height
+            )
+        } ?: emptyList()
+
+        val aliases = dto.aliases?.map {
+            DescriptorAlias(
+                name = it.name,
+                target = it.target
+            )
+        } ?: emptyList()
+
         val atlas = TextureAtlas(
             width = dto.atlasWidth,
             height = dto.atlasHeight,
-            textures = textures
+            textures = textures,
+            slices = slices,
+            aliases = aliases,
+            descriptorOrder = dto.descriptorOrder
         )
 
         return Triple(atlas, palette, dto.gridSnap)
     }
 }
-
