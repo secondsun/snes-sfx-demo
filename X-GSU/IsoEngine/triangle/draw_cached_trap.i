@@ -417,7 +417,9 @@ scanline_loop:
     and r4
     bpl :+
     nop
-    iwt r15, #@skip_scanline
+    iwt r13, #@skip_scanline
+    jmp r13
+    nop
 :
     ; Now: at most one of r3, r4 has bit 15 set.
     iwt r11, #$00FF     ; mask for low byte
@@ -460,7 +462,9 @@ scanline_loop:
     cmp r4
     blt :+
     nop
-    iwt r15, #@skip_scanline
+    iwt r13, #@skip_scanline
+    jmp r13
+    nop
 :
     ; --- Begin span ---
     inc r1
@@ -502,7 +506,9 @@ scanline_loop:
     bpl @draw_span
     nop
 :
-    iwt r15, #@advance_scanline
+    iwt r13, #@advance_scanline
+    jmp r13
+    nop
 
 @draw_span:
     move r12, r0        ; r12 = pixel_count
@@ -562,7 +568,9 @@ scanline_loop:
     stw (r1)            ; save lines_left
     bne @lines_remain_adv
     nop
-    iwt r15, #@trap_finished
+    iwt r13, #@trap_finished
+    jmp r13
+    nop
 
 @lines_remain_adv:
     ; Read trap_ptr from frame_base + 10:
@@ -625,7 +633,9 @@ scanline_loop:
     from r3
     stw (r1)
 
-    iwt r15, #scanline_loop
+    iwt r13, #scanline_loop
+    jmp r13
+    nop
 
 @trap_finished:
     ; Flush GSU pixel caches to game pak RAM
