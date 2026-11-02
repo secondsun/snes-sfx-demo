@@ -923,7 +923,6 @@ clear_screen_loop:
 
     ; Rasterize each compiled trapezoid:
     ; trap_count is in r3 (e.g. 2 or 4)
-    to r12
     move r12, r3        ; r12 = loop count
     iwt r9, #TEST_TRAPS_BUF
     iwt r13, #raster_traps_loop
@@ -934,7 +933,6 @@ raster_traps_loop:
 
     ; draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, frame_half
     ; We stamp at anchor (32, 20), offsets (0, 0), Pass 0
-    to r1
     move r1, r9         ; trap_ptr
     iwt r3, #32         ; anchor_x = 32
     iwt r4, #20         ; anchor_y = 20

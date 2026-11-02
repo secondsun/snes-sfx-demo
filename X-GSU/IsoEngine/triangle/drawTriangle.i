@@ -548,7 +548,6 @@ function draw_textured_triangle points, table_index
     ; Hoist invariant texture setup outside the horizontal X loop:
     ; texture table entry address = TEXTURE_TABLE + table_index * 8
     iwt r0, #(.loword(TEXTURE_TABLE))
-    to r1
     move r1, table_index
     with r1
     mult #8
@@ -1140,7 +1139,6 @@ plotXLoop:
     ; Compute du_dx (Q8.8):
     iwt r0, #TEX_TRI_MIN_U
     ldw (r0)
-    to r3
     move r3, r0         ; r3 = minU
     iwt r0, #TEX_TRI_MAX_U
     ldw (r0)            ; r0 = maxU
@@ -1148,13 +1146,11 @@ plotXLoop:
     sub r3              ; r0 = delta_u = maxU - minU
     add r0              ; r0 = 2 * delta_u
     fmult               ; r0 = ((2 * delta_u) * f_reg) >> 16
-    to r5
     move r5, r0         ; r5 = du_dx (Q8.8)
 
     ; Compute dv_dx (Q10.6):
     iwt r0, #TEX_TRI_MIN_V
     ldw (r0)
-    to r4
     move r4, r0         ; r4 = minV
     iwt r0, #TEX_TRI_MAX_V
     ldw (r0)            ; r0 = maxV
@@ -1166,14 +1162,12 @@ plotXLoop:
     asr
     with r0
     asr                 ; r0 = dv_dx in Q10.6
-    to r6
     move r6, r0         ; r6 = dv_dx (Q10.6)
 
     ; Initial u_cur = minU (already in r3!), v_cur = minV >> 2
     from r4
     asr
     asr
-    to r4
     move r4, r0         ; r4 = v_cur (Q10.6)
 
     backuploop
@@ -1183,7 +1177,6 @@ plotXLoop:
     sub xMin
     beq @no_clip_left
     nop
-    to r12
     move r12, r0        ; r12 = clip_left
     iwt r13, #@clip_u_loop
 @clip_u_loop:
@@ -1199,27 +1192,22 @@ plotXLoop:
     from v1_ptr
     sub v0_ptr
     inc r0
-    to r12
     move r12, r0        ; r12 = pixel_count
 
     ; R1 = startX (plot_x)
-    to r1
     move r1, v0_ptr
 
     ; Load texture masks and offset
     iwt r0, #TEX_TRI_U_MASK
     ldw (r0)
-    to r7
     move r7, r0
 
     iwt r0, #TEX_TRI_V_MASK_SHIFTED
     ldw (r0)
-    to r8
     move r8, r0
 
     iwt r0, #TEX_TRI_ROM_OFFSET
     ldw (r0)
-    to r9
     move r9, r0
 
     ; Prime R14 with first texel ROM address:
@@ -1235,7 +1223,6 @@ plotXLoop:
     add r0              ; r11 = col + row
     with r11
     add r9              ; r11 = col + row + rom_offset
-    to r14
     move r14, r11       ; Prime R14
 
     iwt r13, #@pixel_loop
@@ -1258,7 +1245,6 @@ plotXLoop:
     add r0
     with r11
     add r9
-    to r14
     move r14, r11       ; R14 = next texel address
     loop
     nop
@@ -1280,7 +1266,6 @@ singlePixelSpan:
     nop
 
     ; Set R1 = xMin
-    to r1
     move r1, xMin
 
     ibt r0, #4
@@ -1288,7 +1273,6 @@ singlePixelSpan:
 
     iwt r0, #TEX_TRI_MIN_U
     ldw (r0)
-    to r3
     move r3, r0         ; r3 = u_cur
 
     iwt r0, #TEX_TRI_MIN_V
@@ -1297,22 +1281,18 @@ singlePixelSpan:
     asr
     with r0
     asr
-    to r4
     move r4, r0         ; r4 = v_cur
 
     iwt r0, #TEX_TRI_U_MASK
     ldw (r0)
-    to r7
     move r7, r0
 
     iwt r0, #TEX_TRI_V_MASK_SHIFTED
     ldw (r0)
-    to r8
     move r8, r0
 
     iwt r0, #TEX_TRI_ROM_OFFSET
     ldw (r0)
-    to r9
     move r9, r0
 
     ; Prime R14 and plot single texel:
@@ -1328,7 +1308,6 @@ singlePixelSpan:
     add r0
     with r11
     add r9
-    to r14
     move r14, r11
     getc
     plot

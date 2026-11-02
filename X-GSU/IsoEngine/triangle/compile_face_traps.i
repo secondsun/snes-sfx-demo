@@ -790,7 +790,6 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     ; Read total trap_count
     frame_ptr compile_frame::trap_count, r7
     ldw (r7)
-    to num_traps_emitted
     move num_traps_emitted, r0
     move r0, num_traps_emitted
     return num_traps_emitted

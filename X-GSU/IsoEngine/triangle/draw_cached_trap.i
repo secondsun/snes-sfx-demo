@@ -1,30 +1,23 @@
 ; ==============================================================================
-; IsoEngine CACHE-Resident Affine Textured Scanline Trapezoid Rasterizer
+; draw_cached_trap.i - Affine Textured Scanline Trapezoid Rasterizer for SuperFX
+;
+; Optimized Cache-Resident Implementation:
+;   - Shrunk trap_frame from 22 bytes to 12 bytes on the stack
+;   - Inner scanline loop fits 100% within the 512-byte GSU instruction cache
+;   - Efficient per-scanline setup and 20-byte inner pixel loop
 ; ==============================================================================
-.ifndef ::__DRAW_CACHED_TRAP_DEFINED__
-::__DRAW_CACHED_TRAP_DEFINED__ = 1
-
-.include "libSFX.i"
-.include "../../common/stack.i"
-.include "../../common/function.i"
-.include "../../common/control.i"
-.include "../../common/util.i"
 
 .include "cached_trap.i"
+.include "../../common/util.i"
 
-; Stack-allocated trapezoid state frame (22 bytes, 11 words)
+; Stack-allocated trapezoid state frame (12 bytes, 6 words)
 .struct trap_frame
-    lines_left  .word ; +0:  Number of scanlines remaining
-    xL          .word ; +2:  Current left edge X in Q8.8
-    xR          .word ; +4:  Current right edge X in Q8.8
-    dxL_dy      .word ; +6:  Left edge slope dxL/dy in Q8.8
-    dxR_dy      .word ; +8:  Right edge slope dxR/dy in Q8.8
-    uL          .word ; +10: Current left edge U in Q8.8
-    vL          .word ; +12: Current left edge V in Q(16 - ATLAS_STRIDE_SHIFT).(ATLAS_STRIDE_SHIFT)
-    du_dy       .word ; +14: Left edge du/dy in Q8.8
-    dv_dy       .word ; +16: Left edge dv/dy in Q(16 - ATLAS_STRIDE_SHIFT).(ATLAS_STRIDE_SHIFT)
-    du_dx       .word ; +18: Scanline du/dx in Q8.8
-    dv_dx       .word ; +20: Scanline dv/dx in Q(16 - ATLAS_STRIDE_SHIFT).(ATLAS_STRIDE_SHIFT)
+    lines_left  .word ; +0: Number of scanlines remaining
+    xL          .word ; +2: Current left edge X in Q8.8
+    xR          .word ; +4: Current right edge X in Q8.8
+    uL          .word ; +6: Current left edge U in Q8.8
+    vL          .word ; +8: Current left edge V in Q(16 - ATLAS_STRIDE_SHIFT).(ATLAS_STRIDE_SHIFT)
+    trap_ptr    .word ; +10: Base pointer to cached_trap struct in GSURAM
 .endstruct
 
 ; External or global reference to TEXTURE_TABLE
@@ -60,31 +53,32 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     add r0              ; anchor_y = y = anchor_y + dy_start
 
     ; Read line_count from trap_ptr + 2
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = line_count
+    move r11, trap_ptr
+    inc r11
+    inc r11             ; r11 = trap_ptr + 2
+    ldw (r11)           ; r0 = line_count
 
     ; If line_count <= 0: early exit
     beq @early_exit
     nop
-    with r0
-    add #0
+    from r0
+    sub #0
     blt @early_exit
     nop
 
     ; Check if completely above screen: y_end <= 0
-    to r8
     from anchor_y
-    add r0              ; r8 = y_end = y + line_count
+    add r0              ; r0 = y_end = y + line_count
+    move r8, r0         ; r8 = y_end
     from r8
     sub #1
     blt @early_exit
     nop
 
     ; Check if completely below screen: y >= 160
-    iwt r8, #160
+    iwt r11, #160
     from anchor_y
-    cmp r8
+    cmp r11
     bge @early_exit
     nop
 
@@ -93,52 +87,50 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     sub #0
     bge @no_top_clip
     nop
-    ; anchor_y < 0:
     iwt r0, #0
     with r0
     sub anchor_y        ; r0 = skip = 0 - y
-    to r9
     move r9, r0         ; r9 = skip
-    ldw (trap_ptr)      ; r0 = line_count
+
+    move r11, trap_ptr
+    inc r11
+    inc r11
+    ldw (r11)           ; r0 = line_count
     from r9
     cmp r0
     bge @early_exit     ; if skip >= line_count, entirely off screen!
     nop
     with r0
-    sub r9              ; r0 = new line_count = line_count - skip
+    sub r9              ; r0 = line_count - skip
     iwt anchor_y, #0    ; y = 0
     bra @top_clip_done
     nop
 
 @no_top_clip:
     iwt r9, #0          ; skip = 0
-    ldw (trap_ptr)      ; r0 = line_count
+    move r11, trap_ptr
+    inc r11
+    inc r11
+    ldw (r11)           ; r0 = line_count
 
 @top_clip_done:
     ; Bottom clipping: if y + line_count > 160, line_count = 160 - y
-    to r8
+    move r8, r0         ; r8 = line_count
     from anchor_y
-    add r0              ; r8 = y_end
+    add r8              ; r0 = y_end = anchor_y + line_count
     iwt r11, #160
-    from r8
-    cmp r11
+    from r0
+    cmp r11             ; compare y_end with 160
     blt @bottom_clip_done
     nop
     beq @bottom_clip_done
     nop
     ; y_end > 160:
     from r11
-    sub r4              ; r0 = 160 - y
-    to r8
-    move r8, r0         ; r8 = line_count
-    bra @bottom_clipped
-    nop
+    sub anchor_y        ; r0 = 160 - y
+    move r8, r0         ; r8 = line_count = 160 - y
 
 @bottom_clip_done:
-    to r8
-    move r8, r0         ; r8 = line_count
-
-@bottom_clipped:
     from r8
     sub #1
     blt @early_exit
@@ -151,277 +143,205 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     return
 
 @not_early_exit:
-    ; Save clipped line_count in r12
-    to r12
-    move r12, r8
-
-    ; Save starting Y in r2 (R2 is SuperFX hardware Y coordinate register for plot)
-    to r2
+    ; Save starting Y in r2 (SuperFX hardware Y coordinate register for plot)
     move r2, anchor_y
 
-    ; Compute effective horizontal anchor shift in Q8.8:
-    ; anchor_x_eff = anchor_x << 8
-    to r8
-    from anchor_x
-    swap
-    iwt r11, #$FF00
-    with r8
-    and r11             ; r8 = anchor_x in Q8.8
-
-    ; If frame_half != 0, subtract 128 in Q8.8 (-$8000 = +$8000)
-    from frame_half
-    sub #0
-    beq @no_frame_half_shift
-    nop
-    iwt r0, #$8000
-    with r8
-    add r0              ; r8 += -$8000 (mod 64k)
-@no_frame_half_shift:
-
-    ; Read xL_start (+4) and add anchor_x_eff
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = xL_start
-    with r0
-    add r8
-    to r7
-    move r7, r0         ; r7 = xL = xL_start + anchor_x_eff
-
-    ; Read xR_start (+6) and add anchor_x_eff
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = xR_start
-    with r0
-    add r8
-    to r8
-    move r8, r0         ; r8 = xR = xR_start + anchor_x_eff
-
-    ; Allocate stack frame (22 bytes = .sizeof(trap_frame))
+    ; Allocate stack frame (12 bytes = .sizeof(trap_frame))
     with r10
-    to r4               ; r4 = frame_base = r10
-    with r10
-    add #11
-    with r10
-    add #11             ; advance r10 by 22 bytes
+    add #12
+    move r4, r10
+    with r4
+    sub #12             ; r4 = frame_base
 
     ; Store lines_left (+0)
-    from r12
-    stw (r4)
-
-    ; Store xL (+2)
-    inc r4
-    inc r4
-    from r7
-    stw (r4)
-
-    ; Store xR (+4)
-    inc r4
-    inc r4
     from r8
     stw (r4)
 
-    ; Read dxL_dy (+8 of cached_trap, trap_ptr was at +6)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = dxL_dy
-    inc r4
-    inc r4
-    stw (r4)            ; Store dxL_dy at frame + 6
+    ; Store trap_ptr (+10)
+    move r11, r4
+    with r11
+    add #10             ; r11 = frame_base + 10
+    from trap_ptr
+    stw (r11)
 
-    ; Read dxR_dy (+10 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = dxR_dy
-    inc r4
-    inc r4
-    stw (r4)            ; Store dxR_dy at frame + 8
+    ; Compute anchor_x_eff in r11:
+    move r11, anchor_x
+    with r11
+    swap
+    iwt r14, #$FF00
+    with r11
+    and r14
+
+    from frame_half
+    sub #0
+    beq :+
+    nop
+    iwt r0, #$8000
+    with r11
+    add r0              ; if frame_half == 1, subtract 128 (mod 64k)
+:
+    ; Read xL_start (+4 of cached_trap) and add anchor_x_eff (r11)
+    move r8, trap_ptr
+    with r8
+    add #4              ; r8 = trap_ptr + 4
+    ldw (r8)            ; r0 = xL_start
+    with r0
+    add r11             ; r0 = xL = xL_start + anchor_x_eff
+    move r3, r4
+    inc r3
+    inc r3              ; r3 = frame_base + 2 (xL)
+    stw (r3)            ; store xL
+
+    ; Read xR_start (+6 of cached_trap) and add anchor_x_eff (r11)
+    inc r8
+    inc r8              ; r8 = trap_ptr + 6
+    ldw (r8)            ; r0 = xR_start
+    with r0
+    add r11             ; r0 = xR = xR_start + anchor_x_eff
+    inc r3
+    inc r3              ; r3 = frame_base + 4 (xR)
+    stw (r3)            ; store xR
 
     ; Read uL_start (+12 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = uL_start
-    inc r4
-    inc r4
-    stw (r4)            ; Store uL at frame + 10
+    move r11, trap_ptr
+    with r11
+    add #12             ; r11 = trap_ptr + 12
+    ldw (r11)           ; r0 = uL_start
+    inc r3
+    inc r3              ; r3 = frame_base + 6 (uL)
+    stw (r3)
 
     ; Read vL_start (+14 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = vL_start
-    inc r4
-    inc r4
-    stw (r4)            ; Store vL at frame + 12
-
-    ; Read du_dy (+16 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = du_dy
-    inc r4
-    inc r4
-    stw (r4)            ; Store du_dy at frame + 14
-
-    ; Read dv_dy (+18 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = dv_dy
-    inc r4
-    inc r4
-    stw (r4)            ; Store dv_dy at frame + 16
-
-    ; Read du_dx (+20 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = du_dx
-    inc r4
-    inc r4
-    stw (r4)            ; Store du_dx at frame + 18
-
-    ; Read dv_dx (+22 of cached_trap)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = dv_dx
-    inc r4
-    inc r4
-    stw (r4)            ; Store dv_dx at frame + 20
+    inc r11
+    inc r11             ; r11 = trap_ptr + 14
+    ldw (r11)           ; r0 = vL_start
+    inc r3
+    inc r3              ; r3 = frame_base + 8 (vL)
+    stw (r3)
 
     ; If top clipping skipped scanlines (r9 > 0): advance edges by skip now
     from r9
     sub #0
     beq @skip_done
     nop
-    to r12
     move r12, r9        ; r12 = skip count
     iwt r13, #@skip_loop
 @skip_loop:
-    from r10
-    to r4
-    sub #11
-    with r4
-    sub #11             ; r4 = frame_base
-    inc r4
-    inc r4              ; r4 = frame_base + 2 (xL)
-    from r4
-    to r11
-    add #4              ; r11 = frame_base + 6 (dxL_dy)
+    move r11, trap_ptr
+    with r11
+    add #8              ; r11 = trap_ptr + 8 (dxL_dy)
+    move r3, r4
+    inc r3
+    inc r3              ; r3 = frame_base + 2 (xL)
 
     ; xL += dxL_dy
-    ldw (r4)
-    to r3
-    move r3, r0
-    ldw (r11)
-    with r3
+    ldw (r3)
+    move r14, r0
+    ldw (r11)           ; r0 = dxL_dy
+    with r14
     add r0
-    from r3
-    stw (r4)
+    from r14
+    stw (r3)
 
     ; xR += dxR_dy
-    inc r4
-    inc r4              ; frame_base + 4 (xR)
-    ldw (r4)
-    to r3
-    move r3, r0
+    inc r3
+    inc r3              ; r3 = frame_base + 4 (xR)
+    ldw (r3)
+    move r14, r0
     inc r11
-    inc r11             ; frame_base + 8 (dxR_dy)
-    ldw (r11)
-    with r3
+    inc r11             ; r11 = trap_ptr + 10 (dxR_dy)
+    ldw (r11)           ; r0 = dxR_dy
+    with r14
     add r0
-    from r3
-    stw (r4)
+    from r14
+    stw (r3)
 
     ; uL += du_dy
-    from r4
-    to r4
-    add #6              ; frame_base + 10 (uL)
-    ldw (r4)
-    to r3
-    move r3, r0
-    from r11
-    to r11
-    add #6              ; frame_base + 14 (du_dy)
-    ldw (r11)
-    with r3
+    inc r3
+    inc r3              ; r3 = frame_base + 6 (uL)
+    ldw (r3)
+    move r14, r0
+    with r11
+    add #6              ; r11 = trap_ptr + 16 (du_dy)
+    ldw (r11)           ; r0 = du_dy
+    with r14
     add r0
-    from r3
-    stw (r4)
+    from r14
+    stw (r3)
 
     ; vL += dv_dy
-    inc r4
-    inc r4              ; frame_base + 12 (vL)
-    ldw (r4)
-    to r3
-    move r3, r0
+    inc r3
+    inc r3              ; r3 = frame_base + 8 (vL)
+    ldw (r3)
+    move r14, r0
     inc r11
-    inc r11             ; frame_base + 16 (dv_dy)
-    ldw (r11)
-    with r3
+    inc r11             ; r11 = trap_ptr + 18 (dv_dy)
+    ldw (r11)           ; r0 = dv_dy
+    with r14
     add r0
-    from r3
-    stw (r4)
+    from r14
+    stw (r3)
 
     loop
     nop
 @skip_done:
 
-    ; Read tex_id (+24 of cached_trap, trap_ptr is at +22)
-    inc trap_ptr
-    inc trap_ptr
-    ldw (trap_ptr)      ; r0 = tex_id
+    ; Read tex_id (+24 of cached_trap)
+    move r11, trap_ptr
+    with r11
+    add #15
+    with r11
+    add #9              ; r11 = trap_ptr + 24 (tex_id)
+    ldw (r11)           ; r0 = tex_id
 
     ; Lookup TEXTURE_TABLE + (tex_id << 3)
     from r0
     add r0              ; tex_id * 2
     add r0              ; tex_id * 4
     add r0              ; tex_id * 8
-    to r8
-    move r8, r0
+    move r7, r0
     iwt r0, #TEXTURE_TABLE
     with r0
-    add r8              ; r0 = TEXTURE_TABLE + (tex_id << 3)
+    add r7              ; r0 = TEXTURE_TABLE + (tex_id << 3)
 
 .ifdef TEXTURE_TABLE_IN_RAM
-    to r1
-    move r1, r0
-    ldw (r1)
-    to r9               ; r9 = rom_offset
-    move r9, r0
-    inc r1
-    inc r1
-    ldw (r1)
-    to r7               ; r7 = u_mask
     move r7, r0
-    inc r1
-    inc r1
-    ldw (r1)
-    to r8               ; r8 = v_mask
-    move r8, r0
-    inc r1
-    inc r1
-    ldw (r1)            ; r0 = stride_shift
+    ldw (r7)
+    move r9, r0         ; r9 = rom_offset
+    inc r7
+    inc r7
+    ldw (r7)
+    move r8, r0         ; r8 = u_mask (temp)
+    inc r7
+    inc r7
+    ldw (r7)
+    move r11, r0        ; r11 = v_mask
+    inc r7
+    inc r7
+    ldw (r7)            ; r0 = stride_shift
 .else
-    to r14
     move r14, r0
     _romreadwordLE r9   ; r9 = rom_offset
-    _romreadwordLE r7   ; r7 = u_mask
-    _romreadwordLE r8   ; r8 = v_mask
+    _romreadwordLE r8   ; r8 = u_mask (temp in r8)
+    _romreadwordLE r11  ; r11 = v_mask
     _romreadwordLE r0   ; r0 = stride_shift
 .endif
 
 .ifdef TEXTURE_BASE_ADDR
-    iwt r11, #TEXTURE_BASE_ADDR
+    iwt r7, #TEXTURE_BASE_ADDR
     with r9
-    add r11
+    add r7
 .endif
 
-    ; Compute v_mask_shifted = v_mask << stride_shift
-    to r4
-    move r4, r0         ; r4 = stride_shift
-    move r0, r8         ; r0 = v_mask
-    from r4
-    sub #0              ; test stride_shift
+    move r7, r8         ; r7 = u_mask
+
+    ; Shift v_mask by stride_shift:
+    move r12, r0        ; r12 = stride_shift
+    move r0, r11        ; r0 = v_mask
+    from r12
+    sub #0
     beq @shift_v_done
     nop
-    to r12
-    move r12, r4        ; loop count = stride_shift
     iwt r13, #@shift_v_loop
 @shift_v_loop:
     with r0
@@ -429,46 +349,41 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     loop
     nop
 @shift_v_done:
-    to r8
     move r8, r0         ; r8 = v_mask_shifted
 
-    ; Finalize uL and vL with world-aligned UV offsets
-    ; r5 = u_offset, r6 = v_offset
+    ; Mask UV offsets and add to uL, vL
     with r5
     and r7              ; r5 = u_offset & u_mask
     with r6
     and r8              ; r6 = v_offset & v_mask_shifted
 
-    ; r10 is at frame_base + 22
-    ; frame_base + 10 = r10 - 12
-    from r10
-    to r4
-    sub #11
-    with r4
-    sub #1              ; r4 = frame_base + 10 (uL)
-    ldw (r4)
+    move r3, r4
+    with r3
+    add #6              ; r3 = frame_base + 6 (uL)
+    ldw (r3)
     with r0
     add r5
-    stw (r4)            ; uL = uL + (u_offset & u_mask)
+    stw (r3)            ; uL += masked u_offset
 
-    inc r4
-    inc r4              ; r4 = frame_base + 12 (vL)
-    ldw (r4)
+    inc r3
+    inc r3              ; r3 = frame_base + 8 (vL)
+    ldw (r3)
     with r0
     add r6
-    stw (r4)            ; vL = vL + (v_offset & v_mask_shifted)
+    stw (r3)            ; vL += masked v_offset
 
-    ; Load du_dx (at +18) into r5, dv_dx (at +20) into r6
-    from r4
-    to r4
-    add #6              ; r4 = frame_base + 18 (du_dx)
-    ldw (r4)
-    to r5
+    ; Load du_dx (+20) into r5, dv_dx (+22) into r6
+    move r11, trap_ptr
+    with r11
+    add #15
+    with r11
+    add #5              ; r11 = trap_ptr + 20 (du_dx)
+    ldw (r11)           ; r0 = du_dx
     move r5, r0         ; r5 = du_dx
-    inc r4
-    inc r4              ; r4 = frame_base + 20 (dv_dx)
-    ldw (r4)
-    to r6
+
+    inc r11
+    inc r11             ; r11 = trap_ptr + 22 (dv_dx)
+    ldw (r11)           ; r0 = dv_dx
     move r6, r0         ; r6 = dv_dx
 
     ; --------------------------------------------------------------------------
@@ -480,56 +395,30 @@ function draw_cached_trap trap_ptr, anchor_x, anchor_y, u_offset, v_offset, fram
     ;   r8  = v_mask_shifted
     ;   r9  = rom_offset
     ; --------------------------------------------------------------------------
-    ; Check lines_left for sliver trapezoids (< 3 scanlines): skip cache
-    from r10
-    to r1
-    sub #11
-    with r1
-    sub #11             ; r1 = frame_base
-    ldw (r1)            ; r0 = lines_left
-    from r0
-    sub #3
-    blt scanline_loop
-    nop
-
     .align 16, $01
     cache
 scanline_loop:
-    from r10
-    to r1
-    sub #11
+    move r1, r10
     with r1
-    sub #11             ; r1 = frame_base
+    sub #12             ; r1 = frame_base
 
-    ; Check lines_left (+0)
-    ldw (r1)
-    bne @lines_remaining
-    nop
-    iwt r13, #@trap_finished
-    jmp r13
-    nop
-
-@lines_remaining:
-    ; Load xL (+2) and xR (+4)
     inc r1
-    inc r1
+    inc r1              ; r1 = frame_base + 2 (xL)
     ldw (r1)            ; r0 = xL
-    to r3
     move r3, r0         ; r3 = xL
 
     inc r1
-    inc r1
+    inc r1              ; r1 = frame_base + 4 (xR)
     ldw (r1)            ; r0 = xR
-    to r4
     move r4, r0         ; r4 = xR
 
     ; If both xL and xR have bit 15 set (both < 0 or both >= 128):
     from r3
-    to r0
     and r4
-    bmi @skip_scanline
+    bpl :+
     nop
-
+    iwt r15, #@skip_scanline
+:
     ; Now: at most one of r3, r4 has bit 15 set.
     iwt r11, #$00FF     ; mask for low byte
 
@@ -538,11 +427,10 @@ scanline_loop:
     sub #0
     bpl :+
     nop
-    ; r4 has bit 15 set -> xR >= 128, so xR_int = 128:
     iwt r4, #128
     bra @xR_resolved
     nop
-:   ; r4 has bit 15 clear -> xR in [0, 127], so xR_int = r4 >> 8:
+:
     with r4
     swap
     with r4
@@ -554,15 +442,13 @@ scanline_loop:
     sub #0
     bpl :+
     nop
-    ; r3 has bit 15 set -> xL < 0.
-    ; Floor of negative Q8.8: floor(xL)
     with r3
     swap
     with r3
-    sex                 ; r3 = xL_int = -skip
+    sex
     bra @xL_resolved
     nop
-:   ; r3 has bit 15 clear -> xL in [0, 127], so xL_int = r3 >> 8:
+:
     with r3
     swap
     with r3
@@ -572,30 +458,18 @@ scanline_loop:
     ; If xL_int >= xR_int: nothing to draw on this scanline
     from r3
     cmp r4
-    bge @skip_scanline
+    blt :+
     nop
-
-    bra @begin_span
-    nop
-
-@skip_scanline:
-    iwt r13, #@advance_scanline
-    jmp r13
-    nop
-
-@begin_span:
-
-    ; Load uL (+10) and vL (+12) into r11 and r14
-    from r1
-    to r1
-    add #6              ; r1 = frame_base + 10 (uL)
+    iwt r15, #@skip_scanline
+:
+    ; --- Begin span ---
+    inc r1
+    inc r1              ; r1 = frame_base + 6 (uL)
     ldw (r1)            ; r0 = uL
-    to r11
     move r11, r0        ; r11 = u_cur = uL
     inc r1
-    inc r1              ; r1 = frame_base + 12 (vL)
+    inc r1              ; r1 = frame_base + 8 (vL)
     ldw (r1)            ; r0 = vL
-    to r14
     move r14, r0        ; r14 = v_cur = vL
 
     ; Clip left edge against 0:
@@ -607,11 +481,9 @@ scanline_loop:
     iwt r0, #0
     with r0
     sub r3
-    to r12
     move r12, r0        ; r12 = clip_left = -r3
     iwt r3, #0          ; x_start = 0
 
-    ; Advance u_cur (r11) and v_cur (r14) by clip_left * step:
     iwt r13, #@clip_u_loop
 @clip_u_loop:
     with r11
@@ -625,37 +497,34 @@ scanline_loop:
     ; Compute pixel_count = x_end - x_start = r4 - r3
     from r4
     sub r3
-    beq @advance_scanline
+    beq :+
     nop
-    bmi @advance_scanline
+    bpl @draw_span
     nop
-    to r12
+:
+    iwt r15, #@advance_scanline
+
+@draw_span:
     move r12, r0        ; r12 = pixel_count
 
-    ; Set R1 = x_start (plot_x)
-    to r1
+    ; R1 = x_start (plot X)
     move r1, r3
 
     ; Move u_cur to r3 and v_cur to r4:
-    to r3
-    move r3, r11        ; r3 = u_cur
-    to r4
-    move r4, r14        ; r4 = v_cur
+    move r3, r11
+    move r4, r14
 
     ; Prime R14 with first texel ROM address:
     from r3
+    hib                 ; r0 = u_cur >> 8
     to r11
-    hib                 ; r11 = u_cur >> 8
-    with r11
     and r7              ; r11 = u_int & u_mask
     from r4
-    to r0
     and r8              ; r0 = v_cur & v_mask_shifted
     with r11
     add r0              ; r11 = col + row
     with r11
     add r9              ; r11 = col + row + rom_offset
-    to r14
     move r14, r11       ; Prime R14 (starts hardware ROM prefetch!)
 
     iwt r13, #@pixel_loop
@@ -667,122 +536,104 @@ scanline_loop:
     with r4
     add r6              ; v_cur += dv_dx
     from r3
-    to r11
     hib
-    with r11
+    to r11
     and r7
     from r4
-    to r0
     and r8
     with r11
     add r0
     with r11
     add r9
-    to r14
     move r14, r11       ; R14 = next texel address
     loop
     nop
 
+@skip_scanline:
 @advance_scanline:
-    ; Increment Y scanline
-    inc r2
+    inc r2              ; next Y scanline
 
-    ; Decrement lines_left and advance edges
-    from r10
-    to r1
-    sub #11
+    move r1, r10
     with r1
-    sub #11             ; r1 = frame_base
+    sub #12             ; r1 = frame_base
 
     ldw (r1)            ; r0 = lines_left
     dec r0
     stw (r1)            ; save lines_left
     bne @lines_remain_adv
     nop
-    iwt r13, #@trap_finished
-    jmp r13
-    nop
+    iwt r15, #@trap_finished
 
 @lines_remain_adv:
-    ; Advance xL: xL (+2) += dxL_dy (+6)
+    ; Read trap_ptr from frame_base + 10:
+    move r11, r1
+    with r11
+    add #10
+    ldw (r11)           ; r0 = trap_ptr
+    move r11, r0        ; r11 = trap_ptr
+
+    with r11
+    add #8              ; r11 = trap_ptr + 8 (dxL_dy)
     inc r1
     inc r1              ; r1 = frame_base + 2 (xL)
-    ldw (r1)            ; r0 = xL
-    to r3
+
+    ; xL += dxL_dy
+    ldw (r1)
     move r3, r0
-    from r1
-    to r11
-    add #4              ; r11 = frame_base + 6 (dxL_dy)
     ldw (r11)           ; r0 = dxL_dy
     with r3
     add r0
     from r3
-    stw (r1)            ; save updated xL
+    stw (r1)
 
-    ; Advance xR: xR (+4) += dxR_dy (+8)
+    ; xR += dxR_dy
     inc r1
     inc r1              ; r1 = frame_base + 4 (xR)
     ldw (r1)
-    to r3
     move r3, r0
     inc r11
-    inc r11             ; r11 = frame_base + 8 (dxR_dy)
-    ldw (r11)
+    inc r11             ; r11 = trap_ptr + 10 (dxR_dy)
+    ldw (r11)           ; r0 = dxR_dy
     with r3
     add r0
     from r3
     stw (r1)
 
-    ; Advance uL: uL (+10) += du_dy (+14)
-    from r1
-    to r1
-    add #6              ; r1 = frame_base + 10 (uL)
-    ldw (r1)
-    to r3
-    move r3, r0
-    from r11
-    to r11
-    add #6              ; r11 = frame_base + 14 (du_dy)
-    ldw (r11)
-    with r3
-    add r0
-    from r3
-    stw (r1)
-
-    ; Advance vL: vL (+12) += dv_dy (+16)
+    ; uL += du_dy
     inc r1
-    inc r1              ; r1 = frame_base + 12 (vL)
+    inc r1              ; r1 = frame_base + 6 (uL)
     ldw (r1)
-    to r3
     move r3, r0
-    inc r11
-    inc r11             ; r11 = frame_base + 16 (dv_dy)
-    ldw (r11)
+    with r11
+    add #6              ; r11 = trap_ptr + 16 (du_dy)
+    ldw (r11)           ; r0 = du_dy
     with r3
     add r0
     from r3
     stw (r1)
 
-    iwt r13, #scanline_loop
-    jmp r13
-    nop
+    ; vL += dv_dy
+    inc r1
+    inc r1              ; r1 = frame_base + 8 (vL)
+    ldw (r1)
+    move r3, r0
+    inc r11
+    inc r11             ; r11 = trap_ptr + 18 (dv_dy)
+    ldw (r11)           ; r0 = dv_dy
+    with r3
+    add r0
+    from r3
+    stw (r1)
+
+    iwt r15, #scanline_loop
 
 @trap_finished:
     ; Flush GSU pixel caches to game pak RAM
     rpix
     rpix
 
-    ; Deallocate stack frame (22 bytes)
+    ; Deallocate stack frame (12 bytes)
     with r10
-    sub #11
-    with r10
-    sub #11
+    sub #12
     return
 endfunction
-
-; Macro helper for invoking draw_cached_trap
-.macro draw_cached_trap_call trap_ptr, ax, ay, u_off, v_off, fh
-    call draw_cached_trap trap_ptr, ax, ay, u_off, v_off, fh
-.endmacro
-
-.endif ; ::__DRAW_CACHED_TRAP_DEFINED__
