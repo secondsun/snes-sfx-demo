@@ -93,7 +93,7 @@ ifndef src_gsu
 src_gsu		:= $(call rwildcard, ,%.sgs)
 endif
 ifndef headers
-headers		:= $(call rwildcard, ,%.i) $(call rwildcard, ,%.i700)
+headers		:= $(call rwildcard, ,%.i) $(call rwildcard, ,%.i700) $(call rwildcard, ,%.bin) $(call rwildcard, ,%.pal)
 endif
 
 # libSFX

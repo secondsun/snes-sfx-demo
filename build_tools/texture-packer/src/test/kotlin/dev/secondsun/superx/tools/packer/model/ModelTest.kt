@@ -177,8 +177,8 @@ class ModelTest {
         assertTrue(projFile.exists())
         assertTrue(File(tempDir, "test.bin").exists())
         assertTrue(File(tempDir, "test.pal").exists())
-        assertTrue(File(tempDir, "test_graphics.bin").exists())
-        assertTrue(File(tempDir, "test_palette.bin").exists())
+        assertFalse(File(tempDir, "test_graphics.bin").exists())
+        assertFalse(File(tempDir, "test_palette.bin").exists())
         assertTrue(File(tempDir, "test.i").exists())
         assertTrue(File(tempDir, "test_atlas.png").exists())
 
@@ -263,12 +263,12 @@ class ModelTest {
         )
 
         assertTrue(exported.graphicsBinFile.exists())
-        assertEquals("LEVEL1_graphics.bin", exported.graphicsBinFile.name)
+        assertEquals("LEVEL1.bin", exported.graphicsBinFile.name)
         assertEquals(32 * 32, exported.graphicsBinFile.length().toInt())
         assertArrayEquals(atlas.generateBinary(), exported.graphicsBinFile.readBytes())
 
         assertTrue(exported.paletteBinFile.exists())
-        assertEquals("LEVEL1_palette.bin", exported.paletteBinFile.name)
+        assertEquals("LEVEL1.pal", exported.paletteBinFile.name)
         assertEquals(32, exported.paletteBinFile.length().toInt())
         assertArrayEquals(palette.toBgr555Binary(), exported.paletteBinFile.readBytes())
 
@@ -312,14 +312,34 @@ class ModelTest {
     }
 
     @Test
+    fun testPixelsAsciiTakesPrecedenceOverPixelsHex(@TempDir tempDir: File) {
+        val projFile = File(tempDir, "precedence.sfxproj")
+        val initialPixels = ByteArray(16 * 16) { 2 }
+        val tex = SourceTexture("tile", 16, 16, 0, 0, initialPixels)
+        val atlas = TextureAtlas(16, 16, listOf(tex))
+        val palette = SnesPalette().withSlot(2, SnesColor(31, 0, 0), assigned = true)
+            .withSlot(7, SnesColor(0, 31, 0), assigned = true)
+
+        ProjectService.saveProject(projFile, "precedence", atlas, palette, 16)
+
+        // Simulate editing pixelsAscii in .sfxproj while leaving stale pixelsHex ("0202...") intact
+        val json = projFile.readText().replace("2".repeat(16), "7".repeat(16))
+        projFile.writeText(json)
+
+        val (loadedAtlas, _, _) = ProjectService.loadProject(projFile)
+        assertEquals(7, loadedAtlas.textures[0].getPixel(0, 0))
+        assertEquals(7, loadedAtlas.textures[0].getPixel(15, 15))
+    }
+
+    @Test
     fun testSampleTexturesProjectIfPresent(@TempDir tempDir: File) {
         val sampleProj = File("TEXTURES.sfxproj")
         if (sampleProj.exists()) {
             val (atlas, palette, gridSnap) = ProjectService.loadProject(sampleProj)
             val tempProj = File(tempDir, "TEXTURES.sfxproj")
             ProjectService.saveProject(tempProj, "TEXTURES", atlas, palette, gridSnap)
-            assertTrue(File(tempDir, "TEXTURES_graphics.bin").exists())
-            assertTrue(File(tempDir, "TEXTURES_palette.bin").exists())
+            assertTrue(File(tempDir, "TEXTURES.bin").exists())
+            assertTrue(File(tempDir, "TEXTURES.pal").exists())
             assertTrue(File(tempDir, "TEXTURES.i").exists())
             assertTrue(File(tempDir, "TEXTURES_atlas.png").exists())
         }

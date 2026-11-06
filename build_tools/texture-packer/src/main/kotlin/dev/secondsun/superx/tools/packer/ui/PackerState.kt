@@ -165,8 +165,8 @@ class PackerState {
     fun exportAllAssets(
         destinationDir: File,
         baseName: String,
-        graphicsBinFileName: String = "${baseName}_graphics.bin",
-        paletteBinFileName: String = "${baseName}_palette.bin",
+        graphicsBinFileName: String = "${baseName}.bin",
+        paletteBinFileName: String = "${baseName}.pal",
         indexFileName: String = "${baseName}.i",
         pngFileName: String = "${baseName}_atlas.png",
         includeGraphicsBin: Boolean = true,
@@ -219,7 +219,7 @@ class PackerState {
 
     fun promptExportPaletteBin(parent: Frame? = null) {
         val dialog = FileDialog(parent, "Export Palette Binary", FileDialog.SAVE)
-        dialog.file = "${projectName}_palette.bin"
+        dialog.file = "${projectName}.pal"
         (lastExportDirectory ?: lastImportDirectory)?.let { dir ->
             if (File(dir).isDirectory) dialog.directory = dir
         }
@@ -239,7 +239,7 @@ class PackerState {
 
     fun promptExportGraphicsBin(parent: Frame? = null) {
         val dialog = FileDialog(parent, "Export Graphics Binary", FileDialog.SAVE)
-        dialog.file = "${projectName}_graphics.bin"
+        dialog.file = "${projectName}.bin"
         (lastExportDirectory ?: lastImportDirectory)?.let { dir ->
             if (File(dir).isDirectory) dialog.directory = dir
         }

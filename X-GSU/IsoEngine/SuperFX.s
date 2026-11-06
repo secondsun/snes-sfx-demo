@@ -226,7 +226,7 @@ FRAME_READY: .res 1
 .segment "GSUDATA"
 textures_binary:
 .export textures_binary
-    .incbin "Data/TEXTURES_graphics.bin"
+    .incbin "Data/TEXTURES.bin"
 
 .segment "RODATA"
-   incbin  Palette,        "Data/TEXTURES_palette.bin"
+   incbin  Palette,        "Data/TEXTURES.pal"

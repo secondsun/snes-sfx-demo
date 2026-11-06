@@ -120,8 +120,8 @@ object ProjectService {
         baseName: String,
         atlas: TextureAtlas,
         palette: SnesPalette,
-        graphicsBinFileName: String = "${baseName}_graphics.bin",
-        paletteBinFileName: String = "${baseName}_palette.bin",
+        graphicsBinFileName: String = "${baseName}.bin",
+        paletteBinFileName: String = "${baseName}.pal",
         indexFileName: String = "${baseName}.i",
         pngFileName: String = "${baseName}_atlas.png",
         includeGraphicsBin: Boolean = true,
@@ -221,15 +221,13 @@ object ProjectService {
         val parentDir = projectFile.parentFile ?: File(".")
         val baseName = projectFile.nameWithoutExtension
 
-        // Graphics binaries
+        // Graphics binary
         val binBytes = atlas.generateBinary()
         File(parentDir, "$baseName.bin").writeBytes(binBytes)
-        File(parentDir, "${baseName}_graphics.bin").writeBytes(binBytes)
 
-        // Palette binaries
+        // Palette binary
         val palBytes = palette.toBgr555Binary()
         File(parentDir, "$baseName.pal").writeBytes(palBytes)
-        File(parentDir, "${baseName}_palette.bin").writeBytes(palBytes)
 
         // ca65 assembly index
         val indexText = AtlasIndexGenerator.generate(atlas, baseName)
@@ -256,9 +254,9 @@ object ProjectService {
             }
         }
 
-        // Reconstruct textures
+        // Reconstruct textures (prefer pixelsAscii when present so hand-authored ASCII edits take precedence)
         val textures = dto.textures.map { texDto ->
-            val pixels = if (texDto.pixelsAscii != null && texDto.pixelsAscii.isNotBlank() && texDto.pixelsHex.isBlank()) {
+            val pixels = if (texDto.pixelsAscii != null && texDto.pixelsAscii.isNotBlank()) {
                 asciiToPixels(texDto.pixelsAscii, texDto.width, texDto.height)
             } else {
                 hexToPixels(texDto.pixelsHex, texDto.width, texDto.height)

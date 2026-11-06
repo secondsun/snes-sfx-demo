@@ -140,7 +140,7 @@ fun ExportModal(state: PackerState) {
                     ExportFileRow(
                         checked = incGraphics,
                         onCheckedChange = { incGraphics = it },
-                        fileName = "${cleanBase}_graphics.bin",
+                        fileName = "${cleanBase}.bin",
                         description = "Packed texture atlas binary (${state.atlas.sizeBytes} bytes, 1 byte/texel)"
                     )
 
@@ -150,7 +150,7 @@ fun ExportModal(state: PackerState) {
                     ExportFileRow(
                         checked = incPalette,
                         onCheckedChange = { incPalette = it },
-                        fileName = "${cleanBase}_palette.bin",
+                        fileName = "${cleanBase}.pal",
                         description = "SNES BGR555 palette binary (32 bytes, 16 words)"
                     )
 
@@ -196,8 +196,8 @@ fun ExportModal(state: PackerState) {
                             val ok = state.exportAllAssets(
                                 destinationDir = targetDir,
                                 baseName = cleanBase,
-                                graphicsBinFileName = "${cleanBase}_graphics.bin",
-                                paletteBinFileName = "${cleanBase}_palette.bin",
+                                graphicsBinFileName = "${cleanBase}.bin",
+                                paletteBinFileName = "${cleanBase}.pal",
                                 indexFileName = "${cleanBase}.i",
                                 pngFileName = "${cleanBase}_atlas.png",
                                 includeGraphicsBin = incGraphics,
