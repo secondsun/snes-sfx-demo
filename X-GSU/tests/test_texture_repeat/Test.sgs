@@ -1,0 +1,463 @@
+; ==============================================================================
+; TEST_TEXTURE_REPEAT - GSU Test Suite Harness
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "libSFX.i"
+
+.include "../../IsoEngine/triangle/cached_trap.i"
+.include "Data/TEXTURES.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:  .res 2
+TEST_RESULT:    .res 64
+TEST_TRAP:      .res .sizeof(cached_trap)
+
+.segment "GSUCODE"
+GSU_Code:
+    init_stack
+
+    ; Set ROMBR = $04 for GSU ROM data fetches
+    ibt r0, #$04
+    romb
+
+test_setup:
+    iwt r12, #4
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ; Read TEST_CASE_IDX
+    lm r9, (TEST_CASE_IDX)
+
+    ; Clear TEST_RESULT buffer (64 bytes = 32 words)
+    iwt r8, #TEST_RESULT
+    iwt r12, #32
+    iwt r13, #clear_res_loop
+    iwt r0, #0
+clear_res_loop:
+    stw (r8)
+    inc r8
+    inc r8
+    loop
+    nop
+
+    ; Dispatch based on TEST_CASE_IDX (1..4)
+    from r9
+    sub #1
+    bne :+
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+:   from r9
+    sub #2
+    bne :+
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+:   from r9
+    sub #3
+    bne :+
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+:   iwt r13, #run_case_4
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: Foliage (ID 7, 16x32) Full 16-pixel width span (x=0..15)
+; Row 7 of Foliage: cols 0..7 are [8,8,8,13,13,13,13,13], cols 8..15 are [13,8,13,13,13,8,15,0]
+; Checks if cols 8..15 are rendered, or if cols 0..7 repeat after 8 pixels!
+; ==============================================================================
+run_case_1:
+    iwt r1, #TEST_TRAP
+    ; dy_start = 10, line_count = 1
+    iwt r0, #10
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    ; xL = 0, xR = 16 (Q8.8: $0000, $1000)
+    iwt r0, #$0000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$1000
+    stw (r1)
+    inc r1
+    inc r1
+    ; dxL_dy = 0, dxR_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; uL = 0, vL = 7 << 6 ($01C0, row 7 of texture)
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(7 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dy = 0, dv_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dx = 1.0 (Q8.8 = $0100), dv_dx = 0
+    iwt r0, #$0100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    ; tex_id = 7 (foliage)
+    iwt r0, #7
+    stw (r1)
+
+    ; Draw trapezoid: anchor_x = 0, anchor_y = 0, u_offset = 0, v_offset = 0, frame_half = 0
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Flush pixel cache before reading with rpix
+    rpix
+    rpix
+
+    ; Sample 16 pixels at x=0..15 on y=10 into TEST_RESULT
+    iwt r8, #TEST_RESULT
+    iwt r2, #10
+
+    .repeat 16, i
+        iwt r1, #i
+        rpix
+        stw (r8)
+        inc r8
+        inc r8
+    .endrepeat
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: Stone (ID 5, 32x32) Full width span (x=0..31)
+; Row 4 of Stone: cols 0..7 are [1,4,3,3,4,3,3,1], cols 8..15 are [3,3,1,3,3,3,3,1]
+; ==============================================================================
+run_case_2:
+    iwt r1, #TEST_TRAP
+    ; dy_start = 20, line_count = 1
+    iwt r0, #20
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    ; xL = 0, xR = 32 (Q8.8: $0000, $2000)
+    iwt r0, #$0000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)
+    inc r1
+    inc r1
+    ; dxL_dy = 0, dxR_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; uL = 0, vL = 4 << 6 ($0100, row 4 of stone)
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(4 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dy = 0, dv_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dx = 1.0 (Q8.8 = $0100), dv_dx = 0
+    iwt r0, #$0100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    ; tex_id = 5 (stone)
+    iwt r0, #5
+    stw (r1)
+
+    ; Draw trapezoid
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Flush pixel cache
+    rpix
+    rpix
+
+    ; Sample 16 pixels at x=0..15 on y=20 into TEST_RESULT
+    iwt r8, #TEST_RESULT
+    iwt r2, #20
+
+    .repeat 16, i
+        iwt r1, #i
+        rpix
+        stw (r8)
+        inc r8
+        inc r8
+    .endrepeat
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: Foliage with u_offset = 8 << 8 ($0800, 8 pixels offset in U)
+; Draws x=0..7 on y=30. Since u_offset = 8, should render cols 8..15 of Row 7!
+; ==============================================================================
+run_case_3:
+    iwt r1, #TEST_TRAP
+    ; dy_start = 30, line_count = 1
+    iwt r0, #30
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    ; xL = 0, xR = 8 (Q8.8: $0000, $0800)
+    iwt r0, #$0000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0800
+    stw (r1)
+    inc r1
+    inc r1
+    ; dxL_dy = 0, dxR_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; uL = 0, vL = 7 << 6 ($01C0, row 7 of foliage)
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(7 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dy = 0, dv_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dx = 1.0 (Q8.8 = $0100), dv_dx = 0
+    iwt r0, #$0100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    ; tex_id = 7 (foliage)
+    iwt r0, #7
+    stw (r1)
+
+    ; Draw trapezoid with u_offset = 8 << 8 ($0800)
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #$0800      ; u_offset = 8.0 pixels
+    iwt r6, #0
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Flush pixel cache
+    rpix
+    rpix
+
+    ; Sample 8 pixels at x=0..7 on y=30 into TEST_RESULT
+    iwt r8, #TEST_RESULT
+    iwt r2, #30
+
+    .repeat 8, i
+        iwt r1, #i
+        rpix
+        stw (r8)
+        inc r8
+        inc r8
+    .endrepeat
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: Stone with v_offset = 4 << 6 ($0100, 4 pixels offset in V)
+; vL = 0, v_offset = 4 << 6. Should render Row 4 of Stone!
+; ==============================================================================
+run_case_4:
+    iwt r1, #TEST_TRAP
+    ; dy_start = 40, line_count = 1
+    iwt r0, #40
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    ; xL = 0, xR = 8 (Q8.8: $0000, $0800)
+    iwt r0, #$0000
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0800
+    stw (r1)
+    inc r1
+    inc r1
+    ; dxL_dy = 0, dxR_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; uL = 0, vL = 0 (Row 0)
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dy = 0, dv_dy = 0
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    ; du_dx = 1.0 (Q8.8 = $0100), dv_dx = 0
+    iwt r0, #$0100
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    ; tex_id = 5 (stone)
+    iwt r0, #5
+    stw (r1)
+
+    ; Draw trapezoid with v_offset = 4 << 6 ($0100)
+    iwt r1, #TEST_TRAP
+    iwt r3, #0
+    iwt r4, #0
+    iwt r5, #0
+    iwt r6, #(4 << 6)   ; v_offset = 4 pixels in V
+    iwt r7, #0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    ; Flush pixel cache
+    rpix
+    rpix
+
+    ; Sample 8 pixels at x=0..7 on y=40 into TEST_RESULT
+    iwt r8, #TEST_RESULT
+    iwt r2, #40
+
+    .repeat 8, i
+        iwt r1, #i
+        rpix
+        stw (r8)
+        inc r8
+        inc r8
+    .endrepeat
+
+    iwt r13, #test_complete
+    jmp r13
+    nop
+
+test_complete:
+    ; Let memory settle (8 NOPs)
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    stop
+    nop
+
+; Include the rasterizer under test
+.include "../../IsoEngine/triangle/draw_cached_trap.i"
