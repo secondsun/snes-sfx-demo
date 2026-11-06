@@ -282,12 +282,12 @@ shutdown:
 function init_iso_scene
     register cam_ptr, val
 
-    ; Copy 520 bytes of SHOWCASE_MAP_ROM from ROM bank 4 to MAP_BUF in GSURAM using cached loop
+    ; Copy MAP_BYTE_SIZE bytes of SHOWCASE_MAP_ROM from ROM bank 4 to MAP_BUF in GSURAM using cached loop
     ibt r0, #4
     romb
     iwt r14, #SHOWCASE_MAP_ROM
     iwt r1, #MAP_BUF
-    iwt r12, #520
+    iwt r12, #MAP_BYTE_SIZE
     cache
     move r13, r15
     getb
@@ -364,5 +364,5 @@ CACHED_YAW:
     .res 2
 .export CACHED_YAW
 MAP_BUF:
-    .res .sizeof(map_header) + (8 * 8 * .sizeof(map_cell))
+    .res MAP_BYTE_SIZE
 .export MAP_BUF

@@ -5,6 +5,7 @@
 .import GSU_INIT_FLAG
 .import GSU_JOYPAD
 .import SHOWCASE_MAP_ROM
+.import MAP_BYTE_SIZE
 .import MAP_BUF
 
 
@@ -24,14 +25,14 @@ Main:
         
         stz z:pos_y
 
-        ;Copy Showcase Map to GSURAM
+        ;Copy Showcase Map (MAP_BYTE_SIZE bytes) to GSURAM
         RW_push set:a16i16
         ldx #0
 :       lda f:SHOWCASE_MAP_ROM, x
         sta f:MAP_BUF, x
         inx
         inx
-        cpx #520
+        cpx #MAP_BYTE_SIZE
         bne :-
         RW_pull
 
@@ -42,6 +43,19 @@ Main:
         
         ;Start running snes cpu from work ram
         jml __MAIN_LOOP_RUN__
+
+.segment "ZEROPAGE"
+pos_y: .res 1
+
+VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_VRAM in todo.pointers
+                                ; This is where SFX buffers are copied to.
+                                ; 0 = screen 1
+                                ; 1 = screen 2
+SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram; 
+                                ; 0 = $700400
+                                ; 1 = $702900
+
+FRAME_READY: .res 1
 
 .SEGMENT "MAIN_LOOP"
 Main2:
@@ -210,19 +224,6 @@ drawScreen1:
 .segment "RODATA"
 .include "backgroundMap.s"
 
-
-.segment "ZEROPAGE"
-pos_y: .res 1
-
-VRAM_screen_select: .res 1    ; which VRAM address should be selected, see SFX_VRAM in todo.pointers
-                                ; This is where SFX buffers are copied to.
-                                ; 0 = screen 1
-                                ; 1 = screen 2
-SFX_buffer_position: .res 1   ; Where to begin DMA from in work ram; 
-                                ; 0 = $700400
-                                ; 1 = $702900
-
-FRAME_READY: .res 1
 .segment "GSUDATA"
 textures_binary:
 .export textures_binary

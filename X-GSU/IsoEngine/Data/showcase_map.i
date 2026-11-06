@@ -26,11 +26,16 @@
 
 .segment "GSUDATA"
 
+MAP_COLS = 8
+MAP_ROWS = 8
+MAP_BYTE_SIZE = 8 + (MAP_COLS * MAP_ROWS * 8)
+.export MAP_BYTE_SIZE
+
 .export SHOWCASE_MAP_ROM
 SHOWCASE_MAP_ROM:
     ; map_header (8 bytes):
-    ; cols = 8, rows = 8, origin_x = 128, origin_z = 80, reserved = 0
-    .byte 8, 8
+    ; cols = MAP_COLS (8), rows = MAP_ROWS (8), origin_x = 128, origin_z = 80, reserved = 0
+    .byte MAP_COLS, MAP_ROWS
     .word 128, 80
     .word 0
 
@@ -129,6 +134,8 @@ SHOWCASE_MAP_ROM:
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS_WILD,  TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (5,7) Lawn
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS,       TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (6,7) Lawn
     def_cell 0, PRIM_FLAT,                 TEXTURE_ID_GRASS_DENSE, TEXTURE_ID_GRASS, 0,                  PANEL_NONE,            0, 0 ; (7,7) Lawn
+SHOWCASE_MAP_ROM_END:
+.assert (SHOWCASE_MAP_ROM_END - SHOWCASE_MAP_ROM) = MAP_BYTE_SIZE, error, "SHOWCASE_MAP_ROM size does not match MAP_BYTE_SIZE"
 
 .segment "GSUCODE"
 

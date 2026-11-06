@@ -1,0 +1,368 @@
+.debuginfo +
+.include "libSFX.i"
+.include "../common/stack.i"
+.include "../common/function.i"
+.include "../common/control.i"
+.include "../common/structs.i"
+.include "../common/var.i"
+.include "../common/util.i"
+
+.include "../IsoEngine/map_grid.i"
+.include "Data/TEXTURES.i"
+.include "Data/starship_map.i"
+
+.segment "GSUCODE"
+GSU_Code:
+.export GSU_Code
+
+    init_stack
+    register fb_ptr, cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr, map_ptr, frame_half, debug_ptr, tmp, cx_val, cy_val
+
+resetFrameBuffer:
+    iwt r0, #0
+    cmode
+    iwt fb_ptr, #$4000
+    iwt r12, #$1400
+    cache
+    move r13, r15
+        stw (fb_ptr)
+        inc fb_ptr
+        loop
+        inc fb_ptr
+    nop
+
+init_gsu_main:
+    ; Set plot register options:
+    ; bit 0 = 0 Transparency On (color 0 transparent)
+    ; bit 1 = 0 dither off
+    ; bit 2 = 0 upper 4 bit color off
+    ; bit 3 = 1 sprite mode on
+    iwt r0, #$8
+    cmode
+
+    ; One-time scene initialization check
+    lm tmp, (GSU_INIT_FLAG)
+    with tmp
+    add #0
+    bne scene_initialized
+    nop
+    call init_iso_scene
+scene_initialized:
+
+    ; Check GSU_FRAME_HALF:
+    ; Pass 0 (left half, X in 0..127): update camera controls, compile archetypes if yaw is dirty, render left half
+    ; Pass 1 (right half, X in 128..255): render right half using cached archetypes
+    iwt tmp, #GSU_FRAME_HALF
+    ldb (tmp)
+    lob
+    with r0
+    add #0
+    beq @do_pass0
+    nop
+    iwt r15, #do_pass1
+    nop
+@do_pass0:
+
+    ; --- Pass 0: Update camera yaw (L/R) and translation (D-pad) from controller ---
+    lm tmp, (GSU_JOYPAD)
+    iwt cam_ptr, #ISO_CAM
+    call iso_camera_update_controls cam_ptr, tmp
+
+    ; Check if yaw is dirty; if dirty, compile archetypes
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt lat_ptr, #LATTICE_V2
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt yaw_ptr, #CACHED_YAW
+    call map_grid_compile_archetypes cam_ptr, basis_ptr, lat_ptr, arch_ptr, yaw_ptr
+
+    ; Compute centered origin_x / origin_z from camera focus (center_x, center_y):
+    ;   Uses Q11.5 basis vectors to center the grid at (cols/2, rows/2). Cell anchors
+    ;   are the (0,0) corner of each cell, so the grid footprint spans corners
+    ;   0..cols x 0..rows and its geometric center is (cols/2, rows/2):
+    ;   offset_x_q5 = (cols * Sx.x_q5 + rows * Sz.x_q5) >> 1
+    ;   offset_y_q5 = (cols * Sx.y_q5 + rows * Sz.y_q5) >> 1
+    ;   origin_x = center_x - ((offset_x_q5 + 16) >> 5)
+    ;   origin_z = center_y - ((offset_y_q5 + 16) >> 5)
+    iwt tmp, #ISO_CAM + 2
+    ldw (tmp)
+    move lat_ptr, r0    ; lat_ptr = sin_yaw (Q2.14)
+    inc tmp
+    inc tmp
+    ldw (tmp)
+    move yaw_ptr, r0    ; yaw_ptr = cos_yaw (Q2.14)
+
+    ; sx_x_q5 = cos_yaw >> 4
+    move tmp, yaw_ptr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+
+    ; sx_y_q5 = sin_yaw >> 5
+    move basis_ptr, lat_ptr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+
+    ; cols (cell anchors are cell corners, so the grid spans corners 0..cols)
+    iwt map_ptr, #MAP_BUF
+    ldb (map_ptr)       ; cols
+    lob
+    move r6, r0         ; mul_b = cols
+
+    ; cols * sx_x_q5:
+    from tmp
+    to r8
+    lmult
+    move arch_ptr, r4   ; arch_ptr = off_x_q5 = cols * sx_x_q5
+
+    ; cols * sx_y_q5:
+    from basis_ptr
+    to r8
+    lmult
+    move fb_ptr, r4     ; fb_ptr = off_y_q5 = cols * sx_y_q5
+
+    ; sz_x_q5 = - (sin_yaw >> 4)
+    move tmp, lat_ptr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    asr
+    with tmp
+    not
+    inc tmp
+
+    ; sz_y_q5 = cos_yaw >> 5
+    move basis_ptr, yaw_ptr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+    with basis_ptr
+    asr
+
+    ; rows
+    iwt map_ptr, #MAP_BUF + 1
+    ldb (map_ptr)       ; rows
+    lob
+    move r6, r0         ; mul_b = rows
+
+    ; rows * sz_x_q5:
+    from tmp
+    to r8
+    lmult
+    with arch_ptr
+    add r4              ; off_x_q5 += rows * sz_x_q5
+
+    ; rows * sz_y_q5:
+    from basis_ptr
+    to r8
+    lmult
+    with fb_ptr
+    add r4              ; off_y_q5 += rows * sz_y_q5
+
+    ; Divide by 2:
+    with arch_ptr
+    asr
+    with fb_ptr
+    asr
+
+    ; Round to integer (+16, >> 5):
+    iwt r0, #16
+    with arch_ptr
+    add r0
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr
+    with arch_ptr
+    asr                 ; arch_ptr = off_x in integer pixels
+
+    with fb_ptr
+    add r0
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr
+    with fb_ptr
+    asr                 ; fb_ptr = off_y in integer pixels
+
+    ; Load center_x (+6) and center_y (+8)
+    iwt cam_ptr, #ISO_CAM + 6
+    ldw (cam_ptr)
+    move cx_val, r0     ; center_x
+    inc cam_ptr
+    inc cam_ptr
+    ldw (cam_ptr)
+    move cy_val, r0     ; center_y
+
+    from cx_val
+    sub arch_ptr
+    move cx_val, r0     ; origin_x = center_x - off_x
+
+    from cy_val
+    sub fb_ptr
+    move cy_val, r0     ; origin_z = center_y - off_y
+
+    iwt map_ptr, #MAP_BUF + 2
+    from cx_val
+    stw (map_ptr)       ; origin_x
+    inc map_ptr
+    inc map_ptr
+    from cy_val
+    stw (map_ptr)       ; origin_z
+
+    ; Render Pass 0 (frame_half = 0)
+    iwt map_ptr, #MAP_BUF
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt frame_half, #0
+    iwt debug_ptr, #0
+    call map_grid_render map_ptr, cam_ptr, basis_ptr, arch_ptr, frame_half, debug_ptr
+    bra finish
+    nop
+
+do_pass1:
+    ; Render Pass 1 (frame_half = 1)
+    iwt map_ptr, #MAP_BUF
+    iwt cam_ptr, #ISO_CAM
+    iwt basis_ptr, #ISO_BASIS
+    iwt arch_ptr, #ARCH_TRAPS
+    iwt frame_half, #1
+    iwt debug_ptr, #0
+    call map_grid_render map_ptr, cam_ptr, basis_ptr, arch_ptr, frame_half, debug_ptr
+
+finish:
+shutdown:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+
+; Initializes MAP_BUF, CACHED_YAW, and ISO_CAM once on boot.
+function init_iso_scene
+    register cam_ptr, val
+
+    ; Copy MAP_BYTE_SIZE bytes of STARSHIP_MAP_ROM from ROM bank 4 to MAP_BUF in GSURAM using cached loop
+    ibt r0, #4
+    romb
+    iwt r14, #STARSHIP_MAP_ROM
+    iwt r1, #MAP_BUF
+    iwt r12, #MAP_BYTE_SIZE
+    cache
+    move r13, r15
+    getb
+    inc r14
+    from r0
+    stb (r1)
+    nop
+    loop
+    inc r1
+    nop
+
+    ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80, cam_x = 0, cam_z = 0
+    iwt cam_ptr, #ISO_CAM
+    iwt val, #1
+    call iso_camera_set_yaw cam_ptr, val
+
+    with cam_ptr
+    add #6
+    iwt val, #128
+    from val
+    stw (cam_ptr) ; center_x = 128
+
+    inc cam_ptr
+    inc cam_ptr
+    iwt val, #80
+    from val
+    stw (cam_ptr) ; center_y = 80
+
+    inc cam_ptr
+    inc cam_ptr
+    iwt val, #0
+    from val
+    stw (cam_ptr) ; cam_x = 0
+
+    inc cam_ptr
+    inc cam_ptr
+    from val
+    stw (cam_ptr) ; cam_z = 0
+
+    ; Mark CACHED_YAW as invalid ($FFFF) so first frame recompiles archetypes
+    iwt val, #$FFFF
+    sm (CACHED_YAW), val
+
+    iwt val, #1
+    sm (GSU_INIT_FLAG), val
+
+    return
+endfunction
+
+.segment "GSURAM"
+.align 2
+GSU_INIT_FLAG:
+    .res 2
+.export GSU_INIT_FLAG
+GSU_FRAME_HALF:
+    .res 2
+.export GSU_FRAME_HALF
+GSU_JOYPAD:
+    .res 2
+.export GSU_JOYPAD
+ISO_CAM:
+    .tag iso_camera
+.export ISO_CAM
+ISO_BASIS:
+    .tag iso_basis
+.export ISO_BASIS
+LATTICE_V2:
+    .res 28 * .sizeof(vector2)
+.export LATTICE_V2
+ARCH_TRAPS:
+    .tag arch_traps_table
+.export ARCH_TRAPS
+CACHED_YAW:
+    .res 2
+.export CACHED_YAW
+MAP_BUF:
+    .res MAP_BYTE_SIZE
+.export MAP_BUF
