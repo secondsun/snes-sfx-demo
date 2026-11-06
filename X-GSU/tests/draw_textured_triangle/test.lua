@@ -49,13 +49,13 @@ emu.addEventCallback(function()
     end
 end, emu.eventType.endFrame)
 
--- Load TEXTURES_graphics.bin from local Data folder
+-- Load TEXTURES.bin from local Data folder
 local candidates = {
-    script_dir .. "Data/TEXTURES_graphics.bin",
-    "Data/TEXTURES_graphics.bin",
-    "snes-sfx-demo/X-GSU/tests/draw_textured_triangle/Data/TEXTURES_graphics.bin",
-    "X-GSU/tests/draw_textured_triangle/Data/TEXTURES_graphics.bin",
-    "tests/draw_textured_triangle/Data/TEXTURES_graphics.bin"
+    script_dir .. "Data/TEXTURES.bin",
+    "Data/TEXTURES.bin",
+    "snes-sfx-demo/X-GSU/tests/draw_textured_triangle/Data/TEXTURES.bin",
+    "X-GSU/tests/draw_textured_triangle/Data/TEXTURES.bin",
+    "tests/draw_textured_triangle/Data/TEXTURES.bin"
 }
 
 local tex_data = nil
@@ -70,7 +70,7 @@ for _, path in ipairs(candidates) do
 end
 
 if not tex_data then
-    print("ERROR: Could not locate TEXTURES_graphics.bin")
+    print("ERROR: Could not locate TEXTURES.bin")
     emu.stop(1)
     return
 end
