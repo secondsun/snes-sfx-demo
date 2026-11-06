@@ -8,6 +8,7 @@
 **/*.log
 **/*.sym
 **/*.dmap
+**/actual_render.png
 
 # Tools submodule dotfiles & CI configurations
 **/.git

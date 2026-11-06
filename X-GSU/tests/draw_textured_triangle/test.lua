@@ -32,7 +32,7 @@ emu.addEventCallback(function()
         if post_stop_frames >= 8 then
             local screenshot = emu.takeScreenshot()
             if screenshot then
-                local out_path = script_dir .. "actual_render.png"
+                local out_path = script_dir .. ".build/actual_render.png"
                 local sf = io.open(out_path, "wb")
                 if sf then
                     sf:write(screenshot)

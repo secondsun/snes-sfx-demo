@@ -1,108 +1,65 @@
-# Project AGENTS Guide: SuperFX (SNES-SFX-DEMO) Workspace
+# Project AGENTS Guide: `snes-sfx-demo` Workspace
 
-This document provides context, architecture rules, hardware constraints, and tooling instructions for AI agents working in this repository.
-
----
-
-## 1. Workspace & Subprojects Architecture
-
-This repository is a multi-project workspace targeting the Super Nintendo Entertainment System (SNES) and the **SuperFX (GSU / FX3)** coprocessor:
-
-1. **`libSFX`** (`/libSFX`):
-   - Comprehensive SNES bare-metal SDK and development framework.
-   - Provides runtime bootstrapper, header creation, memory mapping configurations, interrupt handling (NMI/VBLANK), and SMP (APU sound processor) runtime.
-   - Bundles the CC65 toolchain binaries: `ca65` (assembler), `ld65` (linker), and `superfamicheck` (ROM validation and checksum repair).
-
-2. **`X-GSU`** (`/X-GSU`):
-   - Core SuperFX coprocessor mathematical routines and algorithmic libraries.
-   - Includes:
-     - 16-bit 3D vector arithmetic (`add`, `subtract`, `negate`, `dot`, `cross`, `length`, `normalize`, `copy`).
-     - Fixed-point 3D vertex and matrix transformations (`vector3_transform`, `camera_lookAt`).
-     - 32-bit square root (`gsu_sqrt32`) and 16-bit fixed-point reciprocal (`reciprocal`).
-     - Rob Northen Compression (RNC / Huffman) decompression routines (`rnc/`). Note: RNC unit tests (`buffer_rnc`, `decode_rnc`, `hufftable_rnc`) are works in progress and not expected to pass.
-     - Comprehensive unit test suite verified via Mesen CE headless test runner.
-
-3. **`SpriteScale`** (`/SpriteScale`):
-   - SuperFX rasterization demo and sprite scaling engine.
-   - Implements polygon rendering and edge-table rasterization techniques on SuperFX.
-
-4. **`edge-table`** (`/edge-table` and `/docs/edgeTable.txt`):
-   - Specification and architecture for dynamic edge-table scanline rendering.
-   - Organizes scanlines into 160 row buckets, managing span insertion, front-to-back occlusion clipping, and affine texture stepping.
-   - *Status*: Currently implemented within `SpriteScale`; will be refactored into a reusable, documented standalone library in the future.
-
-5. **`build_tools/ExtractGsuWorkRamLabels`** (`/build_tools/ExtractGsuWorkRamLabels`):
-   - Java/Maven utility stub designed to parse `*.sgs` files and recursively traverse `.include` directives to extract and export GSU Work RAM labels.
-   - *Current Workflow*: Agents use the Python script `../.agents/skills/create-gsu-test/scripts/extract_syms.py` to extract symbols and addresses directly from `ld65` symbol map files (`*.cpu.sym`).
+This document provides subproject layout and tooling pointers for `snes-sfx-demo`. For workspace-wide architecture, FX3 hardware invariants, and mandatory MCP tool routing, see root [`../AGENTS.md`](../AGENTS.md) and [`../.agents/rules/sfx-assembly-rules.md`](../.agents/rules/sfx-assembly-rules.md).
 
 ---
 
-## 2. Target Hardware: SuperFX 3 (FX3)
+## 1. Subprojects Architecture
 
-The project targets the **SuperFX 3 (FX3)**, the 21.47 MHz RISC coprocessor revision documented by Randy Linden (see [FX3 Specifications](../.agents/skills/create-gsu-test/references/fx3_specifications.md) and [upstream repo](https://github.com/LimitedRunGames-Tech/snes-fx3)).
+1. **`libSFX`** (`libSFX/`):
+   - SNES bare-metal SDK and development framework (bootstrapper, header creation, memory maps, NMI/VBLANK handlers, SMP runtime).
+   - Bundles the CC65 toolchain binaries: `ca65`, `ld65`, and `superfamicheck`.
 
-### Critical FX3 Architectural Nuances:
-1. **No Hardware `MERGE` Instruction**:
-   - In original SuperFX 1/2 hardware, `ALT2` + `MERGE` merged high bytes of two registers.
-   - **On FX3, `MERGE` is not implemented**.
-   - Workaround: Use bit manipulation sequences with `hib`, `lob`, `swap`, and `or`. See the `condensed_lmult` macro in [`X-GSU/gsu_maths/gsu_vector.i`](X-GSU/gsu_maths/gsu_vector.i).
-2. **Simultaneous Bus Access**:
-   - The FX3 enables simultaneous memory bus access. The GSU and SNES 65816 CPU can access memory concurrently without stalling or bus locking, provided memory banks and chip selects are configured properly.
-3. **Register Calling Conventions**:
-   - `R0`: Default source and destination register (`Sreg`/`Dreg`). Primary input parameter pointer. Any non-prefix instruction resets `Sreg` and `Dreg` back to `R0`.
-   - `R1` - `R3`: General parameters, secondary pointers, and scratch registers. `R3` is the standard return register (or points to output structs).
-   - `R4`: Low 16 bits of 32-bit product during hardware `LMULT`. **Never use `R4` as destination register `D` in `condensed_lmult`**.
-   - `R6`: Hardware multiplicand register for `LMULT` / `MULT`.
-   - `R7` - `R9`: Calculation scratch registers.
-   - `R10`: Dedicated software stack pointer (`init_stack`, `gsu_stack_push`, `gsu_stack_pop`).
-   - `R11`: Link register storing return address for subroutine calls (`call`, `return`).
-   - `R12`: Loop counter register (`loop`).
-   - `R13`: Loop target address register (`loop`).
-   - `R14`: ROM pointer with hardware prefetch buffering (`ROMB`, `GETB`, `GETC`).
-   - `R15`: Program Counter (`PC`).
+2. **`X-GSU`** (`X-GSU/` — see [`X-GSU/AGENTS.md`](X-GSU/AGENTS.md)):
+   - High-level `ca65` macro DSL (`function`, `call`, `return`, `stack`, `control`) and 3D fixed-point math/rasterization libraries (`IsoEngine/`, `gsu_maths/`, `rnc/`, `tests/`).
+
+3. **`SpriteScale`** (`SpriteScale/`):
+   - SuperFX polygon rasterization and sprite scaling demo.
+
+4. **`edge-table`** (`edge-table/` and `docs/edgeTable.txt`):
+   - Dynamic scanline edge-table architecture (160 row buckets, front-to-back occlusion clipping, and affine texture stepping).
+
+5. **`build_tools/texture-packer`** (`build_tools/texture-packer/`):
+   - Kotlin/Compose Desktop graphical texture atlas packer and CLI (`../tools/texture-packer.sh`) backing the `sfx_pack_textures` MCP tool.
 
 ---
 
-## 3. SuperFX Assembly Programming Rules
+## 2. SuperFX (FX3) Hardware & Assembly Rules
 
-1. **Prefix vs Non-Prefix Instructions**:
-   - `with Rn`, `to Rn`, `from Rn` are prefix instructions that modify `Sreg` or `Dreg` for the *immediately following* instruction only.
-   - Arithmetic and branch operations (`add #2`, `sub #4`, `not`, etc.) execute and immediately reset `Sreg` and `Dreg` to `R0`.
-   - Always specify `with Rn` when adjusting pointers (e.g. `with r0; add #2`). A bare `add #2` operates on the previous destination register or `R0`.
-2. **Loop Preservation**:
-   - Hardware `loop` decrements `R12` and branches to `R13` if non-zero.
-   - Any subroutine called within a loop may clobber `R12` or `R13`.
-   - Always push `R12` and `R13` to the stack (`gsu_stack_push r12; gsu_stack_push r13`) before function calls, and restore them (`gsu_stack_pop r13; gsu_stack_pop r12`) before `loop`.
-   - **Never push temporary variables inside `for ... endfor` macros**, because `endfor` invokes `restoreloop` and expects `R13`/`R12` at the top of the stack.
-3. **Word Alignment**:
-   - All 16-bit word loads (`ldw`) and stores (`stw`) must occur at even memory addresses.
-   - Ensure the linker configuration `Map.cfg` includes `align = $2` on `GSURAM`:
-     ```cfg
-     GSURAM: load = SRAM, type = bss, define = yes, align = $2;
-     ```
-4. **Pipelined Write Settling**:
-   - SuperFX RAM writes are pipelined and execute asynchronously across multiple clock cycles.
-   - Before ending a test or reading memory in Lua callbacks, insert 8 consecutive `nop`s to allow all pending stores to commit to RAM.
+All SuperFX assembly and macro code in `snes-sfx-demo` is governed by the canonical rules in [`../.agents/rules/sfx-assembly-rules.md`](../.agents/rules/sfx-assembly-rules.md):
+- **FX3 Invariants**: No hardware `MERGE` instruction (see `condensed_lmult` in [`X-GSU/gsu_maths/gsu_vector.i`](X-GSU/gsu_maths/gsu_vector.i)), 16-bit word alignment on `ldw`/`stw` (`GSURAM` requires `align = $2` in `Map.cfg`), dual `rpix` pixel cache flush, and 8-NOP pipeline settling before `stop`.
+- **Modal Prefixes**: `with`, `to`, `from` apply to the single immediately following instruction only; never place a modal prefix before `move` (`moves`, `moveb`, `movew`).
+- **Instruction Cache**: 512-byte on-chip instruction cache (`cache; move r13, r15`); never place `cache` inside loops or helper subroutines.
 
 ---
 
-## 4. Automated Testing Framework
+## 3. MCP Tools, Testing & Skills
 
-Unit testing uses the headless Mesen CE emulator with Lua verification scripts:
-- **Skill**: [`create-gsu-test`](../.agents/skills/create-gsu-test/SKILL.md)
-- **Scaffolding**: `python3 ../.agents/skills/create-gsu-test/scripts/setup_test.py <test_name>`
-- **Building**: `make -C tests/<test_name> clean all`
-- **Symbol Extraction**: `python3 ../.agents/skills/create-gsu-test/scripts/extract_syms.py tests/<test_name>/Test.cpu.sym`
-- **Execution**: `../tools/run-sfx-test.sh <test_name> 10` (or `../tools/run-sfx-test.sh all`)
+Always prioritize the workspace MCP servers over raw shell commands or `grep` (see root [`../AGENTS.md`](../AGENTS.md) §4):
 
-### Mesen CLI Flags:
-Always pass `--testRunner` (or `--testrunner`). Never pass `--test-runner` (with hyphen), which inadvertently launches GUI mode.
+### `retro-superfx_mesen` MCP Server (Emulation, Testing & Symbols)
+- **`run_sfx_test`**: Compile and headlessly run an `X-GSU` unit test in Mesen CE (automatically syncs `test.lua` symbol addresses and skips `-- @sfx-test status=wip` / `template` tests).
+- **`assert_sfx_math`**: Inject input parameters into GSURAM/registers and assert mathematical outputs.
+- **`capture_sfx_render`**: Capture headless framebuffer PNGs (`IsoEngine`, `SpriteScale`, unit tests) for visual inspection via `read_file`.
+- **`profile_sfx_execution`**: Profile GSU cycle counts, function/label hotspots, cache residency, and VBlank FPS.
+- **`sfx_resolve_address`**: Resolve symbol <-> linker address, nearest label deltas, and memory ranges from `.dbg` and `.cpu.sym`.
+
+### `retro-superfx_lsp` MCP Server (Static Analysis, Code Navigation & Atlases)
+- **`sfx_audit_diagnostics`**: Validate block structure (`function`/`endfunction`, `for`/`endfor`), FX3 hardware invariants, modal lifetimes, and stack depth (`Δ_SP == 0`).
+- **`sfx_lookup_symbol`** / **`sfx_find_references`**: Find symbol definitions, doc comments (In/Out/Clobbers), and usages across `.s`, `.sgs`, `.i`, and `.inc` files.
+- **`sfx_expand_macro`** / **`sfx_analyze_registers`**: Inspect expanded X-GSU macro streams and Chaitin-Briggs register allocation.
+- **`sfx_pack_textures`**: Pack, update, or validate `.sfxproj` texture atlases and companion `.bin`, `.pal`, `.i`, and `_atlas.png` files.
+
+### Relevant Root Skills (`../.agents/skills/`)
+- [`create-gsu-test`](../.agents/skills/create-gsu-test/SKILL.md): Scaffold and verify new unit tests from `X-GSU/tests/test_template`.
+- [`run-gsu-test`](../.agents/skills/run-gsu-test/SKILL.md) & [`sfx-test-runner`](../.agents/skills/sfx-test-runner/SKILL.md): Run single tests or the full suite (`../tools/run-sfx-test.sh [all]`).
+- [`sfx-macro-language`](../.agents/skills/sfx-macro-language/SKILL.md): Reference for the X-GSU macro DSL.
+- [`texture-atlas`](../.agents/skills/texture-atlas/SKILL.md): Author and pack `.sfxproj` texture atlases.
 
 ---
 
-## 5. Technical Documentation References
+## 4. Technical Documentation References
 
-Detailed references are maintained in `../.agents/skills/create-gsu-test/references/`:
 - [FX3 Specifications](../.agents/skills/create-gsu-test/references/fx3_specifications.md): Memory maps, clock speeds, simultaneous bus access, and MERGE workaround.
 - [SuperFX Instruction Set](../.agents/skills/create-gsu-test/references/superfx_instruction_set.md): Complete opcode matrix, flag behaviors, prefix registers, and machine cycles.
 - [SuperFX Guide](../.agents/skills/create-gsu-test/references/superfx_guide.md): Hardware register map, bus contention, and pipeline settling requirements.

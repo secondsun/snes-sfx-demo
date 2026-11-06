@@ -1,3 +1,4 @@
+-- @sfx-test status=template reason="Scaffold template for create-gsu-test"
 -- Resolve directory containing this Lua script (use script_dir .. "Data/..." for binary fixtures)
 local script_info = debug.getinfo(1, "S")
 local script_path = script_info and script_info.source:match("^@?(.*)$") or ""

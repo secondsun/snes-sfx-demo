@@ -1,4 +1,5 @@
-﻿--create lookup table for octal to binary
+-- @sfx-test status=wip reason="RNC buffer unpacking work in progress"
+--create lookup table for octal to binary
 oct2bin = {
     ['0'] = '000',
     ['1'] = '001',

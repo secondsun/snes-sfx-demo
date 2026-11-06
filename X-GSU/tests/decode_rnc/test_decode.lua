@@ -1,4 +1,4 @@
-﻿
+-- @sfx-test status=wip reason="RNC bitstream decoding work in progress"
 --create lookup table for octal to binary
 oct2bin = {
     ['0'] = '000',
