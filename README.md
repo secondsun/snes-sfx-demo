@@ -190,7 +190,7 @@ Unit tests run headlessly in **Mesen CE** using Lua breakpoints to validate memo
 
 1. **GNU Make**: Required for building ROMs and running tests.
 2. **Python 3.10+**: Used for symbol map synchronization (`extract_syms.py`).
-3. **Mesen CE**: SNES emulator required for running unit tests headlessly (configured on system `PATH` or at `/home/summers/Programs/Mesen`).
+3. **Mesen CE**: SNES emulator required for running unit tests headlessly (configured on system `PATH`, specified via `MESEN_PATH`, or installed at `~/Programs/Mesen`).
 4. **Assembler / Linker**: Precompiled `ca65` and `ld65` are included in `libSFX/tools/cc65/bin/`.
 5. **Java 26+ (Optional)**: Required if compiling `.sgs` files via `sfx-optimizer`.
 
@@ -390,7 +390,7 @@ Unit tests run headlessly in **Mesen CE** using Lua breakpoints to validate memo
 
 1. **GNU Make**: Required for building ROMs and running tests.
 2. **Python 3.10+**: Used for symbol map synchronization (`extract_syms.py`).
-3. **Mesen CE**: SNES emulator required for running unit tests headlessly (configured on system `PATH` or at `/home/summers/Programs/Mesen`).
+3. **Mesen CE**: SNES emulator required for running unit tests headlessly (configured on system `PATH`, specified via `MESEN_PATH`, or installed at `~/Programs/Mesen`).
 4. **Assembler / Linker**: Precompiled `ca65` and `ld65` are included in `libSFX/tools/cc65/bin/`.
 5. **Java 26+ (Optional)**: Required if compiling `.sgs` files via `sfx-optimizer`.
 
