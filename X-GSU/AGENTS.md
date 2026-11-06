@@ -77,16 +77,13 @@ All functions follow the SuperFX calling convention:
 
 ## 4. Test Suite Reference
 
-All functions are verified by automated tests in `tests/`:
+All active functions are verified by automated tests in `tests/` (note: `buffer_rnc`, `decode_rnc`, and `hufftable_rnc` are works in progress and not expected to pass):
 ```bash
-# Run individual test:
-./.agents/skills/create-gsu-test/scripts/run_test.sh tests/<test_name> 10
+# Run individual test (from umbrella root):
+./tools/run-sfx-test.sh <test_name> 10
 
-# Run complete test suite:
-for t in rom_to_ram sqrt reciprocal length normalize lookAt transform \
-         vector3_add vector3_subtract vector3_negate vector3_dot vector3_cross vector3_copy; do
-    ./.agents/skills/create-gsu-test/scripts/run_test.sh "tests/$t" 10 || exit 1
-done
+# Run complete active test suite (from umbrella root):
+./tools/run-sfx-test.sh all 10
 ```
 
 All 13 test suites pass with zero errors in headless Mesen CE runner mode.

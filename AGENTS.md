@@ -19,8 +19,8 @@ This repository is a multi-project workspace targeting the Super Nintendo Entert
      - 16-bit 3D vector arithmetic (`add`, `subtract`, `negate`, `dot`, `cross`, `length`, `normalize`, `copy`).
      - Fixed-point 3D vertex and matrix transformations (`vector3_transform`, `camera_lookAt`).
      - 32-bit square root (`gsu_sqrt32`) and 16-bit fixed-point reciprocal (`reciprocal`).
-     - Rob Northen Compression (RNC / Huffman) decompression routines (`rnc/`).
-     - Comprehensive unit test suite with 13 automated tests verified via Mesen CE headless test runner.
+     - Rob Northen Compression (RNC / Huffman) decompression routines (`rnc/`). Note: RNC unit tests (`buffer_rnc`, `decode_rnc`, `hufftable_rnc`) are works in progress and not expected to pass.
+     - Comprehensive unit test suite verified via Mesen CE headless test runner.
 
 3. **`SpriteScale`** (`/SpriteScale`):
    - SuperFX rasterization demo and sprite scaling engine.
@@ -33,13 +33,13 @@ This repository is a multi-project workspace targeting the Super Nintendo Entert
 
 5. **`build_tools/ExtractGsuWorkRamLabels`** (`/build_tools/ExtractGsuWorkRamLabels`):
    - Java/Maven utility stub designed to parse `*.sgs` files and recursively traverse `.include` directives to extract and export GSU Work RAM labels.
-   - *Current Workflow*: Agents use the Python script `.agents/skills/create-gsu-test/scripts/extract_syms.py` to extract symbols and addresses directly from `ld65` symbol map files (`*.cpu.sym`).
+   - *Current Workflow*: Agents use the Python script `../.agents/skills/create-gsu-test/scripts/extract_syms.py` to extract symbols and addresses directly from `ld65` symbol map files (`*.cpu.sym`).
 
 ---
 
 ## 2. Target Hardware: SuperFX 3 (FX3)
 
-The project targets the **SuperFX 3 (FX3)**, the 21.47 MHz RISC coprocessor revision documented by Randy Linden (see [FX3 Specifications](.agents/skills/create-gsu-test/references/fx3_specifications.md) and [upstream repo](https://github.com/LimitedRunGames-Tech/snes-fx3)).
+The project targets the **SuperFX 3 (FX3)**, the 21.47 MHz RISC coprocessor revision documented by Randy Linden (see [FX3 Specifications](../.agents/skills/create-gsu-test/references/fx3_specifications.md) and [upstream repo](https://github.com/LimitedRunGames-Tech/snes-fx3)).
 
 ### Critical FX3 Architectural Nuances:
 1. **No Hardware `MERGE` Instruction**:
@@ -89,11 +89,11 @@ The project targets the **SuperFX 3 (FX3)**, the 21.47 MHz RISC coprocessor revi
 ## 4. Automated Testing Framework
 
 Unit testing uses the headless Mesen CE emulator with Lua verification scripts:
-- **Skill**: [`create-gsu-test`](.agents/skills/create-gsu-test/SKILL.md)
-- **Scaffolding**: `python3 .agents/skills/create-gsu-test/scripts/setup_test.py <test_name>`
+- **Skill**: [`create-gsu-test`](../.agents/skills/create-gsu-test/SKILL.md)
+- **Scaffolding**: `python3 ../.agents/skills/create-gsu-test/scripts/setup_test.py <test_name>`
 - **Building**: `make -C tests/<test_name> clean all`
-- **Symbol Extraction**: `python3 .agents/skills/create-gsu-test/scripts/extract_syms.py tests/<test_name>/Test.cpu.sym`
-- **Execution**: `./.agents/skills/create-gsu-test/scripts/run_test.sh tests/<test_name> 10`
+- **Symbol Extraction**: `python3 ../.agents/skills/create-gsu-test/scripts/extract_syms.py tests/<test_name>/Test.cpu.sym`
+- **Execution**: `../tools/run-sfx-test.sh <test_name> 10` (or `../tools/run-sfx-test.sh all`)
 
 ### Mesen CLI Flags:
 Always pass `--testRunner` (or `--testrunner`). Never pass `--test-runner` (with hyphen), which inadvertently launches GUI mode.
@@ -102,8 +102,8 @@ Always pass `--testRunner` (or `--testrunner`). Never pass `--test-runner` (with
 
 ## 5. Technical Documentation References
 
-Detailed references are maintained in `.agents/skills/create-gsu-test/references/`:
-- [FX3 Specifications](.agents/skills/create-gsu-test/references/fx3_specifications.md): Memory maps, clock speeds, simultaneous bus access, and MERGE workaround.
-- [SuperFX Instruction Set](.agents/skills/create-gsu-test/references/superfx_instruction_set.md): Complete opcode matrix, flag behaviors, prefix registers, and machine cycles.
-- [SuperFX Guide](.agents/skills/create-gsu-test/references/superfx_guide.md): Hardware register map, bus contention, and pipeline settling requirements.
-- [Mesen CE Lua API Guide](.agents/skills/create-gsu-test/references/mesen_lua_api.md): Execution callbacks (`emu.callbackType.exec`), GSU work RAM reads (`emu.readWord`), and exit codes (`emu.stop(0)`).
+Detailed references are maintained in `../.agents/skills/create-gsu-test/references/`:
+- [FX3 Specifications](../.agents/skills/create-gsu-test/references/fx3_specifications.md): Memory maps, clock speeds, simultaneous bus access, and MERGE workaround.
+- [SuperFX Instruction Set](../.agents/skills/create-gsu-test/references/superfx_instruction_set.md): Complete opcode matrix, flag behaviors, prefix registers, and machine cycles.
+- [SuperFX Guide](../.agents/skills/create-gsu-test/references/superfx_guide.md): Hardware register map, bus contention, and pipeline settling requirements.
+- [Mesen CE Lua API Guide](../.agents/skills/create-gsu-test/references/mesen_lua_api.md): Execution callbacks (`emu.callbackType.exec`), GSU work RAM reads (`emu.readWord`), and exit codes (`emu.stop(0)`).

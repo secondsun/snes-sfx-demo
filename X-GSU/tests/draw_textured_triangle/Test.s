@@ -107,11 +107,11 @@ Vblank:
 .segment "GSUDATA"
 textures_binary:
 .export textures_binary
-    .incbin "../../IsoEngine/Data/TEXTURES_graphics.bin"
+    .incbin "Data/TEXTURES_graphics.bin"
 
 .segment "RODATA"
 Palette:
-    .incbin "../../IsoEngine/Data/TEXTURES_palette.bin"
+    .incbin "Data/TEXTURES_palette.bin"
 sizeof_Palette = 32
 
 .include "../../IsoEngine/backgroundMap.s"

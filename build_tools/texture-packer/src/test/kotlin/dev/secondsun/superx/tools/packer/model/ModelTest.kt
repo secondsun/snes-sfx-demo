@@ -312,15 +312,16 @@ class ModelTest {
     }
 
     @Test
-    fun testSampleTexturesProjectIfPresent() {
+    fun testSampleTexturesProjectIfPresent(@TempDir tempDir: File) {
         val sampleProj = File("TEXTURES.sfxproj")
         if (sampleProj.exists()) {
             val (atlas, palette, gridSnap) = ProjectService.loadProject(sampleProj)
-            ProjectService.saveProject(sampleProj, "TEXTURES", atlas, palette, gridSnap)
-            assertTrue(File("TEXTURES_graphics.bin").exists())
-            assertTrue(File("TEXTURES_palette.bin").exists())
-            assertTrue(File("TEXTURES.i").exists())
-            assertTrue(File("TEXTURES_atlas.png").exists())
+            val tempProj = File(tempDir, "TEXTURES.sfxproj")
+            ProjectService.saveProject(tempProj, "TEXTURES", atlas, palette, gridSnap)
+            assertTrue(File(tempDir, "TEXTURES_graphics.bin").exists())
+            assertTrue(File(tempDir, "TEXTURES_palette.bin").exists())
+            assertTrue(File(tempDir, "TEXTURES.i").exists())
+            assertTrue(File(tempDir, "TEXTURES_atlas.png").exists())
         }
     }
 }

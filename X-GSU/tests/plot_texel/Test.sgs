@@ -180,5 +180,6 @@ test_stop:
     nop
 
 ; Includes that need to be in GSURAM as part of GSUCODE
+.include "Data/TEXTURES.i"
 .include "../../gsu_maths/gsu_recip.i"
 .include "../../IsoEngine/triangle/drawTriangle.i"

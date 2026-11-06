@@ -2,8 +2,11 @@
 local test_stop = 0x00BD
 local idle_addr = 0x035B
 
+local script_src = (debug and debug.getinfo and debug.getinfo(1, "S").source) or ""
+local script_dir = script_src:match("^@(.*/)") or "./"
+
 -- Synchronize test_stop and idle from Test.cpu.sym if available
-local sym_file = io.open("snes-sfx-demo/X-GSU/tests/draw_textured_triangle/Test.cpu.sym", "r") or io.open("Test.cpu.sym", "r")
+local sym_file = io.open(script_dir .. "Test.cpu.sym", "r") or io.open("snes-sfx-demo/X-GSU/tests/draw_textured_triangle/Test.cpu.sym", "r") or io.open("Test.cpu.sym", "r")
 if sym_file then
     for line in sym_file:lines() do
         local addr, name = line:match("al%s+([0-9A-Fa-f]+)%s+%.([%w_]+)")
@@ -29,7 +32,7 @@ emu.addEventCallback(function()
         if post_stop_frames >= 8 then
             local screenshot = emu.takeScreenshot()
             if screenshot then
-                local out_path = "/Users/summerspittman/Projects/retro-superfx/snes-sfx-demo/X-GSU/tests/draw_textured_triangle/actual_render.png"
+                local out_path = script_dir .. "actual_render.png"
                 local sf = io.open(out_path, "wb")
                 if sf then
                     sf:write(screenshot)
@@ -46,13 +49,13 @@ emu.addEventCallback(function()
     end
 end, emu.eventType.endFrame)
 
--- Load TEXTURES_graphics.bin
+-- Load TEXTURES_graphics.bin from local Data folder
 local candidates = {
-    "snes-sfx-demo/X-GSU/IsoEngine/Data/TEXTURES_graphics.bin",
-    "../../IsoEngine/Data/TEXTURES_graphics.bin",
-    "IsoEngine/Data/TEXTURES_graphics.bin",
-    "X-GSU/IsoEngine/Data/TEXTURES_graphics.bin",
-    "/Users/summerspittman/Projects/retro-superfx/snes-sfx-demo/X-GSU/IsoEngine/Data/TEXTURES_graphics.bin"
+    script_dir .. "Data/TEXTURES_graphics.bin",
+    "Data/TEXTURES_graphics.bin",
+    "snes-sfx-demo/X-GSU/tests/draw_textured_triangle/Data/TEXTURES_graphics.bin",
+    "X-GSU/tests/draw_textured_triangle/Data/TEXTURES_graphics.bin",
+    "tests/draw_textured_triangle/Data/TEXTURES_graphics.bin"
 }
 
 local tex_data = nil

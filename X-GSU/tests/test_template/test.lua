@@ -1,4 +1,8 @@
-﻿
+-- Resolve directory containing this Lua script (use script_dir .. "Data/..." for binary fixtures)
+local script_info = debug.getinfo(1, "S")
+local script_path = script_info and script_info.source:match("^@?(.*)$") or ""
+local script_dir = script_path:match("^(.*[/\\])") or "./"
+
 test_setup = 0 -- Agent set this to the lower two bytes of value of test_setup in Test.cpu.sym
 test_start = 0 -- Agent set this to the lower two bytes of value of test_start in Test.cpu.sym
 test_stop = 0  -- Agent set this to the lower two bytes of value of test_stop in Test.cpu.sym
