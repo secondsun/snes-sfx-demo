@@ -5,7 +5,7 @@
 ;   - Entire function fits 100% within the 512-byte GSU instruction cache
 ;   - Stack-allocated trapezoid state frame: 12 bytes on stack
 ;   - Pre-shifted TEXTURE_TABLE integration (zero runtime shift loop)
-;   - Pipelined 17-byte inner pixel loop with early R14 prefetch and delay-slot plot
+;   - Pipelined 16-byte inner pixel loop with early R14 prefetch and delay-slot plot
 ; ==============================================================================
 
 .include "cached_trap.i"

@@ -804,7 +804,6 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
 ; ==============================================================================
 @sort_t_mode:
 @sort_current_t:
-    cache
     ; Pass 1: if T0.y > T1.y, swap T0 and T1
     frame_ptr compile_frame::t0_y, r7
     ldw (r7)
@@ -1241,6 +1240,7 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     jmp r13
     nop
 @m_computed_proc:
+    cache
 
     ; 4. Determine whether T1 is Left or Right: is_t1_left = (t1_x < m_x)
     frame_ptr compile_frame::t1_x, r7
@@ -1558,7 +1558,9 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     nop
 
     ; General h >= 3:
-    move r8, r14
+    ; Preserve r6 (xR_start) in r12 and r14 (delta_v) in r11 across reciprocal_lookup_rom:
+    move r11, r14
+    move r12, r6
     reciprocal_lookup_rom r3, r6 ; r6 = 1/h in Q0.16
     from r2
     to r2
@@ -1572,18 +1574,17 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     to r13
     fmult               ; r13 = du_dy = fmult(delta_u, recip_h)
 
-    from r8
+    from r11
     to r14
     fmult               ; r14 = dv_dy = fmult(delta_v, recip_h)
-    iwt r11, #@slopes_computed
-    jmp r11
+    move r6, r12        ; restore r6 = xR_start (Q8.8)
+    bra @slopes_computed
     nop
 
 @h_is_1:
     ; h == 1: slopes equal numerators!
     ; r2 is dxL_dy, r9 is dxR_dy, r13 is du_dy, r14 is dv_dy
-    iwt r11, #@slopes_computed
-    jmp r11
+    bra @slopes_computed
     nop
 
 @h_is_2:
@@ -1598,101 +1599,8 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
     asr
 
 @slopes_computed:
-    ; Convert xTL (r5) and xTR (r6) to Q8.8:
-    ; r5 was xTL, r6 was xTR (we preserved or need to reload them):
-    ; Note: r5 was clobbered by iwt r5, #$FF00 above!
-    ; Let's re-read xTL and xTR from parameters:
-    ; If top half: xTL was T0.x, xTR was T0.x.
-    ; If bottom half: xTL was m_x / t1_x, xTR was t1_x / m_x.
-    ; Wait! We can restore xTL and xTR:
-    ; Check half_index: 0 = top half, 1 = bottom half:
-    frame_ptr compile_frame::half_index, r7
-    ldw (r7)
-    from r0
-    sub #0
-    bne @reload_bot_xt
-    nop
-
-    ; Top half: xTL = t0_x, xTR = t0_x
-    frame_ptr compile_frame::t0_x, r7
-    ldw (r7)
-    to r5
-    from r0
-    swap
-    iwt r8, #$FF00
-    with r5
-    and r8              ; r5 = xL_start (Q8.8)
-    move r6, r5         ; r6 = xR_start (Q8.8)
-
-    ; uTL = t0_u, vTL = t0_v
-    frame_ptr compile_frame::t0_u, r7
-    ldw (r7)
-    move r7, r0         ; r7 = uL_start
-    frame_ptr compile_frame::t0_v, r8
-    ldw (r8)
-    move r8, r0         ; r8 = vL_start
-    iwt r11, #@write_trap_fields
-    jmp r11
-    nop
-
-@reload_bot_xt:
-    ; Bottom half:
-    frame_ptr compile_frame::is_t1_left, r7
-    ldw (r7)
-    from r0
-    sub #0
-    bne @bot_t1_left_reload
-    nop
-
-    ; T1 is Right, M is Left: xTL = m_xq, xTR = t1_x, uTL = m_u, vTL = m_v
-    frame_ptr compile_frame::m_xq, r7
-    to r5
-    ldw (r7)            ; r5 = xL_start (Q8.8 sub-pixel M)
-    iwt r8, #$FF00
-
-    frame_ptr compile_frame::t1_x, r7
-    ldw (r7)
-    to r6
-    from r0
-    swap
-    with r6
-    and r8              ; r6 = xR_start
-
-    frame_ptr compile_frame::m_u, r7
-    ldw (r7)
-    move r7, r0         ; r7 = uL_start
-
-    frame_ptr compile_frame::m_v, r8
-    ldw (r8)
-    move r8, r0         ; r8 = vL_start
-    iwt r11, #@write_trap_fields
-    jmp r11
-    nop
-
-@bot_t1_left_reload:
-    ; T1 is Left, M is Right: xTL = t1_x, xTR = m_x, uTL = t1_u, vTL = t1_v
-    frame_ptr compile_frame::t1_x, r7
-    ldw (r7)
-    to r5
-    from r0
-    swap
-    iwt r8, #$FF00
-    with r5
-    and r8              ; r5 = xL_start
-
-    frame_ptr compile_frame::m_xq, r7
-    to r6
-    ldw (r7)            ; r6 = xR_start (Q8.8 sub-pixel M)
-
-    frame_ptr compile_frame::t1_u, r7
-    ldw (r7)
-    move r7, r0         ; r7 = uL_start
-
-    frame_ptr compile_frame::t1_v, r8
-    ldw (r8)
-    move r8, r0         ; r8 = vL_start
-
 @write_trap_fields:
+    ; r5 = xL_start (Q8.8), r6 = xR_start (Q8.8), r7 = uL_start, r8 = vL_start
     ; Load curr_out_ptr:
     frame_ptr compile_frame::curr_out_ptr, r11
     ldw (r11)
