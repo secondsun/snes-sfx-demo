@@ -92,5 +92,5 @@ TEST_ATLAS:
 ; Texture Table for descriptor lookup
 .export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word .loword(TEST_ATLAS + 0),     31, 31, 6 ; ID 0: 32x32 Floor (pitch 64, stride_shift 6)
-    .word .loword(TEST_ATLAS + 2048),  31, 31, 6 ; ID 1: 32x32 Skirt (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 0),     31, (31 << 6), ((31 << 6) | ((1 << 6) - 1)) ; ID 0: 32x32 Floor (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 2048),  31, (31 << 6), ((31 << 6) | ((1 << 6) - 1)) ; ID 1: 32x32 Skirt (pitch 64, stride_shift 6)

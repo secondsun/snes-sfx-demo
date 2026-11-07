@@ -100,10 +100,16 @@ class ModelTest {
         val indexStr = AtlasIndexGenerator.generate(atlas, "game")
         assertTrue(indexStr.contains("ATLAS_WIDTH        = 64"))
         assertTrue(indexStr.contains("ATLAS_STRIDE_SHIFT = 6"))
+        assertTrue(indexStr.contains("ATLAS_FRAC_MASK    = (1 << ATLAS_STRIDE_SHIFT) - 1"))
+        assertTrue(indexStr.contains("TEXTURE_TABLE_ENTRY_COUNT = 1"))
+        assertTrue(indexStr.contains("TEXTURE_TABLE_SIZE_BYTES  = 8"))
         assertTrue(indexStr.contains("TEXTURE_ID_HERO = 0"))
         assertTrue(indexStr.contains("TEXTURE_HERO_OFFSET = 0"))
+        assertTrue(indexStr.contains("TEXTURE_HERO_V_MASK_SHIFTED = (15 << ATLAS_STRIDE_SHIFT)"))
+        assertTrue(indexStr.contains("TEXTURE_HERO_V_OFFSET_MASK = ((15 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1))"))
+        assertTrue(indexStr.contains("TEXTURE_HERO_U_OFFSET_MASK = ((15 << 8) | \$00FF)"))
         assertTrue(indexStr.contains("TEXTURE_TABLE:"))
-        assertTrue(indexStr.contains(".word .loword(textures_binary + TEXTURE_HERO_OFFSET), 15, 15, ATLAS_STRIDE_SHIFT ; 0: hero (16x16)"))
+        assertTrue(indexStr.contains(".word .loword(textures_binary + TEXTURE_HERO_OFFSET), 15, (15 << ATLAS_STRIDE_SHIFT), ((15 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 0: hero (16x16)"))
     }
 
     @Test
@@ -138,7 +144,7 @@ class ModelTest {
         assertTrue(indexStr.contains("TEXTURE_ID_STONE = 0"))
         assertTrue(indexStr.contains("TEXTURE_ID_WATER_DEEP = 1"))
         assertTrue(indexStr.contains("TEXTURE_ID_PARAPET = 2"))
-        assertTrue(indexStr.contains(".word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, 15, ATLAS_STRIDE_SHIFT ; 2: parapet (32x16)"))
+        assertTrue(indexStr.contains(".word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, (15 << ATLAS_STRIDE_SHIFT), ((15 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 2: parapet (32x16)"))
     }
 
     @Test

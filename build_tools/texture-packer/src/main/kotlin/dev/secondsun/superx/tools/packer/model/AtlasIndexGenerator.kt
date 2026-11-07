@@ -21,10 +21,10 @@ object AtlasIndexGenerator {
         sb.appendLine(";; Structure for runtime texture lookup by IsoEngine / SuperFX")
         sb.appendLine(";; Each descriptor entry is 8 bytes (4 16-bit words) matching the TEXTURE_TABLE format:")
         sb.appendLine(".struct texture_descriptor")
-        sb.appendLine("    rom_offset    .word ; Base byte offset of texture (0,0) in atlas binary (Y * ATLAS_WIDTH + X)")
-        sb.appendLine("    u_mask        .word ; Horizontal coordinate bitmask for fast wrapping: (width - 1)")
-        sb.appendLine("    v_mask        .word ; Vertical coordinate bitmask for fast wrapping: (height - 1)")
-        sb.appendLine("    stride_shift  .word ; Shift count (log2(ATLAS_WIDTH)) to multiply V by atlas pitch")
+        sb.appendLine("    rom_offset      .word ; Base byte offset of texture (0,0) in atlas binary (Y * ATLAS_WIDTH + X)")
+        sb.appendLine("    u_mask          .word ; Horizontal coordinate bitmask for fast wrapping: (width - 1)")
+        sb.appendLine("    v_mask_shifted  .word ; Pre-shifted vertical coordinate bitmask: (height - 1) << ATLAS_STRIDE_SHIFT")
+        sb.appendLine("    v_offset_mask   .word ; Pre-shifted Q10.6 wrap mask: ((height - 1) << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)")
         sb.appendLine(".endstruct")
         sb.appendLine()
 
@@ -44,6 +44,11 @@ object AtlasIndexGenerator {
         sb.appendLine(".ifndef ATLAS_STRIDE_SHIFT")
         sb.appendLine("ATLAS_STRIDE_SHIFT = ${atlas.strideShift}")
         sb.appendLine(".endif")
+        sb.appendLine("ATLAS_FRAC_MASK    = (1 << ATLAS_STRIDE_SHIFT) - 1")
+
+        val descriptors = atlas.resolvedDescriptors()
+        sb.appendLine("TEXTURE_TABLE_ENTRY_COUNT = ${descriptors.size}")
+        sb.appendLine("TEXTURE_TABLE_SIZE_BYTES  = ${descriptors.size * 8}")
         sb.appendLine()
 
         sb.appendLine(";; ==============================================================================")
@@ -62,7 +67,6 @@ object AtlasIndexGenerator {
         sb.appendLine(";; ==============================================================================")
         sb.appendLine()
 
-        val descriptors = atlas.resolvedDescriptors()
         for ((idx, desc) in descriptors.withIndex()) {
             val upperName = SourceTexture.sanitizeToIdentifier(desc.name).uppercase()
             val byteOffset = idx * 8
@@ -77,13 +81,16 @@ object AtlasIndexGenerator {
             sb.appendLine("TEXTURE_${upperName}_U_MASK = ${desc.uMask}")
             sb.appendLine("TEXTURE_${upperName}_V_MASK = ${desc.vMask}")
             sb.appendLine("TEXTURE_${upperName}_WIDTH_SHIFT = ${desc.widthShift} ; log2(${desc.width}): V << ${desc.widthShift}")
+            sb.appendLine("TEXTURE_${upperName}_V_MASK_SHIFTED = (${desc.vMask} << ATLAS_STRIDE_SHIFT)")
+            sb.appendLine("TEXTURE_${upperName}_V_OFFSET_MASK = ((${desc.vMask} << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1))")
+            sb.appendLine("TEXTURE_${upperName}_U_OFFSET_MASK = ((${desc.uMask} << 8) | \$00FF)")
             sb.appendLine()
         }
 
         sb.appendLine(";; ==============================================================================")
         sb.appendLine(";; Texture Table for runtime descriptor lookup")
         sb.appendLine(";; Indexed at runtime via: TEXTURE_TABLE + TEXTURE_<NAME>_BYTE_OFFSET")
-        sb.appendLine(";; Format per entry: rom_offset, u_mask, v_mask, stride_shift (8 bytes total)")
+        sb.appendLine(";; Format per entry: rom_offset, u_mask, v_mask_shifted, v_offset_mask (8 bytes total)")
         sb.appendLine(";; ==============================================================================")
         sb.appendLine(".segment \"GSUDATA\"")
         sb.appendLine(".import textures_binary")
@@ -91,7 +98,7 @@ object AtlasIndexGenerator {
         sb.appendLine("TEXTURE_TABLE:")
         for ((idx, desc) in descriptors.withIndex()) {
             val upperName = SourceTexture.sanitizeToIdentifier(desc.name).uppercase()
-            sb.appendLine("    .word .loword(textures_binary + TEXTURE_${upperName}_OFFSET), ${desc.uMask}, ${desc.vMask}, ATLAS_STRIDE_SHIFT ; $idx: ${desc.comment}")
+            sb.appendLine("    .word .loword(textures_binary + TEXTURE_${upperName}_OFFSET), ${desc.uMask}, (${desc.vMask} << ATLAS_STRIDE_SHIFT), ((${desc.vMask} << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; $idx: ${desc.comment}")
         }
         sb.appendLine(".segment \"GSUCODE\"")
         sb.appendLine()

@@ -174,6 +174,13 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
 .align 2
 gsu_map_render_frame:   .res .sizeof(map_render_frame)
 gsu_map_face_def:       .res .sizeof(face_def)
+gsu_active_arch_mask:   .res 2
+.export gsu_active_arch_mask
+gsu_effective_arch_mask:.res 2
+gsu_map_is_prebaked:    .res 2
+gsu_row_anchor_x_q5:    .res 2
+gsu_row_anchor_z_q5:    .res 2
+gsu_row_cell_offset:    .res 2
 
 .segment "GSUCODE"
 
@@ -1637,6 +1644,18 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r6
     stw (r5)
 
+    ; Load active archetype mask. If 0 (uninitialized / standalone test), treat as $FFFF (compile all)
+    iwt r7, #gsu_active_arch_mask
+    ldw (r7)
+    from r0
+    sub #0
+    bne :+
+    nop
+    iwt r0, #$FFFF
+:
+    iwt r7, #gsu_effective_arch_mask
+    stw (r7)
+
     ; Save inputs in frame
     iwt r7, #gsu_map_render_frame
     from r1
@@ -2403,6 +2422,18 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     ; --------------------------------------------------------------------------
     ; 9. Compile Wedge & Stair Archetypes across Rotations R = 0..3:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #$00FE
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@compile_universal_archetypes
+    jmp r13
+    nop
+:
+
     iwt r7, #gsu_map_render_frame + 140
     iwt r0, #0
     from r0
@@ -2582,6 +2613,17 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     ; --------------------------------------------------------------------------
     ; Compile PRIM_WEDGE_STRAIGHT (1h: arch=1) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_WEDGE_STRAIGHT)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_wedge_straight
+    jmp r13
+    nop
+:
     ; lut index = (1 << 2) | R = 4 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -2706,9 +2748,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_wedge_straight:
     ; --------------------------------------------------------------------------
     ; Compile PRIM_WEDGE_STRAIGHT_2H (2h: arch=2) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_WEDGE_STRAIGHT_2H)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_wedge_straight_2h
+    jmp r13
+    nop
+:
     ; lut index = (2 << 2) | R = 8 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -2831,9 +2885,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_wedge_straight_2h:
     ; --------------------------------------------------------------------------
     ; Compile PRIM_WEDGE_OUTER (1h: arch=3) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_WEDGE_OUTER)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_wedge_outer
+    jmp r13
+    nop
+:
     ; lut index = (3 << 2) | R = 12 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -2946,9 +3012,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_wedge_outer:
     ; --------------------------------------------------------------------------
     ; Compile PRIM_WEDGE_OUTER_2H (2h: arch=4) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_WEDGE_OUTER_2H)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_wedge_outer_2h
+    jmp r13
+    nop
+:
     ; lut index = (4 << 2) | R = 16 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -3061,9 +3139,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_wedge_outer_2h:
     ; --------------------------------------------------------------------------
     ; Compile PRIM_WEDGE_INNER (1h: arch=5) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_WEDGE_INNER)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_wedge_inner
+    jmp r13
+    nop
+:
     ; lut index = (5 << 2) | R = 20 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -3211,9 +3301,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_wedge_inner:
     ; --------------------------------------------------------------------------
     ; Compile PRIM_WEDGE_INNER_2H (2h: arch=6) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_WEDGE_INNER_2H)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_wedge_inner_2h
+    jmp r13
+    nop
+:
     ; lut index = (6 << 2) | R = 24 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -3361,9 +3463,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_wedge_inner_2h:
     ; --------------------------------------------------------------------------
     ; Compile PRIM_STAIRS (arch=7) for rotation R:
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_STAIRS)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_stairs
+    jmp r13
+    nop
+:
     ; lut index = (7 << 2) | R = 28 + R
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -3579,6 +3693,7 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_stairs:
     ; Next rotation R = R + 1
     iwt r7, #gsu_map_render_frame + 140
     ldw (r7)
@@ -3603,6 +3718,17 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     ; ==========================================================================
     ; 10. Compile PRIM_LIQUID_SHALLOW (arch=8):
     ; ==========================================================================
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_LIQUID_SHALLOW)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_liquid_shallow
+    jmp r13
+    nop
+:
     ; entry_ptr = compile_out_ptr (+64)
     iwt r7, #gsu_map_render_frame + 64
     ldw (r7)
@@ -3722,9 +3848,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)            ; store trap count at entry_ptr
 
+@skip_liquid_shallow:
     ; ==========================================================================
     ; 11. Compile PRIM_LIQUID_DEEP (arch=9):
     ; ==========================================================================
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_LIQUID_DEEP)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_liquid_deep
+    jmp r13
+    nop
+:
     ; entry_ptr = compile_out_ptr (+64)
     iwt r7, #gsu_map_render_frame + 64
     ldw (r7)
@@ -3844,9 +3982,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_liquid_deep:
     ; ==========================================================================
     ; 12. Compile PRIM_PILLAR (arch=10):
     ; ==========================================================================
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_PILLAR)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_pillar
+    jmp r13
+    nop
+:
     ; entry_ptr = compile_out_ptr (+64)
     iwt r7, #gsu_map_render_frame + 64
     ldw (r7)
@@ -4084,9 +4234,21 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_pillar:
     ; ==========================================================================
     ; 13. Compile PRIM_FOLIAGE_CROSS (arch=11):
     ; ==========================================================================
+    iwt r7, #gsu_effective_arch_mask
+    ldw (r7)
+    iwt r6, #(1 << PRIM_FOLIAGE_CROSS)
+    from r0
+    and r6
+    bne :+
+    nop
+    iwt r13, #@skip_foliage_cross
+    jmp r13
+    nop
+:
     ; Precompute Center points K_bot and K_top:
     ; K_bot.x = MN.x + MW.x
     ; K_bot.y = MN.y + MW.y
@@ -4287,6 +4449,7 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     from r1
     stw (r7)
 
+@skip_foliage_cross:
     ; Compile 8 canonical Edge Panel templates into arch_buf:
     call compile_edge_panels
 
@@ -4298,6 +4461,332 @@ function map_grid_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps
     ; Return 1 (recompiled)
     iwt r3, #1
     return
+endfunction
+
+; ==============================================================================
+; map_grid_prebake_map
+; Pre-computes 4-way static neighbor skirt drops into cell bytes +6 (drop_ns)
+; and +7 (drop_ew) for all cells in map_ptr, and records the active archetype
+; bitmask into gsu_active_arch_mask. Marks map_header::reserved (+6) as $BACE.
+;
+; In:
+;   map_ptr = r1: Pointer to map struct in GSURAM
+;
+; Clobbers:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function map_grid_prebake_map map_ptr
+    register map_ptr = r1
+
+    ; cols = ldb(map_ptr + 0)
+    move r7, map_ptr
+    ldb (r7)
+    lob
+    move r2, r0         ; r2 = cols
+
+    ; rows = ldb(map_ptr + 1)
+    inc r7
+    ldb (r7)
+    lob
+    move r3, r0         ; r3 = rows
+
+    ; active_mask = 1 (PRIM_FLAT is always active)
+    iwt r4, #1          ; r4 = active_mask
+
+    ; cell_ptr = map_ptr + 8
+    move r14, map_ptr
+    iwt r0, #8
+    with r14
+    add r0              ; r14 = current cell_ptr
+
+    ; Outer loop: j = 0..rows-1
+    iwt r5, #0          ; r5 = j
+@j_loop:
+    ; Inner loop: i = 0..cols-1
+    iwt r6, #0          ; r6 = i
+@i_loop:
+    ; Read cell base_height (cell_ptr + 0)
+    move r7, r14
+    ldb (r7)
+    lob
+    move r8, r0         ; r8 = base_height
+
+    ; Read cell archetype_id (cell_ptr + 1)
+    inc r7
+    ldb (r7)
+    lob
+    iwt r7, #$001F
+    with r0
+    and r7
+    move r7, r0         ; r7 = arch (0..31)
+
+    ; Accumulate into active_mask: active_mask |= (1 << arch)
+    iwt r11, #1
+    from r7
+    sub #0
+    beq @shift_done
+    nop
+    move r0, r7
+@shift_loop:
+    with r11
+    add r11
+    dec r0
+    bne @shift_loop
+    nop
+@shift_done:
+    with r4
+    or r11              ; r4 = active_mask |= (1 << arch)
+
+    ; cell_solid_h: if arch == PRIM_LIQUID_SHALLOW or PRIM_LIQUID_DEEP -> 0, else base_height (r8)
+    move r9, r8         ; r9 = cell_solid_h
+    iwt r0, #PRIM_LIQUID_SHALLOW
+    from r7
+    cmp r0
+    beq @cell_is_liquid
+    nop
+    iwt r0, #PRIM_LIQUID_DEEP
+    from r7
+    cmp r0
+    bne @cell_not_liquid
+    nop
+@cell_is_liquid:
+    iwt r9, #0
+@cell_not_liquid:
+
+    ; 1. South neighbor (j + 1, i): drop_s
+    move r7, r5
+    inc r7              ; j_nb = j + 1
+    move r8, r6         ; i_nb = i
+    iwt r12, #@ret_s
+    iwt r11, #@get_nb_height
+    jmp r11
+    nop
+@ret_s:
+    from r9
+    sub r0              ; cell_solid_h - nb_h
+    bpl :+
+    nop
+    iwt r0, #0
+:
+    iwt r7, #15
+    from r7
+    cmp r0
+    bge :+
+    nop
+    move r0, r7
+:
+    move r13, r0        ; r13 = drop_s (0..15)
+
+    ; 2. North neighbor (j - 1, i): drop_n
+    move r7, r5
+    dec r7              ; j_nb = j - 1
+    move r8, r6         ; i_nb = i
+    iwt r12, #@ret_n
+    iwt r11, #@get_nb_height
+    jmp r11
+    nop
+@ret_n:
+    from r9
+    sub r0              ; cell_solid_h - nb_h
+    bpl :+
+    nop
+    iwt r0, #0
+:
+    iwt r7, #15
+    from r7
+    cmp r0
+    bge :+
+    nop
+    move r0, r7
+:
+    ; pack drop_ns = drop_s | (drop_n << 4)
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0              ; drop_n << 4
+    with r0
+    or r13              ; r0 = drop_s | (drop_n << 4)
+    from r14
+    to r7
+    add #6
+    from r0
+    stb (r7)            ; cell_ptr + 6 = drop_ns
+
+    ; 3. East neighbor (j, i + 1): drop_e
+    move r7, r5         ; j_nb = j
+    move r8, r6
+    inc r8              ; i_nb = i + 1
+    iwt r12, #@ret_e
+    iwt r11, #@get_nb_height
+    jmp r11
+    nop
+@ret_e:
+    from r9
+    sub r0              ; cell_solid_h - nb_h
+    bpl :+
+    nop
+    iwt r0, #0
+:
+    iwt r7, #15
+    from r7
+    cmp r0
+    bge :+
+    nop
+    move r0, r7
+:
+    move r13, r0        ; r13 = drop_e (0..15)
+
+    ; 4. West neighbor (j, i - 1): drop_w
+    move r7, r5         ; j_nb = j
+    move r8, r6
+    dec r8              ; i_nb = i - 1
+    iwt r12, #@ret_w
+    iwt r11, #@get_nb_height
+    jmp r11
+    nop
+@ret_w:
+    from r9
+    sub r0              ; cell_solid_h - nb_h
+    bpl :+
+    nop
+    iwt r0, #0
+:
+    iwt r7, #15
+    from r7
+    cmp r0
+    bge :+
+    nop
+    move r0, r7
+:
+    ; pack drop_ew = drop_e | (drop_w << 4)
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0
+    with r0
+    add r0              ; drop_w << 4
+    with r0
+    or r13              ; r0 = drop_e | (drop_w << 4)
+    from r14
+    to r7
+    add #7
+    from r0
+    stb (r7)            ; cell_ptr + 7 = drop_ew
+
+    ; Advance cell_ptr += 8
+    iwt r0, #8
+    with r14
+    add r0
+
+    ; Advance i:
+    inc r6
+    from r6
+    cmp r2              ; i < cols?
+    bge :+
+    nop
+    iwt r11, #@i_loop
+    jmp r11
+    nop
+:
+
+    ; Advance j:
+    inc r5
+    from r5
+    cmp r3              ; j < rows?
+    bge :+
+    nop
+    iwt r11, #@j_loop
+    jmp r11
+    nop
+:
+
+    ; Store accumulated active_mask into gsu_active_arch_mask:
+    iwt r7, #gsu_active_arch_mask
+    from r4
+    stw (r7)
+
+    ; Mark map as pre-baked: store $BACE in map_header::reserved (map_ptr + 6)
+    from map_ptr
+    to r7
+    add #6
+    iwt r0, #$BACE
+    stw (r7)
+
+    return
+
+; Internal helper: reads neighbor surface elevation at (r8=i_nb, r7=j_nb)
+; Returns surface height in r0 (0 if OOB). Returns via jmp r12.
+@get_nb_height:
+    from r7
+    add #0
+    bmi @nb_oob
+    nop
+    from r7
+    cmp r3              ; j_nb >= rows?
+    bge @nb_oob
+    nop
+    from r8
+    add #0
+    bmi @nb_oob
+    nop
+    from r8
+    cmp r2              ; i_nb >= cols?
+    bge @nb_oob
+    nop
+
+    ; in bounds: offset = (j_nb * cols + i_nb) * 8
+    from r7
+    mult r2             ; r0 = j_nb * cols
+    add r8              ; + i_nb
+    add r0
+    add r0
+    add r0              ; * 8
+    move r11, map_ptr
+    with r11
+    add #8              ; skip header
+    with r11
+    add r0              ; r11 = nb cell_ptr
+
+    ldb (r11)           ; nb base_height
+    lob
+    move r8, r0         ; r8 = nb base_height
+    inc r11
+    ldb (r11)           ; nb arch
+    lob
+    iwt r11, #$001F
+    with r0
+    and r11             ; r0 = nb arch
+    iwt r11, #PRIM_LIQUID_SHALLOW
+    from r0
+    cmp r11
+    bne :+
+    nop
+    inc r8              ; shallow liquid surface = base_height + 1
+    bra @nb_ret
+    nop
+:
+    iwt r11, #PRIM_LIQUID_DEEP
+    from r0
+    cmp r11
+    bne @nb_ret
+    nop
+    inc r8
+    inc r8              ; deep liquid surface = base_height + 2
+@nb_ret:
+    move r0, r8
+    jmp r12
+    nop
+
+@nb_oob:
+    iwt r0, #0
+    jmp r12
+    nop
 endfunction
 
 ; ==============================================================================
@@ -4431,7 +4920,6 @@ function map_stamp_edge_panel edge_idx
     gsu_stack_push r14
     gsu_stack_push r1
     gsu_stack_push r11
-    gsu_stack_push r9
     gsu_stack_push r6
     gsu_stack_push r5
 
@@ -4451,7 +4939,6 @@ function map_stamp_edge_panel edge_idx
 
     gsu_stack_pop r5
     gsu_stack_pop r6
-    gsu_stack_pop r9
     gsu_stack_pop r11
     gsu_stack_pop r1
     gsu_stack_pop r14
@@ -4571,6 +5058,20 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     inc r7
     ldw (r7)
     move r12, r0        ; r12 = origin_z
+    inc r7
+    inc r7
+    ldw (r7)            ; r0 = reserved (+6)
+    iwt r14, #$BACE
+    from r0
+    cmp r14
+    beq :+
+    nop
+    iwt r0, #0
+:
+    move r14, r7
+    iwt r7, #gsu_map_is_prebaked
+    stw (r7)
+    move r7, r14
 
     ; Store cols, rows, origin_x, origin_z in frame
     iwt r7, #gsu_map_render_frame + map_render_frame::cols
@@ -5038,9 +5539,7 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     from r11
     stw (r7)            ; save j_rem
 
-    ; --------------------------------------------------------------------------
-    ; 4. Inner I Loop (Cols)
-    ; --------------------------------------------------------------------------
+    ; Load i_start into r12 and i_count into r14 for row initialization:
     iwt r7, #gsu_map_render_frame + map_render_frame::i_start
     ldw (r7)
     move r12, r0        ; r12 = i_cur = i_start
@@ -5051,6 +5550,71 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ldw (r7)
     move r14, r0        ; r14 = i_rem = i_count
 
+    ; Initialize cur_cell_ptr = map_ptr + 8 + ((j * cols + i_start) << 3)
+    move r6, r9         ; mul_b = j_cur
+    iwt r7, #gsu_map_render_frame + map_render_frame::cols
+    ldw (r7)            ; r0 = cols
+    to r8
+    lmult               ; r4 = j * cols
+    from r4
+    to r8
+    add r12             ; r8 = j * cols + i_start
+    with r8
+    add r8
+    with r8
+    add r8
+    with r8
+    add r8              ; r8 = (j * cols + i_start) << 3
+    iwt r7, #gsu_map_render_frame + map_render_frame::map_ptr
+    ldw (r7)
+    add #8
+    add r8              ; r0 = map_ptr + 8 + ((j * cols + i_start) << 3)
+    iwt r7, #gsu_row_cell_offset
+    stw (r7)
+
+    ; Initialize cur_anchor_x_q5 = origin_x_q5 + j * sz_x_q5 + i_start * sx_x_q5
+    move r6, r9
+    iwt r7, #gsu_map_render_frame + map_render_frame::sz_x_q5
+    ldw (r7)
+    to r8
+    lmult
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_x_q5
+    ldw (r7)
+    to r1
+    add r4              ; r1 = origin_x_q5 + j * sz_x_q5
+    move r6, r12        ; mul_b = i_start
+    iwt r7, #gsu_map_render_frame + map_render_frame::sx_x_q5
+    ldw (r7)
+    to r8
+    lmult
+    from r1
+    add r4              ; r0 = origin_x_q5 + j * sz_x_q5 + i_start * sx_x_q5
+    iwt r7, #gsu_row_anchor_x_q5
+    stw (r7)
+
+    ; Initialize cur_anchor_z_q5 = origin_z_q5 + j * sz_y_q5 + i_start * sx_y_q5
+    move r6, r9
+    iwt r7, #gsu_map_render_frame + map_render_frame::sz_y_q5
+    ldw (r7)
+    to r8
+    lmult
+    iwt r7, #gsu_map_render_frame + map_render_frame::origin_z_q5
+    ldw (r7)
+    to r1
+    add r4              ; r1 = origin_z_q5 + j * sz_y_q5
+    move r6, r12        ; mul_b = i_start
+    iwt r7, #gsu_map_render_frame + map_render_frame::sx_y_q5
+    ldw (r7)
+    to r8
+    lmult
+    from r1
+    add r4              ; r0 = origin_z_q5 + j * sz_y_q5 + i_start * sx_y_q5
+    iwt r7, #gsu_row_anchor_z_q5
+    stw (r7)
+
+    ; --------------------------------------------------------------------------
+    ; 4. Inner I Loop (Cols)
+    ; --------------------------------------------------------------------------
 @i_loop_top:
     iwt r7, #gsu_map_render_frame + map_render_frame::i_cur
     from r12
@@ -5061,32 +5625,11 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     stw (r7)            ; save i_rem
 
     ; --------------------------------------------------------------------------
-    ; 5. Read Map Cell Record at (j * cols + i) << 3
+    ; 5. Read Map Cell Record from stepped gsu_row_cell_offset
     ; --------------------------------------------------------------------------
-    move r6, r9         ; mul_b = j_cur
-    iwt r7, #gsu_map_render_frame + map_render_frame::cols
-    ldw (r7)            ; r0 = cols
-    to r8
-    lmult               ; r4_reg = j * cols
-    from r12            ; add i_cur
-    to r8
-    add r4
-    ; index << 3:
-    with r8
-    add r8
-    with r8
-    add r8
-    with r8
-    add r8              ; r8 = (j * cols + i) << 3
-
-    ; cell_ptr = map_ptr + 8 + r8
-    iwt r7, #gsu_map_render_frame + map_render_frame::map_ptr
-    ldw (r7)
-    with r0
-    add #8
-    with r0
-    add r8
-    move r7, r0         ; r7 = cell_ptr
+    iwt r7, #gsu_row_cell_offset
+    to r7
+    ldw (r7)            ; r7 = cell_ptr
 
 @read_cell_fields:
 
@@ -5141,11 +5684,85 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     ;   camera-facing face only (S or N, E or W, chosen by yaw quadrant), so the
     ;   drop must be measured against the neighbor on that same face:
     ;     drop = max(0, base_height - neighbor.surface_height)
-    ;   Neighbors outside the map count as height 0 (diorama plinth base).
-    ;   Liquid archetypes (PRIM_LIQUID_SHALLOW/DEEP) have no skirts and have surface
-    ;   elevations at base_height + 1h and + 2h respectively.
-    ;   Preserves r9 (j_cur) and r12 (i_cur).
+    ;   If pre-baked drops are present ($BACE), read them directly from cell_ptr + 6
+    ;   and cell_ptr + 7 (r7 is currently cell_ptr + 5).
     ; --------------------------------------------------------------------------
+    iwt r8, #gsu_map_is_prebaked
+    ldw (r8)
+    from r0
+    sub #0
+    beq @fallback_calc_skirt_drops
+    nop
+
+    ; Fast path: read prebaked drop_ns from cell_ptr + 6
+    inc r7
+    ldb (r7)
+    lob
+    move r1, r0         ; r1 = drop_ns byte: drop_s | (drop_n << 4)
+
+    ; Read prebaked drop_ew from cell_ptr + 7
+    inc r7
+    ldb (r7)
+    lob
+    move r2, r0         ; r2 = drop_ew byte: drop_e | (drop_w << 4)
+
+    ; Determine camera-facing NS drop:
+    iwt r8, #gsu_map_render_frame + map_render_frame::front_ns_edge
+    ldw (r8)            ; 2 = South, 0 = North
+    from r0
+    sub #0
+    beq @read_drop_north
+    nop
+    ; South: byte6 & $0F
+    from r1
+    and #$0F
+    bra @store_drop_ns
+    nop
+@read_drop_north:
+    from r1
+    to r0
+    lsr
+    with r0
+    lsr
+    with r0
+    lsr
+    with r0
+    lsr
+    and #$0F
+@store_drop_ns:
+    iwt r8, #gsu_map_render_frame + map_render_frame::drop_ns
+    stw (r8)
+
+    ; Determine camera-facing EW drop:
+    iwt r8, #gsu_map_render_frame + map_render_frame::front_ew_edge
+    ldw (r8)            ; 1 = East, 3 = West
+    sub #1
+    bne @read_drop_west
+    nop
+    ; East: byte7 & $0F
+    from r2
+    and #$0F
+    bra @store_drop_ew
+    nop
+@read_drop_west:
+    from r2
+    to r0
+    lsr
+    with r0
+    lsr
+    with r0
+    lsr
+    with r0
+    lsr
+    and #$0F
+@store_drop_ew:
+    iwt r8, #gsu_map_render_frame + map_render_frame::drop_ew
+    stw (r8)
+    iwt r13, #@skirt_drops_done
+    jmp r13
+    nop
+
+@fallback_calc_skirt_drops:
     iwt r7, #gsu_map_render_frame + map_render_frame::base_height
     to r1
     ldw (r7)            ; r1 = h
@@ -5312,11 +5929,32 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     iwt r7, #gsu_map_render_frame + map_render_frame::drop_ew
     stw (r7)
 
+@skirt_drops_done:
+
     ; --------------------------------------------------------------------------
     ; 6. Calculate 2D Screen Anchor(i, j, base_height) using Q11.5 fixed point:
     ;    Anchor.x = (origin_x_q5 + i * sx_x_q5 + j * sz_x_q5 + 16) >> 5
     ;    Anchor.y = (origin_z_q5 + i * sx_y_q5 + j * sz_y_q5 + base_height * (-448) + 16) >> 5
     ; --------------------------------------------------------------------------
+    iwt r7, #gsu_map_render_frame + map_render_frame::is_8x8
+    ldw (r7)
+    from r0
+    sub #0
+    bne @calc_anchor_8x8
+    nop
+
+    ; Generic loop anchor: gsu_row_anchor_x/z_q5 is already stepped across i!
+    iwt r7, #gsu_row_anchor_x_q5
+    to r1
+    ldw (r7)            ; r1 = cur_anchor_x_q5
+    inc r7
+    inc r7
+    to r2
+    ldw (r7)            ; r2 = cur_anchor_z_q5
+    bra @add_height_to_anchor
+    nop
+
+@calc_anchor_8x8:
     iwt r7, #gsu_map_render_frame + map_render_frame::origin_x_q5
     to r1
     ldw (r7)            ; r1 = anchor_x_q5
@@ -5360,15 +5998,39 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     with r2
     add r4
 
-    ; + base_height * (-448):
+@add_height_to_anchor:
+    ; + base_height * (-448) = (h << 6) - (h << 9) without lmult
     iwt r7, #gsu_map_render_frame + map_render_frame::base_height
-    ldw (r7)
-    move r6, r0         ; mul_b = base_height
-    iwt r0, #$FE40      ; -448
-    to r8
-    lmult
-    with r2
+    ldw (r7)            ; r0 = base_height
+    from r0
+    sub #0
+    beq @height_offset_done
+    nop
+    move r6, r0
+    with r6
+    add r6
+    with r6
+    add r6
+    with r6
+    add r6
+    with r6
+    add r6
+    with r6
+    add r6
+    with r6
+    add r6              ; r6 = h << 6
+    move r4, r6
+    with r4
     add r4
+    with r4
+    add r4
+    with r4
+    add r4              ; r4 = h << 9
+    from r6
+    sub r4              ; r0 = (h << 6) - (h << 9) = -448 * h
+    with r2
+    add r0
+@height_offset_done:
 
     ; Round to integer screen pixels (+16, asr 5):
     iwt r0, #16
@@ -6002,7 +6664,6 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     gsu_stack_push r14
     gsu_stack_push r1
     gsu_stack_push r11
-    gsu_stack_push r9
     gsu_stack_push r6
     gsu_stack_push r5
 
@@ -6022,18 +6683,9 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
 
     gsu_stack_pop r5
     gsu_stack_pop r6
-    gsu_stack_pop r9
     gsu_stack_pop r11
     gsu_stack_pop r1
     gsu_stack_pop r14
-
-    ; Restore template surface type (0) to trap (+24)
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    iwt r0, #0
-    stw (r7)
 
     iwt r7, #.sizeof(cached_trap)
     with r1
@@ -6243,7 +6895,6 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     gsu_stack_push r1
     gsu_stack_push r12
     gsu_stack_push r11
-    gsu_stack_push r9
     gsu_stack_push r6
     gsu_stack_push r5
 
@@ -6263,7 +6914,6 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
 
     gsu_stack_pop r5
     gsu_stack_pop r6
-    gsu_stack_pop r9
     gsu_stack_pop r11
     gsu_stack_pop r12
     gsu_stack_pop r1
@@ -6372,19 +7022,75 @@ function map_grid_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half
     nop
     move r14, r0        ; r14 = new i_rem
 
-    ; Advance i_cur += i_step
+    ; Advance i_cur += i_step, and step cur_cell_ptr and cur_anchor_x/z_q5
     iwt r7, #gsu_map_render_frame + map_render_frame::i_cur
+    to r12
     ldw (r7)
-    move r12, r0
     iwt r7, #gsu_map_render_frame + map_render_frame::i_step
     ldw (r7)
     with r12
     add r0
+    from r0
+    sub #0
+    bmi @step_i_neg
+    nop
 
+    ; i_step == +1:
+    iwt r7, #gsu_row_cell_offset
+    ldw (r7)
+    add #8
+    stw (r7)
+
+    iwt r8, #gsu_map_render_frame + map_render_frame::sx_x_q5
+    to r1
+    ldw (r8)
+    iwt r7, #gsu_row_anchor_x_q5
+    ldw (r7)
+    add r1
+    stw (r7)
+
+    inc r8
+    inc r8
+    to r1
+    ldw (r8)            ; sx_y_q5
+    inc r7
+    inc r7
+    ldw (r7)
+    add r1
+    stw (r7)
+    bra @step_i_done
+    nop
+
+@step_i_neg:
+    ; i_step == -1:
+    iwt r7, #gsu_row_cell_offset
+    ldw (r7)
+    sub #8
+    stw (r7)
+
+    iwt r8, #gsu_map_render_frame + map_render_frame::sx_x_q5
+    to r1
+    ldw (r8)
+    iwt r7, #gsu_row_anchor_x_q5
+    ldw (r7)
+    sub r1
+    stw (r7)
+
+    inc r8
+    inc r8
+    to r1
+    ldw (r8)            ; sx_y_q5
+    inc r7
+    inc r7
+    ldw (r7)
+    sub r1
+    stw (r7)
+
+@step_i_done:
     ; Reload j_cur into r9 for next i_loop_top
     iwt r7, #gsu_map_render_frame + map_render_frame::j_cur
+    to r9
     ldw (r7)
-    move r9, r0
 
     iwt r13, #@i_loop_top
     jmp r13

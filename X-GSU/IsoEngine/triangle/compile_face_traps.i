@@ -804,6 +804,7 @@ function compile_face_traps face_def_ptr, out_traps_ptr : num_traps_emitted
 ; ==============================================================================
 @sort_t_mode:
 @sort_current_t:
+    cache
     ; Pass 1: if T0.y > T1.y, swap T0 and T1
     frame_ptr compile_frame::t0_y, r7
     ldw (r7)

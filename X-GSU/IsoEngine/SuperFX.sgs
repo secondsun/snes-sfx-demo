@@ -7,6 +7,7 @@
 .include "../common/var.i"
 .include "../common/util.i"
 
+TEXTURE_TABLE_IN_RAM = 1
 .include "map_grid.i"
 .include "Data/TEXTURES.i"
 .include "Data/showcase_map.i"
@@ -299,6 +300,15 @@ function init_iso_scene
     inc r1
     nop
 
+    ; Copy TEXTURE_TABLE from ROM bank 4 to GSURAM
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #TEXTURE_TABLE_SIZE_BYTES
+    ibt r0, #$04
+    romb
+
+    ; Pre-bake 4-way skirt drops and accumulate active archetype mask
+    iwt r1, #MAP_BUF
+    call map_grid_prebake_map r1
+
     ; Initialize ISO_CAM: yaw = 1, center_x = 128, center_y = 80, cam_x = 0, cam_z = 0
     iwt cam_ptr, #ISO_CAM
     iwt val, #1
@@ -339,6 +349,9 @@ endfunction
 
 .segment "GSURAM"
 .align 2
+TEXTURE_TABLE_RAM:
+    .res 120
+.export TEXTURE_TABLE_RAM
 GSU_INIT_FLAG:
     .res 2
 .export GSU_INIT_FLAG

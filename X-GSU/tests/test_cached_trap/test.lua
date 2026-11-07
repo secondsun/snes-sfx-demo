@@ -1,8 +1,8 @@
 -- test.lua - Mesen test script for CACHE-Resident Affine Textured Scanline Trapezoid Rasterizer
 test_setup = 0x0007
 test_stop  = 0x0457
-TEST_CASE_IDX = 0x10B6
-TEST_RESULT   = 0x10B8
+TEST_CASE_IDX = 0x1032
+TEST_RESULT   = 0x1034
 
 local index = 1
 local fail_count = 0

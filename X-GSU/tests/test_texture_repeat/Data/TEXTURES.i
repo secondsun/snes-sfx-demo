@@ -8,10 +8,10 @@
 ;; Structure for runtime texture lookup by IsoEngine / SuperFX
 ;; Each descriptor entry is 8 bytes (4 16-bit words) matching the TEXTURE_TABLE format:
 .struct texture_descriptor
-    rom_offset    .word ; Base byte offset of texture (0,0) in atlas binary (Y * ATLAS_WIDTH + X)
-    u_mask        .word ; Horizontal coordinate bitmask for fast wrapping: (width - 1)
-    v_mask        .word ; Vertical coordinate bitmask for fast wrapping: (height - 1)
-    stride_shift  .word ; Shift count (log2(ATLAS_WIDTH)) to multiply V by atlas pitch
+    rom_offset      .word ; Base byte offset of texture (0,0) in atlas binary (Y * ATLAS_WIDTH + X)
+    u_mask          .word ; Horizontal coordinate bitmask for fast wrapping: (width - 1)
+    v_mask_shifted  .word ; Pre-shifted vertical coordinate bitmask: (height - 1) << ATLAS_STRIDE_SHIFT
+    v_offset_mask   .word ; Q10.6 v_offset wrap mask: ((height - 1) << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)
 .endstruct
 
 ;; ==============================================================================
@@ -220,21 +220,21 @@ TEXTURE_WATER_CALM_WIDTH_SHIFT = 5 ; log2(32): V << 5
 .import textures_binary
 .export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word .loword(textures_binary + TEXTURE_ROOF_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 0: roof (32x32)
-    .word .loword(textures_binary + TEXTURE_GRASS_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 1: grass (32x32)
-    .word .loword(textures_binary + TEXTURE_WATER_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 2: water (32x32)
-    .word .loword(textures_binary + TEXTURE_SAND_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 3: sand (32x32)
-    .word .loword(textures_binary + TEXTURE_WATER_DEEP_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 4: water_deep (32x32)
-    .word .loword(textures_binary + TEXTURE_STONE_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 5: stone (32x32)
-    .word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, 15, ATLAS_STRIDE_SHIFT ; 6: parapet (32x16)
-    .word .loword(textures_binary + TEXTURE_FOLIAGE_OFFSET), 15, 31, ATLAS_STRIDE_SHIFT ; 7: foliage (16x32)
-    .word .loword(textures_binary + TEXTURE_GRASS_WILD_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 8: grass_wild (32x32)
-    .word .loword(textures_binary + TEXTURE_GRASS_DENSE_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 9: grass_dense (32x32)
-    .word .loword(textures_binary + TEXTURE_STONE_FLOOR_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 10: stone_floor (32x32)
-    .word .loword(textures_binary + TEXTURE_STONE_CRACKED_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 11: stone_cracked (32x32)
-    .word .loword(textures_binary + TEXTURE_SAND_RIPPLE_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 12: sand_ripple (32x32)
-    .word .loword(textures_binary + TEXTURE_SAND_WET_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 13: sand_wet (32x32)
-    .word .loword(textures_binary + TEXTURE_WATER_CALM_OFFSET), 31, 31, ATLAS_STRIDE_SHIFT ; 14: water_calm (32x32)
+    .word .loword(textures_binary + TEXTURE_ROOF_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 0: roof (32x32)
+    .word .loword(textures_binary + TEXTURE_GRASS_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 1: grass (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 2: water (32x32)
+    .word .loword(textures_binary + TEXTURE_SAND_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 3: sand (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_DEEP_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 4: water_deep (32x32)
+    .word .loword(textures_binary + TEXTURE_STONE_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 5: stone (32x32)
+    .word .loword(textures_binary + TEXTURE_PARAPET_OFFSET), 31, (15 << ATLAS_STRIDE_SHIFT), ((15 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 6: parapet (32x16)
+    .word .loword(textures_binary + TEXTURE_FOLIAGE_OFFSET), 15, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 7: foliage (16x32)
+    .word .loword(textures_binary + TEXTURE_GRASS_WILD_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 8: grass_wild (32x32)
+    .word .loword(textures_binary + TEXTURE_GRASS_DENSE_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 9: grass_dense (32x32)
+    .word .loword(textures_binary + TEXTURE_STONE_FLOOR_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 10: stone_floor (32x32)
+    .word .loword(textures_binary + TEXTURE_STONE_CRACKED_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 11: stone_cracked (32x32)
+    .word .loword(textures_binary + TEXTURE_SAND_RIPPLE_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 12: sand_ripple (32x32)
+    .word .loword(textures_binary + TEXTURE_SAND_WET_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 13: sand_wet (32x32)
+    .word .loword(textures_binary + TEXTURE_WATER_CALM_OFFSET), 31, (31 << ATLAS_STRIDE_SHIFT), ((31 << ATLAS_STRIDE_SHIFT) | ((1 << ATLAS_STRIDE_SHIFT) - 1)) ; 14: water_calm (32x32)
 .segment "GSUCODE"
 
 .endif ; __TEXTURES_I_DEFINED__

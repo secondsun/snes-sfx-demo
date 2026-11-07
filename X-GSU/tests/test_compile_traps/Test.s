@@ -119,8 +119,8 @@ TEST_ATLAS:
 ; Texture Table for descriptor lookup
 .export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word .loword(TEST_ATLAS + 0),     15,  15, 6 ; ID 0: 16x16 (pitch 64, stride_shift 6)
-    .word .loword(TEST_ATLAS + 1024),  31,  31, 6 ; ID 1: 32x32 (pitch 64, stride_shift 6)
-    .word .loword(TEST_ATLAS + 3072),  63,  63, 6 ; ID 2: 64x64 (pitch 64, stride_shift 6)
-    .word .loword(TEST_ATLAS + 7168),  15,  15, 6 ; ID 3: 16x16 checkerboard ($00 / $01)
-    .word .loword(TEST_ATLAS + 8192), 127, 127, 7 ; ID 4: 128x128 (pitch 128, stride_shift 7)
+    .word .loword(TEST_ATLAS + 0),     15,  (15 << 6),  ((15 << 6) | ((1 << 6) - 1))   ; ID 0: 16x16 (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 1024),  31,  (31 << 6),  ((31 << 6) | ((1 << 6) - 1))   ; ID 1: 32x32 (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 3072),  63,  (63 << 6),  ((63 << 6) | ((1 << 6) - 1))   ; ID 2: 64x64 (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 7168),  15,  (15 << 6),  ((15 << 6) | ((1 << 6) - 1))   ; ID 3: 16x16 checkerboard ($00 / $01)
+    .word .loword(TEST_ATLAS + 8192), 127, (127 << 7), ((127 << 7) | ((1 << 7) - 1)) ; ID 4: 128x128 (pitch 128, stride_shift 7)

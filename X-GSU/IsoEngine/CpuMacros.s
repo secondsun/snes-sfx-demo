@@ -13,7 +13,7 @@
   lda     #%00011101 ;4bpp_160 SuperFX controls ram and rom
   sta     GSU_SCMR
   
-  lda     #%10000000 ;mask interrupts from GSU
+  lda     #%10100000 ;mask interrupts from GSU, HighSpeed Multiply
   sta     GSU_CFGR
   
   lda     #$01 ; 21.4 MHZ speed

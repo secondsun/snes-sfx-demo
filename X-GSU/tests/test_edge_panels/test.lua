@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for Compass Edge Panels & Intra-Cell Pipeline (Ticket 7)
 io.stdout:setvbuf("no")
-test_setup = 0x2FEA
-test_stop  = 0x3356
-TEST_CASE_IDX = 0x3ED0
-TEST_RESULT   = 0x3ED2
+test_setup = 0x32C6
+test_stop  = 0x3632
+TEST_CASE_IDX = 0x41B8
+TEST_RESULT   = 0x41BA
 
 local index = 1
 local fail_count = 0

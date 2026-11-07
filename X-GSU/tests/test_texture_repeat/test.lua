@@ -1,8 +1,8 @@
 -- test.lua - Mesen test script for texture repeat & masking verification
 test_setup    = 0x0007
 test_stop     = 0x0358
-TEST_CASE_IDX = 0x0FB6
-TEST_RESULT   = 0x0FB8
+TEST_CASE_IDX = 0x0F32
+TEST_RESULT   = 0x0F34
 
 local index = 1
 local fail_count = 0
