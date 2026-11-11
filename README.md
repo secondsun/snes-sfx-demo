@@ -22,7 +22,6 @@ snes-sfx-demo/
 │   └── tests/               # Automated unit test suite run via headless Mesen CE
 ├── SpriteScale/             # SuperFX polygon rasterization demo & scaling engine
 ├── edge-table/              # Scanline edge-table specification & span clipping architecture
-├── build_tools/             # Tools for GSU Work RAM symbol extraction
 └── docs/                    # Hardware references and rasterizer documentation
 ```
 
@@ -222,7 +221,6 @@ snes-sfx-demo/
 │   └── tests/               # Automated unit test suite run via headless Mesen CE
 ├── SpriteScale/             # SuperFX polygon rasterization demo & scaling engine
 ├── edge-table/              # Scanline edge-table specification & span clipping architecture
-├── build_tools/             # Tools for GSU Work RAM symbol extraction
 └── docs/                    # Hardware references and rasterizer documentation
 ```
 

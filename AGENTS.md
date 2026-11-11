@@ -19,8 +19,8 @@ This document provides subproject layout and tooling pointers for `snes-sfx-demo
 4. **`edge-table`** (`edge-table/` and `docs/edgeTable.txt`):
    - Dynamic scanline edge-table architecture (160 row buckets, front-to-back occlusion clipping, and affine texture stepping).
 
-5. **`build_tools/texture-packer`** (`build_tools/texture-packer/`):
-   - Kotlin/Compose Desktop graphical texture atlas packer and CLI (`../tools/texture-packer.sh`) backing the `sfx_pack_textures` MCP tool.
+5. **Companion Asset Authoring (`sfx-studio`)**:
+   - Texture Atlas and Level authoring tools live in top-level [`../sfx-studio/`](../sfx-studio/) (CLI and Desktop studio), backing the `sfx_pack_textures` MCP tool on `retro-superfx_studio`.
 
 ---
 
@@ -44,11 +44,13 @@ Always prioritize the workspace MCP servers over raw shell commands or `grep` (s
 - **`profile_sfx_execution`**: Profile GSU cycle counts, function/label hotspots, cache residency, and VBlank FPS.
 - **`sfx_resolve_address`**: Resolve symbol <-> linker address, nearest label deltas, and memory ranges from `.dbg` and `.cpu.sym`.
 
-### `retro-superfx_lsp` MCP Server (Static Analysis, Code Navigation & Atlases)
+### `retro-superfx_lsp` MCP Server (Static Analysis & Code Navigation)
 - **`sfx_audit_diagnostics`**: Validate block structure (`function`/`endfunction`, `for`/`endfor`), FX3 hardware invariants, modal lifetimes, and stack depth (`Δ_SP == 0`).
 - **`sfx_lookup_symbol`** / **`sfx_find_references`**: Find symbol definitions, doc comments (In/Out/Clobbers), and usages across `.s`, `.sgs`, `.i`, and `.inc` files.
 - **`sfx_expand_macro`** / **`sfx_analyze_registers`**: Inspect expanded X-GSU macro streams and Chaitin-Briggs register allocation.
-- **`sfx_pack_textures`**: Pack, update, or validate `.sfxproj` texture atlases and companion `.bin`, `.pal`, `.i`, and `_atlas.png` files.
+
+### `retro-superfx_studio` MCP Server (Asset & Texture Studio)
+- **`sfx_pack_textures`**: Pack, update, or validate `.sfxproj` texture atlases and companion `.bin`, `.pal`, `.i`, and `_atlas.png` files (backed by top-level `../sfx-studio/`).
 
 ### Relevant Root Skills (`../.agents/skills/`)
 - [`create-gsu-test`](../.agents/skills/create-gsu-test/SKILL.md): Scaffold and verify new unit tests from `X-GSU/tests/test_template`.

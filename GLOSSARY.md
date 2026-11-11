@@ -18,6 +18,10 @@ An orthographic camera rig with a fixed downward elevation pitch that orbits hor
 ### Projected Vertex Cache
 The per-frame collection of 2D screen-space vertex coordinates computed during the first frame-half pass and reused during the second frame-half pass.
 
+### Level
+A complete tactical battle stage defined over a Map Grid, pairing its 3D surface geometry and Texture Atlas bindings with cell-aligned gameplay layers such as walkability, terrain attributes, spawns, and triggers.
+_Avoid_: Scene, board, map file, world
+
 ### Map Grid
 The rectangular $N \times M$ array of Map Cells that defines a tactical battlefield.
 _Avoid_: Game model, board, level mesh
@@ -62,32 +66,16 @@ Temporary data storage dynamically allocated on `gsu_stack_ram` via `gsu_stack_a
 ### Winding Order
 The clockwise or counter-clockwise sequence of a face's projected 2D vertices on screen, whose signed area indicates whether the face is front-facing or back-facing relative to the camera.
 
-### Source Texture
-An individual power-of-two bitmap graphic imported into a texture project to be quantized, edited, and positioned within a Texture Atlas.
-_Avoid_: Imported tile, bitmap graphic, source image
-
 ### Texture Atlas
-The composite power-of-two graphics buffer into which multiple Source Textures are positioned and merged for runtime texture mapping.
+The composite power-of-two graphics buffer into which multiple authored textures are packed for runtime texture mapping.
 _Avoid_: Binary graphics file, texture map
 
 ### Texel
-A single pixel element within a Source Texture or Texture Atlas representing a 4-bit palette color index (`0` for transparent, `1`–`15` for opaque colors).
+A single pixel element within a Texture Atlas representing a palette color index (`0` for transparent, `1`–`15` for opaque colors).
 _Avoid_: Tile pixel, byte pixel
 
-### Atlas Index
-The symbolic metadata manifest describing the Texture Atlas dimensions and each Source Texture's identifier, coordinates, dimensions, and byte offset for use by the engine.
-_Avoid_: Index file, texture header
-
 ### Texture Descriptor
-An 8-byte record within the Texture Table (`TEXTURE_TABLE`) defining a Source Texture's base ROM offset, horizontal coordinate bitmask (`u_mask`), vertical coordinate bitmask (`v_mask`), and power-of-two row stride shift (`stride_shift`) within the Texture Atlas.
+A runtime lookup record within the Texture Table defining a texture region's base offset, horizontal and vertical wrapping masks, and row stride shift within the Texture Atlas.
 _Avoid_: Texture entry, texture header, slot struct
-
-### Virtual Slice
-A secondary Texture Descriptor defined as a sub-rectangle of an existing Source Texture within the Texture Atlas, sharing texel data without allocating additional atlas space.
-_Avoid_: Sub-texture, texture slice, crop region
-
-### Descriptor Alias
-A symbolic identifier in an Atlas Index that maps directly to the index or byte offset of another existing Texture Descriptor without creating a new table entry.
-_Avoid_: Texture alias, duplicate ID, linked texture
 
 
