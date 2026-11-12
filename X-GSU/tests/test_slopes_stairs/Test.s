@@ -2,7 +2,7 @@
 ; TEST_MAP_GRID - SNES Main CPU Harness & GSU ROM Data
 ; ==============================================================================
 .include "libSFX.i"
-.import GSU_Code
+.import GSU_Code, __GSURAM_LOAD__
 
 Main:
     ; Copy GSU code to SRAM
@@ -13,8 +13,8 @@ Main:
     jml __MAIN_LOOP_RUN__
 
 .segment "MAIN_LOOP"
-    ; Clear screen buffer in SRAM at $708000 ($2800 bytes)
-    ldx #$8000
+    ; Clear GSURAM BSS and screen buffer in SRAM ($70:__GSURAM_LOAD__ .. $70:A7FF)
+    ldx #.loword(__GSURAM_LOAD__)
     lda #0
 :   sta $700000, x
     inx

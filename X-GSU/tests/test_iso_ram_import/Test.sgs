@@ -1,0 +1,608 @@
+; ==============================================================================
+; TEST_ISO_RAM_IMPORT - Unit Test Suite for `gsu_iso_import_bank71` & Dynamic Stride
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../gsu_iso/gsu_iso_map.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+SENTINEL_WORD:      .res 2
+
+.segment "GSUCODE"
+
+function clear_screen_buf
+    ibt r0, #0
+    ramb
+    iwt r1, #$A000
+    iwt r12, #($2800 / 2)
+    iwt r13, #@clr
+    ibt r0, #0
+@clr:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+; Helper: write valid 2-entry `.tab` (stride_shift=6, width=64) at $71:8000
+; and an 8x8 `.map` at $71:8808 with cell (1,1) elevated to height 2
+function stage_valid_8x8_in_bank71
+    ibt r0, #1
+    ramb
+
+    iwt r1, #BANK71_TAB_ADDR
+    iwt r0, #SFX_TAB_MAGIC
+    stw (r1)                ; +0: magic = $5453
+    inc r1
+    inc r1
+    iwt r0, #2
+    stw (r1)                ; +2: entry_count = 2
+    inc r1
+    inc r1
+    iwt r0, #64
+    stw (r1)                ; +4: atlas_width = 64
+    inc r1
+    inc r1
+    iwt r0, #6
+    stw (r1)                ; +6: stride_shift = 6
+    inc r1
+    inc r1
+
+    ; Entry 0: offset=$0400, 32x32
+    iwt r0, #$0400
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #31
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(31 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #((31 << 6) | 63)
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Entry 1: offset=$1400, 32x32
+    iwt r0, #$1400
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #31
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(31 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #((31 << 6) | 63)
+    stw (r1)
+
+    ; Stage 8x8 map header at $71:8808 (reserved = 0 -> NOT pre-baked yet)
+    iwt r1, #BANK71_MAP_ADDR
+    ibt r0, #8
+    stb (r1)                ; cols = 8
+    inc r1
+    stb (r1)                ; rows = 8
+    inc r1
+    ibt r0, #0
+    stw (r1)                ; origin_x = 0
+    inc r1
+    inc r1
+    stw (r1)                ; origin_z = 0
+    inc r1
+    inc r1
+    stw (r1)                ; reserved = 0
+    inc r1
+    inc r1
+
+    ; Fill 64 cells (all h=0, PRIM_FLAT, top=0, skirt=1)
+    iwt r12, #(64 * 4)
+    iwt r13, #@zero_cells
+    ibt r0, #0
+@zero_cells:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+
+    ; Set cell (i=1, j=1) -> index (1*8 + 1) = 9 -> offset 8 + 72 = 80 to base_height = 2
+    iwt r1, #(BANK71_MAP_ADDR + 8 + 72)
+    ibt r0, #2
+    stb (r1)
+
+    ibt r0, #0
+    ramb
+    return
+endfunction
+
+.export GSU_Code
+GSU_Code:
+    init_stack
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+test_setup:
+    iwt r12, #4
+    iwt r13, #test_call
+
+test_call:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    lm r9, (TEST_CASE_IDX)
+
+    iwt r8, #TEST_RESULT
+    iwt r12, #16
+    iwt r13, #clear_res
+    ibt r0, #0
+clear_res:
+    stw (r8)
+    inc r8
+    loop
+    inc r8
+
+    ; Sentinels in $70 vs $71
+    ibt r0, #0
+    ramb
+    iwt r1, #SENTINEL_WORD
+    iwt r0, #$BEEF
+    stw (r1)
+    ibt r0, #1
+    ramb
+    iwt r0, #$CAFE
+    stw (r1)
+    ibt r0, #0
+    ramb
+
+    from r9
+    sub #1
+    bne @check_2
+    nop
+    iwt r13, #run_case_1
+    jmp r13
+    nop
+@check_2:
+    from r9
+    sub #2
+    bne @check_3
+    nop
+    iwt r13, #run_case_2
+    jmp r13
+    nop
+@check_3:
+    from r9
+    sub #3
+    bne @check_4
+    nop
+    iwt r13, #run_case_3
+    jmp r13
+    nop
+@check_4:
+    iwt r13, #run_case_4
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 1: Valid `.tab` + `8x8` `.map` Import, Pre-Bake & Metadata
+; ==============================================================================
+run_case_1:
+    call stage_valid_8x8_in_bank71
+
+    iwt r0, #SFX_LOAD_MODE_LEVEL
+    sm (GSU_LOAD_MODE), r0
+    iwt r0, #0
+    sm (GSU_INIT_FLAG), r0
+
+    call gsu_iso_import_bank71
+
+    ; Immediately read sentinel without touching `ramb`
+    iwt r1, #SENTINEL_WORD
+    to r9
+    ldw (r1)
+
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)                ; [0]: status == 0 (SFX_IMPORT_OK)
+    inc r8
+    inc r8
+    from r9
+    stw (r8)                ; [1]: sentinel == $BEEF (RAMBR == 0)
+    inc r8
+    inc r8
+    lm r0, (gsu_v32_shifted)
+    stw (r8)                ; [2]: gsu_v32_shifted == $0800 (32 << 6)
+    inc r8
+    inc r8
+    lm r0, (TEXTURE_TABLE_RAM + 8)
+    stw (r8)                ; [3]: entry[1].atlas_offset == $1400
+    inc r8
+    inc r8
+    lm r0, (MAP_BUF + 6)
+    stw (r8)                ; [4]: MAP_PREBAKED_MAGIC == $BACE
+    inc r8
+    inc r8
+    ; Cell (1,1) drops word (+6 of cell 9 -> MAP_BUF + 8 + 72 + 6 = MAP_BUF + 86)
+    lm r0, (MAP_BUF + 86)
+    stw (r8)                ; [5]: drop_ew:drop_ns == $2222 (height 2 surrounded by 0!)
+    inc r8
+    inc r8
+    lm r0, (CACHED_YAW)
+    stw (r8)                ; [6]: CACHED_YAW == $FFFF
+    inc r8
+    inc r8
+    lm r0, (GSU_INIT_FLAG)
+    stw (r8)                ; [7]: GSU_INIT_FLAG == 1
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 2: Error Validation (Bad Magic, Bad Count, Bad Map Dimensions) + RAMBR==0
+; ==============================================================================
+run_case_2:
+    ; 2A: Bad magic ($DEAD)
+    call stage_valid_8x8_in_bank71
+    ibt r0, #1
+    ramb
+    iwt r1, #BANK71_TAB_ADDR
+    iwt r0, #$DEAD
+    stw (r1)
+    ibt r0, #0
+    ramb
+
+    call gsu_iso_import_bank71
+    move r4, r3             ; expected 1 (SFX_IMPORT_ERR_BAD_MAGIC)
+    iwt r1, #SENTINEL_WORD
+    to r5
+    ldw (r1)                ; expected $BEEF
+
+    gsu_stack_push r4
+    gsu_stack_push r5
+
+    ; 2B: Bad entry_count (0)
+    call stage_valid_8x8_in_bank71
+    ibt r0, #1
+    ramb
+    iwt r1, #(BANK71_TAB_ADDR + 2)
+    ibt r0, #0
+    stw (r1)
+    ibt r0, #0
+    ramb
+
+    call gsu_iso_import_bank71
+    move r6, r3             ; expected 2 (SFX_IMPORT_ERR_BAD_COUNT)
+
+    gsu_stack_push r6
+
+    ; 2C: Bad map cols (17 > 16)
+    call stage_valid_8x8_in_bank71
+    ibt r0, #1
+    ramb
+    iwt r1, #BANK71_MAP_ADDR
+    ibt r0, #17
+    stb (r1)
+    ibt r0, #0
+    ramb
+
+    call gsu_iso_import_bank71
+    move r7, r3             ; expected 3 (SFX_IMPORT_ERR_BAD_DIM)
+    iwt r1, #SENTINEL_WORD
+    to r9
+    ldw (r1)                ; expected $BEEF
+
+    gsu_stack_pop r6
+    gsu_stack_pop r5
+    gsu_stack_pop r4
+
+    iwt r8, #TEST_RESULT
+    from r4
+    stw (r8)                ; [0]: err_magic == 1
+    inc r8
+    inc r8
+    from r5
+    stw (r8)                ; [1]: sentinel_after_magic == $BEEF
+    inc r8
+    inc r8
+    from r6
+    stw (r8)                ; [2]: err_count == 2
+    inc r8
+    inc r8
+    from r7
+    stw (r8)                ; [3]: err_dim == 3
+    inc r8
+    inc r8
+    from r9
+    stw (r8)                ; [4]: sentinel_after_dim == $BEEF
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 3: Dynamic `stride_shift` (5 vs 7) + Live 128px-Wide Atlas Render
+; ==============================================================================
+run_case_3:
+    call clear_screen_buf
+
+    ; Subtest A: stride_shift = 5 (32px wide)
+    iwt r1, #5
+    call gsu_iso_set_stride_shift r1
+    lm r4, (gsu_v16_shifted) ; expected $0200
+    lm r5, (gsu_v32_shifted) ; expected $0400
+    gsu_stack_push r4
+    gsu_stack_push r5
+
+    ; Subtest B: stage 128px-wide (stride_shift=7) 32x32 color-6 floor texture at $71:2000
+    ibt r0, #1
+    ramb
+    iwt r4, #$2000
+    iwt r5, #32             ; 32 rows
+@c3_rows:
+    move r1, r4
+    iwt r12, #32
+    iwt r13, #@c3_cols
+    ibt r0, #6
+@c3_cols:
+    stb (r1)
+    loop
+    inc r1
+    iwt r6, #128            ; pitch = 128 bytes/row (stride_shift = 7)!
+    with r4
+    add r6
+    dec r5
+    bne @c3_rows
+    nop
+
+    ; Write .tab with width=128, stride_shift=7 at $71:8000
+    iwt r1, #BANK71_TAB_ADDR
+    iwt r0, #SFX_TAB_MAGIC
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #1
+    stw (r1)                ; entry_count = 1
+    inc r1
+    inc r1
+    iwt r0, #128
+    stw (r1)                ; atlas_width = 128
+    inc r1
+    inc r1
+    iwt r0, #7
+    stw (r1)                ; stride_shift = 7
+    inc r1
+    inc r1
+    iwt r0, #$2000
+    stw (r1)                ; entry[0].atlas_offset = $2000
+    inc r1
+    inc r1
+    iwt r0, #31
+    stw (r1)                ; u_mask = 31
+    inc r1
+    inc r1
+    iwt r0, #(31 << 7)
+    stw (r1)                ; v_mask_shifted = (31 << 7) = $0F80
+    inc r1
+    inc r1
+    iwt r0, #((31 << 7) | 127)
+    stw (r1)                ; v_preserve_mask = $0FFF
+
+    ; Write 4x4 flat map at $71:8808
+    iwt r1, #BANK71_MAP_ADDR
+    ibt r0, #4
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    ibt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r12, #(16 * 4)
+    iwt r13, #@c3_cells
+@c3_cells:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+
+    ibt r0, #0
+    ramb
+
+    iwt r0, #SFX_LOAD_MODE_LEVEL
+    sm (GSU_LOAD_MODE), r0
+    call gsu_iso_import_bank71
+
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    call gsu_iso_update_origin r1, r2
+
+    iwt r1, #ISO_CAM
+    iwt r2, #ISO_BASIS
+    iwt r3, #LATTICE_V2
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #CACHED_YAW
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Render Pass 0 ([0..127])
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    gsu_stack_pop r5
+    gsu_stack_pop r4
+
+    iwt r8, #TEST_RESULT
+    from r4
+    stw (r8)                ; [0]: shift=5 v16 == $0200
+    inc r8
+    inc r8
+    from r5
+    stw (r8)                ; [1]: shift=5 v32 == $0400
+    inc r8
+    inc r8
+    lm r0, (gsu_runtime_stride_shift)
+    stw (r8)                ; [2]: runtime shift == 7
+    inc r8
+    inc r8
+    lm r0, (gsu_v32_shifted)
+    stw (r8)                ; [3]: shift=7 v32 == $1000
+    inc r8
+    inc r8
+    iwt r1, #126
+    iwt r2, #80
+    rpix
+    stw (r8)                ; [4]: center floor pixel == 6
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 4: `SFX_LOAD_MODE_MAP` (Yaw Preserved) vs `SFX_LOAD_MODE_LEVEL` (Full Reset)
+; ==============================================================================
+run_case_4:
+    call stage_valid_8x8_in_bank71
+
+    ; Set camera yaw = 30 and dirty pan offsets
+    iwt r1, #ISO_CAM
+    iwt r2, #30
+    call iso_camera_set_yaw r1, r2
+
+    iwt r1, #(ISO_CAM + 6)
+    iwt r0, #200
+    stw (r1)                ; center_x = 200
+    inc r1
+    inc r1
+    iwt r0, #120
+    stw (r1)                ; center_y = 120
+    inc r1
+    inc r1
+    iwt r0, #55
+    stw (r1)                ; cam_x = 55
+
+    ; Import in MAP mode (2): must preserve yaw == 30, reset center=(128,80), cam_x=0
+    iwt r0, #SFX_LOAD_MODE_MAP
+    sm (GSU_LOAD_MODE), r0
+    call gsu_iso_import_bank71
+
+    lm r4, (ISO_CAM + 0)    ; yaw == 30
+    lm r5, (ISO_CAM + 6)    ; center_x == 128
+    lm r6, (ISO_CAM + 8)    ; center_y == 80
+    lm r7, (ISO_CAM + 10)   ; cam_x == 0
+
+    gsu_stack_push r4
+    gsu_stack_push r5
+    gsu_stack_push r6
+    gsu_stack_push r7
+
+    ; Now import in LEVEL mode (1): must reset yaw == 1
+    call stage_valid_8x8_in_bank71
+    iwt r0, #SFX_LOAD_MODE_LEVEL
+    sm (GSU_LOAD_MODE), r0
+    call gsu_iso_import_bank71
+
+    lm r9, (ISO_CAM + 0)    ; yaw == 1
+
+    gsu_stack_pop r7
+    gsu_stack_pop r6
+    gsu_stack_pop r5
+    gsu_stack_pop r4
+
+    iwt r8, #TEST_RESULT
+    from r4
+    stw (r8)                ; [0]: map_mode yaw == 30
+    inc r8
+    inc r8
+    from r5
+    stw (r8)                ; [1]: map_mode center_x == 128
+    inc r8
+    inc r8
+    from r6
+    stw (r8)                ; [2]: map_mode center_y == 80
+    inc r8
+    inc r8
+    from r7
+    stw (r8)                ; [3]: map_mode cam_x == 0
+    inc r8
+    inc r8
+    from r9
+    stw (r8)                ; [4]: level_mode yaw == 1
+
+test_done:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop

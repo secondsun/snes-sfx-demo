@@ -1,0 +1,328 @@
+; ==============================================================================
+; TEST_CPU_ASSET_LOADER - GSU Verification & Hot-Swapped Map Render Suite
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../gsu_iso/gsu_iso_map.i"
+
+.segment "GSURAM"
+.align 2
+CPU_SNAP_P1:        .res 12
+CPU_SNAP_P2:        .res 10
+CPU_SNAP_P3:        .res 12
+CPU_SNAP_P4:        .res 6
+.export CPU_SNAP_P1, CPU_SNAP_P2, CPU_SNAP_P3, CPU_SNAP_P4
+
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 16
+
+.segment "GSUCODE"
+
+function clear_screen_buf
+    ibt r0, #0
+    ramb
+    iwt r1, #$A000
+    iwt r12, #($2800 / 2)
+    iwt r13, #@clr
+    ibt r0, #0
+@clr:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+function count_color5_pixels
+    ibt r0, #0
+    ramb
+    iwt r4, #0
+    cache
+    iwt r2, #0
+@cy:
+    iwt r1, #0
+@cx:
+    rpix
+    sub #5
+    bne :+
+    nop
+    inc r4
+:   inc r1
+    inc r1
+    iwt r7, #128
+    from r1
+    cmp r7
+    blt @cx
+    nop
+    inc r2
+    inc r2
+    iwt r7, #160
+    from r2
+    cmp r7
+    blt @cy
+    nop
+    return
+endfunction
+
+GSU_Code:
+.export GSU_Code
+    init_stack
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+    ibt r0, #$00
+    cmode
+
+    iwt r12, #4
+    iwt r13, #test_loop
+    nop
+
+test_setup:
+    nop
+    nop
+
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ibt r0, #0
+    ramb
+    iwt r1, #TEST_CASE_IDX
+    to r4
+    ldw (r1)
+
+    from r4
+    sub #1
+    bne @check_c2
+    nop
+    iwt r15, #case_1
+    nop
+@check_c2:
+    from r4
+    sub #2
+    bne @check_c3
+    nop
+    iwt r15, #case_2
+    nop
+@check_c3:
+    from r4
+    sub #3
+    bne @check_c4
+    nop
+    iwt r15, #case_3
+    nop
+@check_c4:
+    iwt r15, #case_4
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 1: Full 32,768-byte ($8000) Atlas Copy, DB == $80, Lock == 0, CGRAM[1]
+; ------------------------------------------------------------------------------
+case_1:
+    iwt r8, #TEST_RESULT
+    lm r0, (CPU_SNAP_P1 + 0)        ; [0]: $71:0000 == $1122
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P1 + 2)        ; [1]: $71:4000 == $3344
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P1 + 4)        ; [2]: $71:7FFE == $7788 (32 KB end!)
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P1 + 6)        ; [3]: CGRAM[1] == $14A5
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P1 + 8)        ; [4]: (DB << 8) | lock == $8000
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P1 + 10)       ; [5]: sfx_atlas_load_count == 1
+    stw (r8)
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 2: Resident `atlas_id = 0` Deduplication Cache Hit
+; ------------------------------------------------------------------------------
+case_2:
+    iwt r8, #TEST_RESULT
+    lm r0, (CPU_SNAP_P2 + 0)        ; [0]: sfx_atlas_load_count == 1
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P2 + 2)        ; [1]: $71:0000 == $DEAD (untouched!)
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P2 + 4)        ; [2]: $71:880A origin_x == 111
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P2 + 6)        ; [3]: GSU_LOAD_MODE == 1
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P2 + 8)        ; [4]: GSU_INIT_FLAG == 0
+    stw (r8)
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 3: Resident `atlas_id = 1` Cache Miss & Multi-Bank Switch ($86 -> $71)
+; ------------------------------------------------------------------------------
+case_3:
+    iwt r8, #TEST_RESULT
+    lm r0, (CPU_SNAP_P3 + 0)        ; [0]: sfx_atlas_load_count == 2
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P3 + 2)        ; [1]: sfx_resident_atlas_id == 1
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P3 + 4)        ; [2]: $71:0000 == $0505
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P3 + 6)        ; [3]: CGRAM[1] == $7C1F
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P3 + 8)        ; [4]: GSU_LOAD_MODE == 1
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P3 + 10)       ; [5]: GSU_INIT_FLAG == 0
+    stw (r8)
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 4: `SFX_LOAD_MAP` Map-Only Hot-Swap + Live GSU Import & Render
+; ------------------------------------------------------------------------------
+case_4:
+    call clear_screen_buf
+    call gsu_iso_import_bank71
+    move r9, r3                     ; save import status in r9 (== 0)
+    gsu_stack_push r9
+
+    iwt r1, #ISO_CAM
+    iwt r2, #15
+    call iso_camera_set_yaw r1, r2
+
+    iwt r1, #128
+    sm (ISO_CAM + 6), r1
+    iwt r1, #80
+    sm (ISO_CAM + 8), r1
+
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    call gsu_iso_update_origin r1, r2
+
+    iwt r1, #ISO_CAM
+    iwt r2, #ISO_BASIS
+    iwt r3, #LATTICE_V2
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #CACHED_YAW
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
+
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    call count_color5_pixels        ; r4 = count of color-5 pixels
+    gsu_stack_pop r9
+
+    ; Read (rows << 8) | cols from imported MAP_BUF (+0..+1)
+    iwt r1, #MAP_BUF
+    to r5
+    ldw (r1)                        ; $0406 (cols=6, rows=4)
+
+    iwt r8, #TEST_RESULT
+    lm r0, (CPU_SNAP_P4 + 0)        ; [0]: sfx_atlas_load_count == 2
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P4 + 2)        ; [1]: GSU_LOAD_MODE == 2 (SFX_LOAD_MODE_MAP)
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (CPU_SNAP_P4 + 4)        ; [2]: pre-import GSU_INIT_FLAG == 0
+    stw (r8)
+    inc r8
+    inc r8
+    from r9                         ; [3]: gsu_iso_import_bank71 err == 0
+    stw (r8)
+    inc r8
+    inc r8
+    from r5                         ; [4]: imported (rows<<8)|cols == $0406
+    stw (r8)
+    inc r8
+    inc r8
+    from r4                         ; [5]: rendered color-5 pixel count > 0
+    stw (r8)
+
+test_done:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop

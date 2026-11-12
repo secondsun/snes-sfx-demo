@@ -11,7 +11,7 @@ This document provides subproject layout and tooling pointers for `snes-sfx-demo
    - Bundles the CC65 toolchain binaries: `ca65`, `ld65`, and `superfamicheck`.
 
 2. **`X-GSU`** (`X-GSU/` — see [`X-GSU/AGENTS.md`](X-GSU/AGENTS.md)):
-   - High-level `ca65` macro DSL (`function`, `call`, `return`, `stack`, `control`) and 3D fixed-point math/rasterization libraries (`IsoEngine/`, `gsu_maths/`, `rnc/`, `tests/`).
+   - High-level `ca65` macro DSL (`function`, `call`, `return`, `stack`, `control`), 3D fixed-point math/rasterization libraries, Bank-`$71` isometric runtime (`gsu_iso/`), and showcase demos (`IsoEngine/`, `StarshipMap/`, `RamMapDemo/`, `gsu_maths/`, `rnc/`, `tests/`).
 
 3. **`SpriteScale`** (`SpriteScale/`):
    - SuperFX polygon rasterization and sprite scaling demo.
@@ -20,7 +20,7 @@ This document provides subproject layout and tooling pointers for `snes-sfx-demo
    - Dynamic scanline edge-table architecture (160 row buckets, front-to-back occlusion clipping, and affine texture stepping).
 
 5. **Companion Asset Authoring (`sfx-studio`)**:
-   - Texture Atlas and Level authoring tools live in top-level [`../sfx-studio/`](../sfx-studio/) (CLI and Desktop studio), backing the `sfx_pack_textures` MCP tool on `retro-superfx_studio`.
+   - Texture Atlas and Level authoring tools live in top-level [`../sfx-studio/`](../sfx-studio/) (CLI and Desktop studio), backing the `sfx_pack_textures` and `sfx_manage_level` MCP tools on `retro-superfx_studio`.
 
 ---
 
@@ -49,11 +49,13 @@ Always prioritize the workspace MCP servers over raw shell commands or `grep` (s
 - **`sfx_lookup_symbol`** / **`sfx_find_references`**: Find symbol definitions, doc comments (In/Out/Clobbers), and usages across `.s`, `.sgs`, `.i`, and `.inc` files.
 - **`sfx_expand_macro`** / **`sfx_analyze_registers`**: Inspect expanded X-GSU macro streams and Chaitin-Briggs register allocation.
 
-### `retro-superfx_studio` MCP Server (Asset & Texture Studio)
-- **`sfx_pack_textures`**: Pack, update, or validate `.sfxproj` texture atlases and companion `.bin`, `.pal`, `.i`, and `_atlas.png` files (backed by top-level `../sfx-studio/`).
+### `retro-superfx_studio` MCP Server (Asset & Level Studio)
+- **`sfx_pack_textures`**: Pack, update, or validate `.sfxproj` texture atlases and companion `.bin`, `.pal`, relocatable `.tab`, `.i`, and `_atlas.png` files (backed by top-level `../sfx-studio/`).
+- **`sfx_manage_level`**: Create, patch cells/regions, validate, import from ca65 `def_cell` `.i`, or pack `.sfxlevel` isometric levels and companion `.map`, `.i`, and `_preview.png` files.
 
 ### Relevant Root Skills (`../.agents/skills/`)
 - [`create-gsu-test`](../.agents/skills/create-gsu-test/SKILL.md): Scaffold and verify new unit tests from `X-GSU/tests/test_template`.
+- [`iso-level`](../.agents/skills/iso-level/SKILL.md): Author, edit, import, validate, and pack `.sfxlevel` isometric levels and Bank-`$71` `.map` files.
 - [`run-gsu-test`](../.agents/skills/run-gsu-test/SKILL.md) & [`sfx-test-runner`](../.agents/skills/sfx-test-runner/SKILL.md): Run single tests or the full suite (`../tools/run-sfx-test.sh [all]`).
 - [`sfx-macro-language`](../.agents/skills/sfx-macro-language/SKILL.md): Reference for the X-GSU macro DSL.
 - [`texture-atlas`](../.agents/skills/texture-atlas/SKILL.md): Author and pack `.sfxproj` texture atlases.

@@ -728,6 +728,13 @@ clear_screen_c4:
 
 test_done:
     nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
 test_stop:
     nop
     nop

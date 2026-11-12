@@ -1,0 +1,410 @@
+; ==============================================================================
+; TEST_CPU_MSU1_LOADER - GSU Verification & Bit-Exact Render Parity Suite
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../gsu_iso/gsu_iso_map.i"
+
+.segment "GSURAM"
+.align 2
+MSU_SNAP_P1:        .res 12
+MSU_SNAP_P2:        .res 10
+MSU_SNAP_P3:        .res 10
+.export MSU_SNAP_P1, MSU_SNAP_P2, MSU_SNAP_P3
+
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 16
+
+.segment "GSUCODE"
+
+function clear_screen_buf
+    ibt r0, #0
+    ramb
+    iwt r1, #$A000
+    iwt r12, #($2800 / 2)
+    iwt r13, #@clr
+    ibt r0, #0
+@clr:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+; Accumulates grass (2,3 -> slot +2), stone (5,6 -> slot +4), water (8,9 -> slot +6),
+; roof (11,12 -> slot +8), parapet (13,14 -> slot +10) across active 128x160 half-buffer.
+function accum_msu_materials
+    ibt r0, #0
+    ramb
+    cache
+    iwt r2, #0
+@scan_y:
+    iwt r1, #0
+@scan_x:
+    rpix
+    moves r9, r0
+    bne :+
+    nop
+    iwt r15, #@next_px
+    nop
+:
+    from r9
+    sub #2
+    beq @do_grass
+    nop
+    from r9
+    sub #3
+    bne @chk_stone
+    nop
+@do_grass:
+    iwt r8, #(TEST_RESULT + 2)
+    iwt r15, #@inc_slot
+    nop
+
+@chk_stone:
+    from r9
+    sub #5
+    beq @do_stone
+    nop
+    from r9
+    sub #6
+    bne @chk_water
+    nop
+@do_stone:
+    iwt r8, #(TEST_RESULT + 4)
+    iwt r15, #@inc_slot
+    nop
+
+@chk_water:
+    from r9
+    sub #8
+    beq @do_water
+    nop
+    from r9
+    sub #9
+    bne @chk_roof
+    nop
+@do_water:
+    iwt r8, #(TEST_RESULT + 6)
+    iwt r15, #@inc_slot
+    nop
+
+@chk_roof:
+    from r9
+    sub #11
+    beq @do_roof
+    nop
+    from r9
+    sub #12
+    bne @chk_parapet
+    nop
+@do_roof:
+    iwt r8, #(TEST_RESULT + 8)
+    iwt r15, #@inc_slot
+    nop
+
+@chk_parapet:
+    from r9
+    sub #13
+    beq @do_parapet
+    nop
+    from r9
+    sub #14
+    bne @next_px
+    nop
+@do_parapet:
+    iwt r8, #(TEST_RESULT + 10)
+
+@inc_slot:
+    ldw (r8)
+    inc r0
+    stw (r8)
+
+@next_px:
+    inc r1
+    inc r1
+    iwt r7, #128
+    from r1
+    cmp r7
+    bge :+
+    nop
+    iwt r15, #@scan_x
+    nop
+:   inc r2
+    inc r2
+    iwt r7, #160
+    from r2
+    cmp r7
+    bge :+
+    nop
+    iwt r15, #@scan_y
+    nop
+:   return
+endfunction
+
+GSU_Code:
+.export GSU_Code
+    init_stack
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+    ibt r0, #$00
+    cmode
+
+    iwt r12, #4
+    iwt r13, #test_loop
+    nop
+
+test_setup:
+    nop
+    nop
+
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ibt r0, #0
+    ramb
+    iwt r1, #TEST_CASE_IDX
+    to r4
+    ldw (r1)
+
+    from r4
+    sub #1
+    bne @check_c2
+    nop
+    iwt r15, #case_1
+    nop
+@check_c2:
+    from r4
+    sub #2
+    bne @check_c3
+    nop
+    iwt r15, #case_2
+    nop
+@check_c3:
+    from r4
+    sub #3
+    bne @check_c4
+    nop
+    iwt r15, #case_3
+    nop
+@check_c4:
+    iwt r15, #case_4
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 1: `sfx_msu1_detect` & 32-Bit Seek (>64 KB) Bank-$71 + CGRAM Streaming
+; ------------------------------------------------------------------------------
+case_1:
+    iwt r8, #TEST_RESULT
+    lm r0, (MSU_SNAP_P1 + 0)        ; [0]: detect == 1 ("S-MSU1" verified!)
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P1 + 2)        ; [1]: (DB << 8) | lock == $8000
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P1 + 4)        ; [2]: $71:8000 == $5453
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P1 + 6)        ; [3]: $71:9014 == $2247
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P1 + 8)        ; [4]: PPU CGRAM[2] == $2247
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P1 + 10)       ; [5]: loads == 1
+    stw (r8)
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 2: MSU-1 Resident `atlas_id = 0` Cache Hit & `SFX_LOAD_MAP` Hot-Swap
+; ------------------------------------------------------------------------------
+case_2:
+    iwt r8, #TEST_RESULT
+    lm r0, (MSU_SNAP_P2 + 0)        ; [0]: loads == 1 (cache hit!)
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P2 + 2)        ; [1]: $71:0000 == $DEAD (untouched!)
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P2 + 4)        ; [2]: $71:8808 dims == $0404
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P2 + 6)        ; [3]: $71:880A origin_x == 96
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P2 + 8)        ; [4]: GSU_LOAD_MODE == 2
+    stw (r8)
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 3: MSU-1 Multi-Atlas Switch ($00016000) & Restore ($00012000)
+; ------------------------------------------------------------------------------
+case_3:
+    iwt r8, #TEST_RESULT
+    lm r0, (MSU_SNAP_P3 + 0)        ; [0]: loads == 2
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P3 + 2)        ; [1]: $71:0000 == $0B0B
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P3 + 4)        ; [2]: CGRAM[2] == $5AD6
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P3 + 6)        ; [3]: loads == 3
+    stw (r8)
+    inc r8
+    inc r8
+    lm r0, (MSU_SNAP_P3 + 8)        ; [4]: CGRAM[2] == $2247
+    stw (r8)
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 4: Bit-Exact Parity between MSU-1 & ROM AssetSource via Two-Pass Render
+; ------------------------------------------------------------------------------
+case_4:
+    call gsu_iso_import_bank71
+    sm (TEST_RESULT + 0), r3        ; [0]: import err == 0
+
+    ; Zero TEST_RESULT[1..5]
+    iwt r8, #(TEST_RESULT + 2)
+    ibt r0, #0
+    stw (r8)
+    inc r8
+    inc r8
+    stw (r8)
+    inc r8
+    inc r8
+    stw (r8)
+    inc r8
+    inc r8
+    stw (r8)
+    inc r8
+    inc r8
+    stw (r8)
+
+    iwt r1, #ISO_CAM
+    iwt r2, #15
+    call iso_camera_set_yaw r1, r2
+
+    iwt r1, #128
+    sm (ISO_CAM + 6), r1
+    iwt r1, #80
+    sm (ISO_CAM + 8), r1
+
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    call gsu_iso_update_origin r1, r2
+
+    iwt r1, #ISO_CAM
+    iwt r2, #ISO_BASIS
+    iwt r3, #LATTICE_V2
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #CACHED_YAW
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Pass 0
+    call clear_screen_buf
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call accum_msu_materials
+
+    ; Pass 1
+    call clear_screen_buf
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call accum_msu_materials
+
+test_done:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop

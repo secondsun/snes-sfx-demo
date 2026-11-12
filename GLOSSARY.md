@@ -27,7 +27,7 @@ The rectangular $N \times M$ array of Map Cells that defines a tactical battlefi
 _Avoid_: Game model, board, level mesh
 
 ### Map Cell
-A single $(i, j)$ coordinate slot on the Map Grid holding a Base Elevation, a Shape Archetype, texture references, and Neighbor Skirt Drops.
+A single $(i, j)$ coordinate slot on the Map Grid holding a Base Elevation, a Shape Archetype, surface texture references, Edge Panel placements, and Neighbor Skirt Drops.
 _Avoid_: Tile, block, map square
 
 ### Base Elevation
@@ -77,5 +77,17 @@ _Avoid_: Tile pixel, byte pixel
 ### Texture Descriptor
 A runtime lookup record within the Texture Table defining a texture region's base offset, horizontal and vertical wrapping masks, and row stride shift within the Texture Atlas.
 _Avoid_: Texture entry, texture header, slot struct
+
+### Texture Table
+The ordered catalog of Texture Descriptors accompanying a Texture Atlas, mapping sequential texture IDs to their region offsets and wrapping masks.
+_Avoid_: Descriptor array, texture LUT, slot table
+
+### Asset Source
+The backing storage medium—such as cartridge ROM or MSU-1 data storage—from which the host CPU reads level assets during stage transitions.
+_Avoid_: Data backend, pack reader, ROM loader
+
+### Asset Staging Bank
+The dedicated cartridge RAM region into which the host CPU stages the active Texture Atlas, Texture Table, and Map Grid for coprocessor consumption.
+_Avoid_: Expansion buffer, texture RAM, map bank
 
 

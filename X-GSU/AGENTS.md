@@ -6,7 +6,7 @@ This document provides developer and agent guidance for the **`X-GSU`** library 
 
 ## 1. Subproject Architecture & Directory Structure
 
-`X-GSU` contains core SuperFX 3 (FX3) mathematics, vector/matrix operations, camera transformations, and compression libraries.
+`X-GSU` contains core SuperFX 3 (FX3) mathematics, vector/matrix operations, camera transformations, Bank-`$71` isometric asset staging/rendering, showcase demos, and compression libraries.
 
 ```
 X-GSU/
@@ -17,12 +17,22 @@ X-GSU/
 │   ├── structs.i        # Vector3, Vector4, Matrix4, Camera, and Huffman data structures
 │   ├── util.i           # Utility macros (rom_to_ram, fixed-point helpers)
 │   └── var.i            # Global GSURAM variables and buffers
+├── gsu_iso/
+│   ├── bank71_layout.i        # Canonical Bank-$71 slot offsets, magic headers, and loader contracts
+│   ├── draw_cached_trap_ram.i # Bank-$71 RAM affine trapezoid rasterizer (ramb #1, dynamic stride_shift)
+│   ├── gsu_iso_map.i          # Relocatable .tab/.map importer and 4x4..16x16 isometric compiler/renderer
+│   ├── cpu_asset_loader.i     # 65816 host loader (bus handoff, atlas_id deduplication, CGRAM 0 DMA)
+│   ├── asset_source_rom.i     # ROM cartridge MVN asset-source backend
+│   └── asset_source_msu1.i    # MSU-1 32-bit seek + 2-step Bank-$7F -> Bank-$71 DMA backend
 ├── gsu_maths/
 │   ├── gsu_camera.i     # camera_lookAt (builds 4x4 view matrix from eye, target, up vectors)
 │   ├── gsu_recip.i      # reciprocal (16-bit 0.16 fixed-point reciprocal via table + Newton-Raphson)
 │   ├── gsu_sqrt.i       # gsu_sqrt32 (32-bit integer square root using iterative subtraction)
 │   ├── gsu_trig.i       # Sine/cosine lookup tables and trigonometry helpers
 │   └── gsu_vector.i     # 3D vector arithmetic (add, subtract, negate, dot, cross, length, normalize, transform)
+├── IsoEngine/           # ROM-resident 3D isometric engine (Bank 4 textures & procedural terrain)
+├── StarshipMap/         # ROM-resident 3D starship interior showcase built on IsoEngine modules
+├── RamMapDemo/          # Bank-$71 RAM-staged multi-level / multi-atlas showcase (SELECT level swap)
 ├── rnc/
 │   └── gsu_decompress.i # Rob Northen Compression (RNC Method 1/2) decompressor
 └── tests/               # Automated unit tests running on Mesen CE
@@ -86,4 +96,4 @@ All active functions are verified by automated tests in `tests/` (note: `buffer_
 ./tools/run-sfx-test.sh all 10
 ```
 
-All 13 test suites pass with zero errors in headless Mesen CE runner mode.
+All active test suites pass with zero errors in headless Mesen CE runner mode.

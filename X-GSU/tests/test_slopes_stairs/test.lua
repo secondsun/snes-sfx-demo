@@ -1,8 +1,8 @@
 -- test.lua - Mesen test script for Rotatable Sloped & Stepped Shape Archetypes
-test_setup = 0x32C1
-test_stop  = 0x3571
-TEST_CASE_IDX = 0x40FC
-TEST_RESULT   = 0x40FE
+test_setup = 0x322A
+test_stop  = 0x34DA
+TEST_CASE_IDX = 0x4064
+TEST_RESULT   = 0x4066
 
 local index = 1
 local fail_count = 0
