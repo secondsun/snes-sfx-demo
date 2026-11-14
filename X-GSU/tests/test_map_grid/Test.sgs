@@ -9,12 +9,20 @@
 .include "../../common/control.i"
 .include "libSFX.i"
 
+.segment "GSURAM"
+.align 2
+TEXTURE_TABLE_RAM:  .res 64
+.export TEXTURE_TABLE_RAM
+.import TEXTURE_TABLE
+
 .segment "GSUCODE"
 GSU_Entry:
     iwt r15, #GSU_Code
     nop
 
-.include "../../IsoEngine/map_grid.i"
+GSU_ISO_USE_ROM_TEXTURES = 1
+GSU_ISO_NO_DEFAULT_BUFFERS = 1
+.include "../../gsu_iso/gsu_iso_map.i"
 
 .segment "GSURAM"
 .align 2
@@ -34,13 +42,18 @@ TEST_MAP_BUF:       .res 256
 GSU_Code:
     init_stack
 
+    ; Copy ROM TEXTURE_TABLE (4 descriptors = 32 bytes) to GSURAM & set default stride_shift = 6
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #32
+    ibt r1, #6
+    call gsu_iso_set_stride_shift r1
+
     ; Set ROMBR = $04 for GSU ROM data fetches
     ibt r0, #$04
     romb
     nop
 
 test_setup:
-    iwt r12, #4         ; 4 test cases
+    iwt r12, #5         ; 5 test cases
     iwt r13, #test_call
 
 test_call:
@@ -87,7 +100,15 @@ clear_res_loop:
     jmp r13
     nop
 @check_case_4:
+    from r9
+    sub #4
+    bne @check_case_5
+    nop
     iwt r13, #run_case_4
+    jmp r13
+    nop
+@check_case_5:
+    iwt r13, #run_case_5
     jmp r13
     nop
 
@@ -119,7 +140,7 @@ run_case_1:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Save dirty flag (r3, expected 1) in TEST_RESULT + 0
     iwt r7, #TEST_RESULT + 0
@@ -138,7 +159,7 @@ run_case_1:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Save clean flag (r3, expected 0) in TEST_RESULT + 4
     iwt r7, #TEST_RESULT + 4
@@ -163,7 +184,7 @@ run_case_1:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Save dirty flag (r3, expected 1) in TEST_RESULT + 6
     iwt r7, #TEST_RESULT + 6
@@ -255,7 +276,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Render with debug trace buffer
     iwt r1, #TEST_MAP_BUF
@@ -264,7 +285,7 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #$FFFF      ; frame_half = -1 (full screen traversal)
     iwt r6, #TEST_TRACE_BUF
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Check first word (at offset 0) and last word (at offset 16 = 8 * 2)
     iwt r1, #TEST_TRACE_BUF
@@ -312,7 +333,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r1, #TEST_MAP_BUF
     iwt r2, #TEST_CAM
@@ -320,7 +341,7 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #$FFFF
     iwt r6, #TEST_TRACE_BUF
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     iwt r1, #TEST_TRACE_BUF
     ldw (r1)
@@ -367,7 +388,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r1, #TEST_MAP_BUF
     iwt r2, #TEST_CAM
@@ -375,7 +396,7 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #$FFFF
     iwt r6, #TEST_TRACE_BUF
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     iwt r1, #TEST_TRACE_BUF
     ldw (r1)
@@ -421,7 +442,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r1, #TEST_MAP_BUF
     iwt r2, #TEST_CAM
@@ -429,7 +450,7 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #$FFFF
     iwt r6, #TEST_TRACE_BUF
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     iwt r1, #TEST_TRACE_BUF
     ldw (r1)
@@ -548,7 +569,7 @@ run_case_3:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; --- Pass 0 (Half 0): screen X in [0, 128) ---
     ; Expected: 4 cells visited (0, 1, 2, 3), cell 4 culled!
@@ -558,10 +579,10 @@ run_case_3:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0          ; frame_half = 0
     iwt r6, #TEST_TRACE_BUF
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Read debug_count from frame (+12)
-    iwt r1, #gsu_map_render_frame + map_render_frame::debug_count
+    iwt r1, #gsu_iso_render_frame + map_render_frame::debug_count
     ldw (r1)
     iwt r8, #TEST_RESULT + 0
     stw (r8)            ; [0]: pass0_count (expected 4)
@@ -586,9 +607,9 @@ clear_trace_c3:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #1          ; frame_half = 1
     iwt r6, #TEST_TRACE_BUF
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
-    iwt r1, #gsu_map_render_frame + map_render_frame::debug_count
+    iwt r1, #gsu_iso_render_frame + map_render_frame::debug_count
     ldw (r1)
     iwt r8, #TEST_RESULT + 2
     stw (r8)            ; [1]: pass1_count (expected 2)
@@ -609,7 +630,7 @@ clear_trace_c3:
     ldw (r1)
     iwt r8, #TEST_RESULT + 8
     stw (r8)
-    iwt r1, #gsu_map_render_frame + map_render_frame::frame_half
+    iwt r1, #gsu_iso_render_frame + map_render_frame::frame_half
     ldw (r1)
     iwt r8, #TEST_RESULT + 10
     stw (r8)
@@ -787,7 +808,7 @@ clear_screen_c4:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Render Pass 0 (Half 0: [0..127])
     iwt r1, #TEST_MAP_BUF
@@ -796,7 +817,7 @@ clear_screen_c4:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Render Pass 1 (Half 1: [128..255])
     iwt r1, #TEST_MAP_BUF
@@ -805,7 +826,7 @@ clear_screen_c4:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #1
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Flush pixel cache and let RAM writes settle
     rpix
@@ -857,6 +878,233 @@ clear_screen_c4:
     stw (r8)            ; [3]: pass0_edge (expected != 0)
     inc r8
     inc r8
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 5: Runtime Non-64px Atlas Stride (stride_shift = 7 / 128px Width)
+;         Verifies ROM Skirt `v_offset` (`(s * 16) << 7` = 2048) and Floor
+;         `v_offset` (`(j * 32) << 7` = 4096) do NOT hit hardcoded <<10/<<11
+;         sentinel bands (Color 9).
+; ==============================================================================
+run_case_5:
+    ; Clear screen buffer in SRAM ($708000..$70A7FF)
+    iwt r1, #$8000
+    iwt r12, #$2800 / 2
+    iwt r13, #clear_screen_c5
+    iwt r0, #0
+clear_screen_c5:
+    from r0
+    stw (r1)
+    inc r1
+    inc r1
+    loop
+    nop
+
+    ; Switch runtime atlas pitch to 128 bytes/row (stride_shift = 7)
+    ibt r1, #7
+    call gsu_iso_set_stride_shift r1
+
+    ; Build 2x2 map at origin (64, 40):
+    ;   Cell (0,0): h=0, PRIM_FLAT, top_tex=3, skirt_tex=2, drop_ns=0, drop_ew=0
+    ;   Cell (1,0): h=0, PRIM_FLAT, top_tex=3, skirt_tex=2, drop_ns=0, drop_ew=0  -> j=0 floor at (112, 46)
+    ;   Cell (0,1): h=2, PRIM_FLAT, top_tex=3, skirt_tex=2, drop_ns=2, drop_ew=0  -> j=1 floor at (80, 35), s=0 skirt at (80, 50), s=1 skirt at (80, 64)
+    ;   Cell (1,1): h=0, PRIM_FLAT, top_tex=3, skirt_tex=2, drop_ns=0, drop_ew=0
+    iwt r1, #TEST_MAP_BUF
+    ibt r0, #2
+    stb (r1)            ; cols = 2
+    inc r1
+    stb (r1)            ; rows = 2
+    inc r1
+    iwt r0, #64         ; origin_x = 64
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #40         ; origin_z = 40
+    stw (r1)
+    inc r1
+    inc r1
+    ibt r0, #0
+    stw (r1)
+    inc r1
+    inc r1
+
+    ; Cell (0,0): h=0, top=3, skirt=2
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    ibt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    ibt r0, #3
+    stb (r1)
+    inc r1
+    ibt r0, #2
+    stb (r1)
+    inc r1
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+
+    ; Cell (1,0): h=0, top=3, skirt=2
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    ibt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    ibt r0, #3
+    stb (r1)
+    inc r1
+    ibt r0, #2
+    stb (r1)
+    inc r1
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+
+    ; Cell (0,1): h=2, top=3, skirt=2, drop_ns=2, drop_ew=0
+    ibt r0, #2
+    stb (r1)
+    inc r1
+    ibt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    ibt r0, #3
+    stb (r1)
+    inc r1
+    ibt r0, #2
+    stb (r1)
+    inc r1
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    ibt r0, #2          ; drop_ns = 2 (2-step South cliff!)
+    stb (r1)
+    inc r1
+    ibt r0, #0
+    stb (r1)
+    inc r1
+
+    ; Cell (1,1): h=0, top=3, skirt=2
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    ibt r0, #PRIM_FLAT
+    stb (r1)
+    inc r1
+    ibt r0, #3
+    stb (r1)
+    inc r1
+    ibt r0, #2
+    stb (r1)
+    inc r1
+    ibt r0, #0
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+    stb (r1)
+    inc r1
+
+    ; Force archetype recompilation at yaw = 1 using stride_shift = 7
+    iwt r1, #TEST_CACHED_YAW
+    iwt r0, #$FFFF
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r0, #1
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$0045      ; sin_yaw
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #$3FFF      ; cos_yaw
+    stw (r1)
+
+    iwt r1, #TEST_CAM
+    iwt r2, #TEST_BASIS
+    iwt r3, #TEST_LATTICE
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #TEST_CACHED_YAW
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Render Pass 0 (Half 0: [0..127])
+    iwt r1, #TEST_MAP_BUF
+    iwt r2, #TEST_CAM
+    iwt r3, #TEST_BASIS
+    iwt r4, #TEST_ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+
+    ; Flush plot cache and settle RAM
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Sample 4 pixels in Pass 0:
+    ; [0] Skirt step s=0 at (X=80, Y=50) -> expected Color 3
+    ; [1] Skirt step s=1 at (X=80, Y=64) -> expected Color 6 (NOT sentinel 9!)
+    ; [2] Floor cell (1,0) j=0 at (X=112, Y=46) -> expected Color 4
+    ; [3] Floor cell (0,1) j=1 at (X=80, Y=35) -> expected Color 5 (NOT sentinel 9!)
+    iwt r8, #TEST_RESULT
+    iwt r1, #80
+    iwt r2, #50
+    rpix
+    stw (r8)
+    inc r8
+    inc r8
+
+    iwt r1, #80
+    iwt r2, #64
+    rpix
+    stw (r8)
+    inc r8
+    inc r8
+
+    iwt r1, #112
+    iwt r2, #46
+    rpix
+    stw (r8)
+    inc r8
+    inc r8
+
+    iwt r1, #80
+    iwt r2, #35
+    rpix
+    stw (r8)
+
+    ; Restore default stride_shift = 6
+    ibt r1, #6
+    call gsu_iso_set_stride_shift r1
 
     iwt r13, #test_done
     jmp r13

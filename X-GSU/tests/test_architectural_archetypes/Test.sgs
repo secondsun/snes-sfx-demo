@@ -6,12 +6,18 @@
 .include "../../common/function.i"
 .include "../../common/control.i"
 .include "../../common/structs.i"
-.include "../../gsu_maths/gsu_recip.i"
-.include "../../gsu_maths/gsu_iso_camera.i"
-.include "../../IsoEngine/triangle/cached_trap.i"
-.include "../../IsoEngine/triangle/draw_cached_trap.i"
-.include "../../IsoEngine/triangle/compile_face_traps.i"
-.include "../../IsoEngine/map_grid.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.import TEXTURE_TABLE
+
+.segment "GSURAM"
+.align 2
+TEXTURE_TABLE_RAM:  .res 64
+.export TEXTURE_TABLE_RAM
+
+GSU_ISO_USE_ROM_TEXTURES = 1
+GSU_ISO_NO_DEFAULT_BUFFERS = 1
+.include "../../gsu_iso/gsu_iso_map.i"
 
 .segment "GSURAM"
 .align 2
@@ -30,6 +36,12 @@ TEST_MAP_BUF:       .res 256
 .export GSU_Code
 GSU_Code:
     init_stack
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #24
+    ibt r1, #6
+    call gsu_iso_set_stride_shift r1
+    ibt r0, #$04
+    romb
+    nop
     register idx_val
 
 test_setup:
@@ -107,7 +119,7 @@ run_case_1:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Check PRIM_LIQUID_SHALLOW (arch=8): index = (8 << 2) | 0 = 32
     ; arch_lut offset = 326 + 32 * 2 = 390
@@ -228,7 +240,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Read PRIM_PILLAR (arch=10): index = 40 (offset 326 + 80 = 406)
     iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
@@ -261,7 +273,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
     ldw (r7)
@@ -293,7 +305,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
     ldw (r7)
@@ -325,7 +337,7 @@ run_case_2:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r7, #TEST_ARCH_TRAPS + 326 + (40 * 2)
     ldw (r7)
@@ -365,7 +377,7 @@ run_case_3:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Read PRIM_FOLIAGE_CROSS (arch=11): index = 44 (offset 326 + 88 = 414)
     iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
@@ -398,7 +410,7 @@ run_case_3:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
     ldw (r7)
@@ -430,7 +442,7 @@ run_case_3:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
     ldw (r7)
@@ -462,7 +474,7 @@ run_case_3:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     iwt r7, #TEST_ARCH_TRAPS + 326 + (44 * 2)
     ldw (r7)
@@ -654,7 +666,7 @@ clear_screen_c4:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Render Pass 0 (Half 0: [0..127])
     iwt r1, #TEST_MAP_BUF
@@ -663,7 +675,7 @@ clear_screen_c4:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Render Pass 1 (Half 1: [128..255])
     iwt r1, #TEST_MAP_BUF
@@ -672,7 +684,7 @@ clear_screen_c4:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #1
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Flush pixel cache and let RAM writes settle
     rpix

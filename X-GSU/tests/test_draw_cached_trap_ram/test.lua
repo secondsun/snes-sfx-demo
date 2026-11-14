@@ -1,19 +1,20 @@
 -- test.lua - Mesen test script for Bank-$71 `draw_cached_trap_ram`
 io.stdout:setvbuf("no")
-test_setup    = 0x0248
-test_stop     = 0x05D5
-TEST_CASE_IDX = 0x1004
-TEST_RESULT   = 0x1006
+test_setup    = 0x0428
+test_stop     = 0x0B52
+TEST_CASE_IDX = 0x1580
+TEST_RESULT   = 0x1582
 
 local index = 1
 local fail_count = 0
-local TOTAL_CASES = 4
+local TOTAL_CASES = 5
 
 local case_names = {
     [1] = "Bank-$71 Non-Zero atlas_offset ($4200), Color-0 Transparency, 16px Flush & RAMBR==0",
     [2] = "Power-of-Two u_mask / v_mask_shifted Tiling Wrap Across Offsets",
     [3] = "Pass 0 [0..127] vs Pass 1 [128..255] Horizontal Seam Clipping",
-    [4] = "Top/Bottom Vertical Clipping & Off-Screen Early-Exit RAMBR==0"
+    [4] = "Top/Bottom Vertical Clipping & Off-Screen Early-Exit RAMBR==0",
+    [5] = "Bit-Exact ROM vs Bank-$71 Pixel Parity on Top-Clipped (@skip_loop) & Left-Clipped (@clip_u_loop) Traps + RAMBR==0"
 }
 
 function runCase(idx)
@@ -54,6 +55,10 @@ function onTestStop(address, value)
         passed = (r0 == 0xBEEF) and (r1 == 7) and (r2 == 7) and (r3 == 0)
         detail = string.format("sentinel=%04X (exp BEEF), px(40,0)=%d, px(40,2)=%d, px(40,3)=%d (exp 7,7,0)",
             r0, r1, r2, r3)
+    elseif index == 5 then
+        passed = (r0 == 0xBEEF) and (r1 == 0xBEEF) and (r2 == 0) and (r3 > 100) and (r4 == r5)
+        detail = string.format("sentinel_a=%04X, sentinel_b=%04X (exp BEEF), mismatches=%d (exp 0), nonzero_px=%d, hash_rom=%04X, hash_ram=%04X",
+            r0, r1, r2, r3, r4, r5)
     end
 
     if passed then

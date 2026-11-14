@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for `gsu_iso_map.i` 16x16 Grids, Skirts, Panels & Archetypes
 io.stdout:setvbuf("no")
-test_setup    = 0x3683
-test_stop     = 0x3B3B
-TEST_CASE_IDX = 0x813A
-TEST_RESULT   = 0x813C
+test_setup    = 0x3633
+test_stop     = 0x3D97
+TEST_CASE_IDX = 0x8396
+TEST_RESULT   = 0x8398
 
 local index = 1
 local fail_count = 0

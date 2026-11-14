@@ -13,6 +13,8 @@
 
 .segment "GSURAM"
 .align 2
+TEXTURE_TABLE_RAM: .res 120
+.export TEXTURE_TABLE_RAM
 TEST_CASE_IDX:  .res 2
 TEST_RESULT:    .res 64
 TEST_TRAP:      .res .sizeof(cached_trap)
@@ -21,7 +23,8 @@ TEST_TRAP:      .res .sizeof(cached_trap)
 GSU_Code:
     init_stack
 
-    ; Set ROMBR = $04 for GSU ROM data fetches
+    ; Copy ROM TEXTURE_TABLE (15 descriptors = 120 bytes) to GSURAM and set ROMBR = $04
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #120
     ibt r0, #$04
     romb
 
@@ -460,4 +463,4 @@ test_stop:
     nop
 
 ; Include the rasterizer under test
-.include "../../IsoEngine/triangle/draw_cached_trap.i"
+.include "../../gsu_iso/draw_cached_trap.i"

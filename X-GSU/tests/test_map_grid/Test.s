@@ -89,8 +89,50 @@ TEST_ATLAS:
     .endrepeat
 .endrepeat
 
+; Texture 2: 32x32 2-Band Skirt at pitch 128 (stride_shift = 7):
+;   Rows 0..7   (bytes 0..1023):    Color 3 (upper skirt step s=0)
+;   Rows 8..15  (bytes 1024..2047): Sentinel Color 9 (catches broken << 10 offset!)
+;   Rows 16..31 (bytes 2048..4095): Color 6 (lower skirt step s=1 via 16 << 7 = 2048)
+TEST_ATLAS_128_SKIRT:
+.repeat 32, row
+    .repeat 32, col
+        .if row < 8
+            .byte $03
+        .elseif row < 16
+            .byte $09
+        .else
+            .byte $06
+        .endif
+    .endrepeat
+    .repeat 96
+        .byte $00
+    .endrepeat
+.endrepeat
+
+; Texture 3: 32x64 2-Cell Floor at pitch 128 (stride_shift = 7):
+;   Rows 0..15  (bytes 0..2047):    Color 4 (cell j=0 floor)
+;   Rows 16..31 (bytes 2048..4095): Sentinel Color 9 (catches broken << 11 offset!)
+;   Rows 32..63 (bytes 4096..8191): Color 5 (cell j=1 floor via 32 << 7 = 4096)
+TEST_ATLAS_128_FLOOR:
+.repeat 64, row
+    .repeat 32, col
+        .if row < 16
+            .byte $04
+        .elseif row < 32
+            .byte $09
+        .else
+            .byte $05
+        .endif
+    .endrepeat
+    .repeat 96
+        .byte $00
+    .endrepeat
+.endrepeat
+
 ; Texture Table for descriptor lookup
 .export TEXTURE_TABLE
 TEXTURE_TABLE:
-    .word .loword(TEST_ATLAS + 0),     31, (31 << 6), ((31 << 6) | ((1 << 6) - 1)) ; ID 0: 32x32 Floor (pitch 64, stride_shift 6)
-    .word .loword(TEST_ATLAS + 2048),  31, (31 << 6), ((31 << 6) | ((1 << 6) - 1)) ; ID 1: 32x32 Skirt (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 0),          31, (31 << 6), ((31 << 6) | ((1 << 6) - 1)) ; ID 0: 32x32 Floor (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS + 2048),       31, (31 << 6), ((31 << 6) | ((1 << 6) - 1)) ; ID 1: 32x32 Skirt (pitch 64, stride_shift 6)
+    .word .loword(TEST_ATLAS_128_SKIRT),    31, (31 << 7), ((31 << 7) | ((1 << 7) - 1)) ; ID 2: 32x32 Skirt (pitch 128, stride_shift 7)
+    .word .loword(TEST_ATLAS_128_FLOOR),    31, (63 << 7), ((63 << 7) | ((1 << 7) - 1)) ; ID 3: 32x64 Floor (pitch 128, stride_shift 7)

@@ -11,9 +11,12 @@
 
 .include "../../IsoEngine/triangle/cached_trap.i"
 .include "../../IsoEngine/triangle/compile_face_traps_def.i"
+.import TEXTURE_TABLE
 
 .segment "GSURAM"
 .align 2
+TEXTURE_TABLE_RAM:  .res 40
+.export TEXTURE_TABLE_RAM
 TEST_CASE_IDX:      .res 2
 TEST_RESULT:        .res 32
 TEST_FACE:          .res .sizeof(face_def)
@@ -29,7 +32,8 @@ TEST_P3:            .res .sizeof(vector2)
 GSU_Code:
     init_stack
 
-    ; Set ROMBR = $04 for GSU ROM data fetches
+    ; Copy ROM TEXTURE_TABLE (5 descriptors = 40 bytes) to GSURAM and set ROMBR = $04
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #40
     ibt r0, #$04
     romb
 
@@ -952,6 +956,10 @@ raster_traps_loop:
     loop
     nop
 
+    ; Flush plot pixel cache before rpix readback
+    rpix
+    rpix
+
     ; Read sample pixels from framebuffer to TEST_RESULT:
     ; Sample 1: Center of Diamond (x=64, y=36)
     iwt r8, #TEST_RESULT + 2
@@ -1169,4 +1177,4 @@ test_stop:
     nop
 
 .include "../../IsoEngine/triangle/compile_face_traps.i"
-.include "../../IsoEngine/triangle/draw_cached_trap.i"
+.include "../../gsu_iso/draw_cached_trap.i"

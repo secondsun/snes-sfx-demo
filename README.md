@@ -17,7 +17,7 @@ snes-sfx-demo/
 ├── X-GSU/                   # High-level SuperFX macro language, 3D math & demos
 │   ├── common/              # X-GSU ca65 macros (function, stack, loops, conditionals)
 │   ├── gsu_maths/           # 16-bit fixed-point 3D vector, matrix & trig math
-│   ├── gsu_iso/             # Bank-$71 RAM isometric asset staging, compiler & ROM/MSU-1 loaders
+│   ├── gsu_iso/             # Unified isometric map compiler, dual-leaf trap rasterizers & Bank-$71/MSU-1 loaders
 │   ├── IsoEngine/           # Interactive 3D isometric camera & ROM-resident terrain engine
 │   ├── StarshipMap/         # Multi-room 3D starship interior showcase on IsoEngine
 │   ├── RamMapDemo/          # Multi-level / multi-atlas Bank-$71 RAM-staged showcase
@@ -41,10 +41,10 @@ snes-sfx-demo/
      - 16-bit 3D vector arithmetic (`vector3_add`, `vector3_subtract`, `vector3_negate`, `vector3_dot`, `vector3_cross`, `vector3_length`, `normalize`, `vector3_copy`).
      - Fixed-point 3D vertex and matrix transformations (`vector3_transform`, `camera_lookAt`).
      - Fast 32-bit square root (`gsu_sqrt32`), 16-bit reciprocal (`reciprocal`), and sine/cosine lookup tables (`trig`).
-   - **Bank-`$71` Isometric Runtime & Host Loaders** (`gsu_iso/`):
-     - Stages `sfx-studio`-packed texture atlases (`.bin`, relocatable `.tab`, `.pal`) and isometric levels (`.map`, `4×4`..`16×16`) in Game Pak RAM Bank `$71` (`128 KB` `$70–$71` expansion RAM).
-     - `draw_cached_trap_ram.i`: Affine trapezoid span rasterizer sampling texels from Bank `$71` (`ramb #1`, `ldb (r11)`) with dynamic power-of-two `stride_shift` (`32`..`256` px atlas widths).
-     - `gsu_iso_map.i`: Relocatable `.tab`/`.map` importer (`gsu_iso_import_bank71`), variable `W×H` painter's traversal (`8×8` LUT fast path + row-by-row general traversal), and archetype trap compiler.
+   - **Unified Isometric Runtime & Host Loaders** (`gsu_iso/`):
+     - Shared across both 32 KB direct-ROM scenes (`IsoEngine`, `StarshipMap`) and 128 KB Bank-`$71` RAM-staged scenes (`RamMapDemo`), supporting `sfx-studio`-packed texture atlases (`.bin`, `.tab`, `.pal`) and isometric levels (`.map`, `4×4`..`16×16`) with dynamic power-of-two `stride_shift` (`32`..`256` px atlas widths).
+     - `draw_cached_trap.i` & `draw_cached_trap_ram.i`: Shared `_gsu_define_trap_rasterizer` generator macro instantiating two separate 512-byte-cache-resident affine trapezoid leaf functions—`draw_cached_trap` (`ROMB` + pipelined `getc; plot` loop) and `draw_cached_trap_ram` (Bank `$71` `ramb #1` + `ldb (r11)` loop restoring `RAMBR = 0`)—unified on Bank-`$70` `TEXTURE_TABLE_RAM` and caller-owned end-of-pass `rpix; rpix` flushing.
+     - `gsu_iso_map.i`: Unified Map Grid & Shape Archetype compiler (`gsu_iso_compile_archetypes`, `gsu_iso_render`, `gsu_iso_update_origin`) with `gsu_iso_init_rom` boot helper for direct-ROM scenes and `gsu_iso_import_bank71` relocatable `.tab`/`.map` importer for Bank-`$71` scenes, variable `W×H` painter's traversal (`8×8` LUT fast path + row-by-row general traversal), and configurable `.ifndef`-guarded buffer footprints.
      - `cpu_asset_loader.i` + swappable `asset_source_rom.i` (`MVN`) and `asset_source_msu1.i` (`$2000–$2007` 32-bit seek + 2-step DMA via `$7F:0000`): 65816 host loader with GSU bus handoff, `atlas_id` deduplication, and CGRAM 0 palette upload.
    - **Decompression** (`rnc/`):
      - High-performance SuperFX implementation of Rob Northen Compression (RNC / Huffman) decompression.

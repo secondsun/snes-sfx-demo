@@ -1,5 +1,5 @@
 -- test.lua for draw_textured_triangle test
-local test_stop = 0x00BD
+local test_stop = 0x00C1
 local idle_addr = 0x035B
 
 local script_src = (debug and debug.getinfo and debug.getinfo(1, "S").source) or ""

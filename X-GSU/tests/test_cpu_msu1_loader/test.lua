@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for End-to-End 65816 MSU-1 AssetSource -> Bank $71 -> GSU
 io.stdout:setvbuf("no")
-test_setup    = 0x3618
-test_stop     = 0x3781
-TEST_CASE_IDX = 0x7DA0
-TEST_RESULT   = 0x7DA2
+test_setup    = 0x35C8
+test_stop     = 0x378D
+TEST_CASE_IDX = 0x7DAC
+TEST_RESULT   = 0x7DAE
 
 local index = 1
 local fail_count = 0

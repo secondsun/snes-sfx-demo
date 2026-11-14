@@ -1,12 +1,13 @@
 ; ==============================================================================
-; gsu_iso_map.i - Reusable Bank-$71 Isometric Map Importer, Compiler & Renderer
+; gsu_iso_map.i - Unified SuperFX Isometric Map Grid, Archetype Compiler & Renderer
 ;
 ; Supports:
-;   - Importing relocatable `.tab` (magic $5453 "ST") + `.map` (4x4..16x16)
-;     staged in Game Pak RAM Bank $71 ($71:8000 and $71:8808)
+;   - Direct-ROM 32 KB scenes (`GSU_ISO_USE_ROM_TEXTURES = 1` + `gsu_iso_init_rom`
+;     + `draw_cached_trap`) and Bank-$71 RAM scenes (`gsu_iso_import_bank71` +
+;     `draw_cached_trap_ram`) from one shared codebase with zero traversal `.ifdef`s
+;   - Configurable `GSU_ISO_MAX_MAP_BYTES` and `GSU_ISO_MAX_TAB_BYTES` via `.ifndef`
 ;   - Dynamic runtime `stride_shift` (e.g. 5=32px, 6=64px, 7=128px, 8=256px)
 ;   - All 12 isometric shape archetypes, 4 rotations, 4-way skirts, 1h/2h panels
-;   - Bank-$71 affine trapezoid rasterization via `draw_cached_trap_ram`
 ; ==============================================================================
 .ifndef __GSU_ISO_MAP_DEFINED__
 __GSU_ISO_MAP_DEFINED__ = 1
@@ -24,13 +25,35 @@ __GSU_ISO_MAP_DEFINED__ = 1
 .include "../IsoEngine/triangle/compile_face_traps_def.i"
 .include "../IsoEngine/triangle/compile_face_traps.i"
 .include "bank71_layout.i"
+
+.ifndef GSU_ISO_USE_ROM_TEXTURES
+_GSU_SKIP_ROM_TRAP_INST .set 1
+.endif
+.include "draw_cached_trap.i"
+_GSU_SKIP_ROM_TRAP_INST .set 0
+.ifndef GSU_ISO_USE_ROM_TEXTURES
 .include "draw_cached_trap_ram.i"
+.endif
+
+; 1-line rasterizer dispatch seam (selects ROM vs Bank-$71 leaf at assemble time
+; so 32 KB direct-ROM targets never link unused Bank-$71 code and vice versa)
+.macro _gsu_iso_draw_trap
+.ifdef GSU_ISO_USE_ROM_TEXTURES
+    call draw_cached_trap
+.else
+    call draw_cached_trap_ram
+.endif
+.endmacro
 
 GSU_ISO_MAX_COLS        = 16
 GSU_ISO_MAX_ROWS        = 16
 GSU_ISO_MAX_CELLS       = 256
+.ifndef GSU_ISO_MAX_MAP_BYTES
 GSU_ISO_MAX_MAP_BYTES   = 2056      ; 8B map_header + 256 * 8B map_cell
+.endif
+.ifndef GSU_ISO_MAX_TAB_BYTES
 GSU_ISO_MAX_TAB_BYTES   = 2048      ; 256 * 8B descriptors in Bank $70
+.endif
 
 ; ==============================================================================
 ; Binary Map Structures (ca65)
@@ -236,59 +259,35 @@ CACHED_YAW:                 .res 2
 .endif
 
 ; Helper macro: dst_reg = (r0 * 16) << gsu_runtime_stride_shift
+; Uses hardware 8x8 unsigned `umult` against `gsu_v16_shifted >> 8` (12B, 12 cycles;
+; supports stride_shift 4..10, including 32px..256px atlases).
+; Requires: dst_reg in R1..R15, scratch_reg in R0..R11, r0 in 0..255
 ; Clobbers: r0, dst_reg, scratch_reg
 .macro _gsu_iso_v_offset_16 dst_reg, scratch_reg
-    with r0
-    add r0
-    with r0
-    add r0
-    with r0
-    add r0
-    with r0
-    add r0
     move dst_reg, r0
-    iwt scratch_reg, #gsu_runtime_stride_shift
+    iwt scratch_reg, #gsu_v16_shifted
     ldw (scratch_reg)
-    move scratch_reg, r0
-    moves scratch_reg, scratch_reg
-    beq :++
-    nop
-:
-    with dst_reg
-    add dst_reg
-    dec scratch_reg
-    bne :-
-    nop
-:
+    hib
+    umult dst_reg
+    lob
+    to dst_reg
+    swap
 .endmacro
 
 ; Helper macro: dst_reg = (r0 * 32) << gsu_runtime_stride_shift
+; Uses hardware 8x8 unsigned `umult` against `gsu_v32_shifted >> 8` (12B, 12 cycles;
+; supports stride_shift 4..10, including 32px..256px atlases).
+; Requires: dst_reg in R1..R15, scratch_reg in R0..R11, r0 in 0..255
 ; Clobbers: r0, dst_reg, scratch_reg
 .macro _gsu_iso_v_offset_32 dst_reg, scratch_reg
-    with r0
-    add r0
-    with r0
-    add r0
-    with r0
-    add r0
-    with r0
-    add r0
-    with r0
-    add r0
     move dst_reg, r0
-    iwt scratch_reg, #gsu_runtime_stride_shift
+    iwt scratch_reg, #gsu_v32_shifted
     ldw (scratch_reg)
-    move scratch_reg, r0
-    moves scratch_reg, scratch_reg
-    beq :++
-    nop
-:
-    with dst_reg
-    add dst_reg
-    dec scratch_reg
-    bne :-
-    nop
-:
+    hib
+    umult dst_reg
+    lob
+    to dst_reg
+    swap
 .endmacro
 
 .segment "GSUCODE"
@@ -325,6 +324,117 @@ function gsu_iso_set_stride_shift shift_val
     return
 endfunction
 
+.ifndef GSU_ISO_NO_DEFAULT_BUFFERS
+
+; ==============================================================================
+; gsu_iso_init_rom
+; Direct-ROM boot initializer for 32 KB Bank-$70 isometric scenes (`IsoEngine`,
+; `StarshipMap`, and ROM tests). Copies the ROM Texture Table (`TEXTURE_TABLE`)
+; into `TEXTURE_TABLE_RAM`, copies the ROM Map Grid (`.map` / `def_cell` table)
+; into `MAP_BUF`, sets dynamic `gsu_runtime_stride_shift`, pre-bakes 4-way
+; neighbor skirt drops (`$BACE`), initializes `ISO_CAM` (`yaw=1`, `center=(128,80)`,
+; `cam=(0,0)`), marks `CACHED_YAW = $FFFF`, and sets `GSU_INIT_FLAG = 1`.
+;
+; In:
+;   map_rom_ptr      = r1: 16-bit ROM offset of map header in Bank $04 (`GSUDATA`)
+;   map_byte_size    = r2: Byte length of map header + cells
+;   tab_rom_ptr      = r3: 16-bit ROM offset of `TEXTURE_TABLE` in Bank $04 (`GSUDATA`)
+;   tab_byte_size    = r4: Byte length of `TEXTURE_TABLE` (`entry_count * 8`)
+;   stride_shift_val = r5: log2(atlas_width), e.g. 5 (32px), 6 (64px), 7 (128px), 8 (256px)
+; Postconditions:
+;   - `RAMBR == 0` ($70) and `ROMBR == $04` on return
+; Clobbers:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function gsu_iso_init_rom map_rom_ptr, map_byte_size, tab_rom_ptr, tab_byte_size, stride_shift_val
+    register map_rom_ptr = r1, map_byte_size = r2, tab_rom_ptr = r3, tab_byte_size = r4, stride_shift_val = r5
+
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+    gsu_stack_push stride_shift_val
+    gsu_stack_push tab_byte_size
+
+    ; 1. Copy ROM TEXTURE_TABLE (r3, r4 bytes) -> Bank-$70 TEXTURE_TABLE_RAM
+    move r14, tab_rom_ptr
+    move r12, tab_byte_size
+    iwt r6, #TEXTURE_TABLE_RAM
+    iwt r13, #@copy_tab_rom
+@copy_tab_rom:
+    getb
+    inc r14
+    stb (r6)
+    nop
+    loop
+    inc r6
+
+    ; 2. Copy ROM .map (r1, r2 bytes) -> Bank-$70 MAP_BUF
+    move r14, map_rom_ptr
+    move r12, map_byte_size
+    iwt r6, #MAP_BUF
+    iwt r13, #@copy_map_rom
+@copy_map_rom:
+    getb
+    inc r14
+    stb (r6)
+    nop
+    loop
+    inc r6
+
+    ; 3. Store runtime tab count (tab_byte_size >> 3), stride shift & atlas width
+    gsu_stack_pop r0
+    lsr
+    lsr
+    lsr
+    sm (gsu_runtime_tab_count), r0
+
+    gsu_stack_pop r1
+    call gsu_iso_set_stride_shift r1
+
+    lm r0, (gsu_v16_shifted)
+    lsr
+    lsr
+    lsr
+    lsr
+    sm (gsu_runtime_atlas_width), r0
+
+    ; 4. Pre-bake 4-way skirt drops & active archetype mask in $70:MAP_BUF
+    iwt r1, #MAP_BUF
+    call gsu_iso_prebake_map r1
+
+    ; 5. Initialize ISO_CAM: yaw = 1, center = (128, 80), cam = (0, 0)
+    iwt r1, #ISO_CAM
+    iwt r2, #1
+    call iso_camera_set_yaw r1, r2
+
+    iwt r1, #(ISO_CAM + 6)
+    iwt r0, #128
+    stw (r1)                ; center_x = 128
+    inc r1
+    inc r1
+    iwt r0, #80
+    stw (r1)                ; center_y = 80
+    inc r1
+    inc r1
+    ibt r0, #0
+    stw (r1)                ; cam_x = 0
+    inc r1
+    inc r1
+    stw (r1)                ; cam_z = 0
+
+    ; 6. Force archetype recompilation on first Pass 0 & mark scene initialized
+    iwt r0, #$FFFF
+    sm (CACHED_YAW), r0
+    iwt r0, #1
+    sm (GSU_INIT_FLAG), r0
+    ibt r0, #0
+    sm (GSU_IMPORT_ERROR), r0
+    return
+endfunction
+
+.ifndef GSU_ISO_USE_ROM_TEXTURES
 ; ==============================================================================
 ; gsu_iso_import_bank71
 ; Imports the active Texture Table (`.tab` at `$71:8000`) and Map Grid (`.map` at
@@ -595,6 +705,9 @@ function gsu_iso_import_bank71 : status_code
     sm (GSU_IMPORT_ERROR), r3
     return
 endfunction
+.endif ; !GSU_ISO_USE_ROM_TEXTURES
+
+.endif ; !GSU_ISO_NO_DEFAULT_BUFFERS
 
 ; ==============================================================================
 ; gsu_iso_update_origin
@@ -5521,7 +5634,7 @@ function gsu_iso_stamp_edge_panel edge_idx
     ldw (r7)
     move r7, r0         ; frame_half
 
-    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+    _gsu_iso_draw_trap
 
     gsu_stack_pop r5
     gsu_stack_pop r6
@@ -6974,7 +7087,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ldw (r7)
     move r7, r0         ; frame_half
 
-    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+    _gsu_iso_draw_trap
 
     gsu_stack_pop r4
     gsu_stack_pop r5
@@ -7119,7 +7232,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ldw (r7)
     move r7, r0         ; frame_half
 
-    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+    _gsu_iso_draw_trap
 
     gsu_stack_pop r4
     gsu_stack_pop r5
@@ -7248,7 +7361,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ldw (r7)
     move r7, r0         ; frame_half
 
-    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+    _gsu_iso_draw_trap
 
     gsu_stack_pop r5
     gsu_stack_pop r6
@@ -7472,7 +7585,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ldw (r7)
     move r7, r0         ; frame_half
 
-    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+    _gsu_iso_draw_trap
 
     gsu_stack_pop r5
     gsu_stack_pop r6

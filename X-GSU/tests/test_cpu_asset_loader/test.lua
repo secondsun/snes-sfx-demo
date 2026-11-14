@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for 65816 Bank-$71 Host Loader & ROM AssetSource
 io.stdout:setvbuf("no")
-test_setup    = 0x35B1
-test_stop     = 0x3711
-TEST_CASE_IDX = 0x7D38
-TEST_RESULT   = 0x7D3A
+test_setup    = 0x3561
+test_stop     = 0x3733
+TEST_CASE_IDX = 0x7D5A
+TEST_RESULT   = 0x7D5C
 
 local index = 1
 local fail_count = 0

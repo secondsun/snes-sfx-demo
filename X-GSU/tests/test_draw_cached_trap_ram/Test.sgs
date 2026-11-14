@@ -13,10 +13,13 @@
 .align 2
 TEXTURE_TABLE_RAM:  .res 64
 .export TEXTURE_TABLE_RAM
+.import PARITY_ROM_TEX
 TEST_CASE_IDX:      .res 2
 TEST_RESULT:        .res 32
 TEST_TRAP:          .res 32
+TEST_TRAP_B:        .res 32
 SENTINEL_WORD:      .res 2
+ROM_SNAP_BUF:       .res 1536
 
 .segment "GSUCODE"
 GSU_Entry:
@@ -25,6 +28,7 @@ GSU_Entry:
 
 .include "../../IsoEngine/triangle/cached_trap.i"
 .include "../../gsu_iso/bank71_layout.i"
+.include "../../gsu_iso/draw_cached_trap.i"
 .include "../../gsu_iso/draw_cached_trap_ram.i"
 
 ; Helper: clear 4bpp screen buffer at $70:A000..$70:C7FF
@@ -104,7 +108,7 @@ GSU_Code:
     ramb
 
 test_setup:
-    iwt r12, #4
+    iwt r12, #5
     iwt r13, #test_call
 
 test_call:
@@ -161,7 +165,15 @@ clear_res_loop:
     jmp r13
     nop
 @check_4:
+    from r9
+    sub #4
+    bne @check_5
+    nop
     iwt r13, #run_case_4
+    jmp r13
+    nop
+@check_5:
+    iwt r13, #run_case_5
     jmp r13
     nop
 
@@ -704,6 +716,376 @@ run_case_4:
     iwt r2, #3
     rpix
     stw (r8)                ; [3]: px(40,3) == 0
+
+    iwt r13, #test_done
+    jmp r13
+    nop
+
+; ==============================================================================
+; Case 5: Bit-Exact Pixel Parity Between ROM `draw_cached_trap` and Bank-$71
+;         `draw_cached_trap_ram` Across Top-Clipped (`@skip_loop`) and
+;         Left-Clipped (`@clip_u_loop`) Skewed Affine Trapezoids + `RAMBR == 0`
+; ==============================================================================
+; Helper: clear screen buffer and paint background color 11 on x=0..15, y=0..23
+; so color-0 transparent cutout preservation is tested alongside opaque texels.
+function prep_parity_scene
+    call clear_screen_buf
+    ibt r0, #11
+    color
+    ibt r0, #0
+    cmode
+    ibt r2, #0              ; y = 0..23
+    iwt r5, #24
+@bg_y_loop:
+    ibt r1, #0              ; x = 0..15
+    iwt r12, #16
+    iwt r13, #@bg_x_loop
+@bg_x_loop:
+    loop
+    plot
+    inc r2
+    dec r5
+    bne @bg_y_loop
+    nop
+    rpix
+    rpix
+    return
+endfunction
+
+run_case_5:
+    ; Stage exact 1,024-byte copy of PARITY_ROM_TEX from ROM Bank $04 into $71:3400
+    ibt r0, #1
+    ramb
+    rom_to_ram #PARITY_ROM_TEX, #$04, #$3400, #1024
+    ibt r0, #0
+    ramb
+    ibt r0, #$04
+    romb
+
+    ; Descriptor 3 (ROM `draw_cached_trap`): offset = .loword(PARITY_ROM_TEX), 16x16 pitch 64
+    iwt r1, #(TEXTURE_TABLE_RAM + 24)
+    iwt r0, #.loword(PARITY_ROM_TEX)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #15
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(15 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #((15 << 6) | 63)
+    stw (r1)
+
+    ; Descriptor 4 (Bank-$71 `draw_cached_trap_ram`): offset = $3400, 16x16 pitch 64
+    iwt r1, #(TEXTURE_TABLE_RAM + 32)
+    iwt r0, #$3400
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #15
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #(15 << 6)
+    stw (r1)
+    inc r1
+    inc r1
+    iwt r0, #((15 << 6) | 63)
+    stw (r1)
+
+    ; Populate Trap A (TEST_TRAP): Top-Clipped skewed affine trapezoid (anchor_y = -5 -> @skip_loop)
+    iwt r8, #TEST_TRAP
+    ibt r0, #0
+    stw (r8)                ; +0:  dy_start = 0
+    inc r8
+    inc r8
+    iwt r0, #13
+    stw (r8)                ; +2:  line_count = 13 (5 clipped, 8 drawn at y=0..7)
+    inc r8
+    inc r8
+    iwt r0, #$0240
+    stw (r8)                ; +4:  xL_start = 2.25
+    inc r8
+    inc r8
+    iwt r0, #$1080
+    stw (r8)                ; +6:  xR_start = 16.5
+    inc r8
+    inc r8
+    iwt r0, #$0050
+    stw (r8)                ; +8:  dxL_dy = +0.3125
+    inc r8
+    inc r8
+    iwt r0, #$0090
+    stw (r8)                ; +10: dxR_dy = +0.5625
+    inc r8
+    inc r8
+    iwt r0, #$0140
+    stw (r8)                ; +12: uL_start
+    inc r8
+    inc r8
+    iwt r0, #$0030
+    stw (r8)                ; +14: vL_start
+    inc r8
+    inc r8
+    iwt r0, #$0070
+    stw (r8)                ; +16: du_dy
+    inc r8
+    inc r8
+    iwt r0, #$0054
+    stw (r8)                ; +18: dv_dy
+    inc r8
+    inc r8
+    iwt r0, #$0130
+    stw (r8)                ; +20: du_dx
+    inc r8
+    inc r8
+    iwt r0, #$0028
+    stw (r8)                ; +22: dv_dx
+    inc r8
+    inc r8
+    ibt r0, #3
+    stw (r8)                ; +24: tex_id = 3 (ROM)
+
+    ; Populate Trap B (TEST_TRAP_B): Left-Clipped skewed affine trapezoid (anchor_x = -8 -> @clip_u_loop)
+    iwt r8, #TEST_TRAP_B
+    ibt r0, #0
+    stw (r8)                ; +0:  dy_start = 0
+    inc r8
+    inc r8
+    iwt r0, #10
+    stw (r8)                ; +2:  line_count = 10 (drawn at y=10..19)
+    inc r8
+    inc r8
+    iwt r0, #$0200
+    stw (r8)                ; +4:  xL_start = 2.0 (with anchor_x=-8 -> -6.0!)
+    inc r8
+    inc r8
+    iwt r0, #$1380
+    stw (r8)                ; +6:  xR_start = 19.5 (with anchor_x=-8 -> 11.5)
+    inc r8
+    inc r8
+    iwt r0, #$FFE0
+    stw (r8)                ; +8:  dxL_dy = -0.125
+    inc r8
+    inc r8
+    iwt r0, #$0060
+    stw (r8)                ; +10: dxR_dy = +0.375
+    inc r8
+    inc r8
+    iwt r0, #$00C0
+    stw (r8)                ; +12: uL_start
+    inc r8
+    inc r8
+    iwt r0, #$0020
+    stw (r8)                ; +14: vL_start
+    inc r8
+    inc r8
+    iwt r0, #$0068
+    stw (r8)                ; +16: du_dy
+    inc r8
+    inc r8
+    iwt r0, #$0048
+    stw (r8)                ; +18: dv_dy
+    inc r8
+    inc r8
+    iwt r0, #$0148
+    stw (r8)                ; +20: du_dx
+    inc r8
+    inc r8
+    iwt r0, #$0034
+    stw (r8)                ; +22: dv_dx
+    inc r8
+    inc r8
+    ibt r0, #3
+    stw (r8)                ; +24: tex_id = 3 (ROM)
+
+    ; --- 1. Render Trap A + Trap B via ROM `draw_cached_trap` ---
+    call prep_parity_scene
+    ibt r0, #$04
+    romb
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #4              ; anchor_x = 4
+    iwt r4, #$FFFB          ; anchor_y = -5 (top-clipped!)
+    iwt r5, #$0280          ; u_offset
+    iwt r6, #$00C0          ; v_offset
+    iwt r7, #0              ; frame_half = 0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    iwt r1, #TEST_TRAP_B
+    iwt r3, #$FFF8          ; anchor_x = -8 (left-clipped!)
+    iwt r4, #10             ; anchor_y = 10
+    iwt r5, #$0180          ; u_offset
+    iwt r6, #$0140          ; v_offset
+    iwt r7, #0              ; frame_half = 0
+    call draw_cached_trap r1, r3, r4, r5, r6, r7
+
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Snapshot all 32x24 = 768 pixels into ROM_SNAP_BUF, count non-bg/non-zero & rolling hash
+    iwt r8, #ROM_SNAP_BUF
+    iwt r6, #0              ; rom_nonzero_count
+    iwt r7, #0              ; rom_hash
+    ibt r2, #0              ; y = 0..23
+@snap_y_loop:
+    ibt r1, #0              ; x = 0..31
+@snap_x_loop:
+    rpix                    ; r0 = pixel(x, y), also clobbers flags
+    stw (r8)
+    inc r8
+    inc r8
+    moves r4, r0
+    beq @snap_zero
+    nop
+    inc r6
+@snap_zero:
+    ; rom_hash = (rom_hash * 3) + px + 1
+    from r7
+    to r5
+    add r7
+    with r7
+    add r5
+    with r7
+    add r4
+    inc r7
+
+    inc r1
+    iwt r0, #32
+    from r1
+    sub r0
+    blt @snap_x_loop
+    nop
+
+    inc r2
+    iwt r0, #24
+    from r2
+    sub r0
+    blt @snap_y_loop
+    nop
+
+    ; Save rom_nonzero_count and rom_hash into TEST_RESULT + 6 and + 8
+    iwt r9, #(TEST_RESULT + 6)
+    from r6
+    stw (r9)
+    inc r9
+    inc r9
+    from r7
+    stw (r9)
+
+    ; --- 2. Render identical Trap A + Trap B via Bank-$71 `draw_cached_trap_ram` ---
+    call prep_parity_scene
+
+    ; Switch both traps to tex_id = 4 (Bank-$71 copy at $71:3400)
+    iwt r8, #(TEST_TRAP + 24)
+    ibt r0, #4
+    stw (r8)
+    iwt r8, #(TEST_TRAP_B + 24)
+    ibt r0, #4
+    stw (r8)
+
+    iwt r1, #TEST_TRAP
+    iwt r3, #4
+    iwt r4, #$FFFB
+    iwt r5, #$0280
+    iwt r6, #$00C0
+    iwt r7, #0
+    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+
+    ; IMMEDIATELY verify RAMBR == 0 after Trap A (without touching `ramb`)!
+    iwt r1, #SENTINEL_WORD
+    to r9
+    ldw (r1)
+    iwt r8, #TEST_RESULT
+    from r9
+    stw (r8)                ; [0]: sentinel_a ($BEEF)
+
+    iwt r1, #TEST_TRAP_B
+    iwt r3, #$FFF8
+    iwt r4, #10
+    iwt r5, #$0180
+    iwt r6, #$0140
+    iwt r7, #0
+    call draw_cached_trap_ram r1, r3, r4, r5, r6, r7
+
+    ; IMMEDIATELY verify RAMBR == 0 after Trap B (without touching `ramb`)!
+    iwt r1, #SENTINEL_WORD
+    to r9
+    ldw (r1)
+    iwt r8, #(TEST_RESULT + 2)
+    from r9
+    stw (r8)                ; [2]: sentinel_b ($BEEF)
+
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; Compare all 768 pixels against ROM_SNAP_BUF and compute ram_hash
+    iwt r8, #ROM_SNAP_BUF
+    iwt r6, #0              ; mismatch_count
+    iwt r7, #0              ; ram_hash
+    ibt r2, #0              ; y = 0..23
+@cmp_y_loop:
+    ibt r1, #0              ; x = 0..31
+@cmp_x_loop:
+    rpix
+    move r4, r0             ; r4 = ram_px(x, y)
+    ldw (r8)                ; r0 = rom_px(x, y)
+    inc r8
+    inc r8
+    from r4
+    sub r0
+    beq @px_match
+    nop
+    inc r6                  ; mismatch_count++
+@px_match:
+    from r7
+    to r5
+    add r7
+    with r7
+    add r5
+    with r7
+    add r4
+    inc r7
+
+    inc r1
+    iwt r0, #32
+    from r1
+    sub r0
+    blt @cmp_x_loop
+    nop
+
+    inc r2
+    iwt r0, #24
+    from r2
+    sub r0
+    blt @cmp_y_loop
+    nop
+
+    iwt r9, #(TEST_RESULT + 4)
+    from r6
+    stw (r9)                ; [4]: mismatch_count (expected 0!)
+    iwt r9, #(TEST_RESULT + 10)
+    from r7
+    stw (r9)                ; [10]: ram_hash (expected == rom_hash!)
 
 test_done:
     rpix

@@ -75,7 +75,7 @@ A single pixel element within a Texture Atlas representing a palette color index
 _Avoid_: Tile pixel, byte pixel
 
 ### Texture Descriptor
-A runtime lookup record within the Texture Table defining a texture region's base offset, horizontal and vertical wrapping masks, and row stride shift within the Texture Atlas.
+A runtime lookup record within the Texture Table defining a texture region's base offset and horizontal and vertical wrapping masks within the Texture Atlas.
 _Avoid_: Texture entry, texture header, slot struct
 
 ### Texture Table

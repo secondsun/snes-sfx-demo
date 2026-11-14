@@ -21,7 +21,7 @@
 .ifndef ::__SHOWCASE_MAP_I_DEFINED__
 ::__SHOWCASE_MAP_I_DEFINED__ = 1
 
-.include "../map_grid.i"
+.include "../../gsu_iso/gsu_iso_map.i"
 .include "TEXTURES.i"
 
 .segment "GSUDATA"

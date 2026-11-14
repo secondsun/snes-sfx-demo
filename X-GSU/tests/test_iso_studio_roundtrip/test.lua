@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for End-to-End `sfx-studio` -> 65816 -> Bank $71 -> GSU Roundtrip
 io.stdout:setvbuf("no")
-test_setup    = 0x36DB
-test_stop     = 0x37B0
-TEST_CASE_IDX = 0x7DB6
-TEST_RESULT   = 0x7DB8
+test_setup    = 0x368B
+test_stop     = 0x3760
+TEST_CASE_IDX = 0x7D66
+TEST_RESULT   = 0x7D68
 
 local index = 1
 local fail_count = 0

@@ -6,12 +6,18 @@
 .include "../../common/function.i"
 .include "../../common/control.i"
 .include "../../common/structs.i"
-.include "../../gsu_maths/gsu_recip.i"
-.include "../../gsu_maths/gsu_iso_camera.i"
-.include "../../IsoEngine/triangle/cached_trap.i"
-.include "../../IsoEngine/triangle/draw_cached_trap.i"
-.include "../../IsoEngine/triangle/compile_face_traps.i"
-.include "../../IsoEngine/map_grid.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.import TEXTURE_TABLE
+
+.segment "GSURAM"
+.align 2
+TEXTURE_TABLE_RAM:  .res 64
+.export TEXTURE_TABLE_RAM
+
+GSU_ISO_USE_ROM_TEXTURES = 1
+GSU_ISO_NO_DEFAULT_BUFFERS = 1
+.include "../../gsu_iso/gsu_iso_map.i"
 
 .segment "GSURAM"
 .align 2
@@ -30,7 +36,9 @@ TEST_MAP_BUF:       .res 256
 .export GSU_Code
 GSU_Code:
     init_stack
-
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #24
+    ibt r1, #6
+    call gsu_iso_set_stride_shift r1
     ; Set ROMBR = $04 for GSU ROM data fetches
     ibt r0, #$04
     romb
@@ -113,11 +121,11 @@ run_case_1:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Iterate through the 8 entries in panel_lut:
     ; Count how many templates have trap_count > 0 and sum trap counts
-    iwt r11, #gsu_map_render_frame + map_render_frame::panel_lut
+    iwt r11, #gsu_iso_render_frame + map_render_frame::panel_lut
     iwt r12, #8         ; 8 templates
     iwt r8, #0          ; non_zero_templates
     iwt r9, #0          ; total_traps
@@ -159,7 +167,7 @@ run_case_1:
     inc r7
 
     ; Read template 0 (N 1h) and template 1 (N 2h) trap counts
-    iwt r11, #gsu_map_render_frame + map_render_frame::panel_lut
+    iwt r11, #gsu_iso_render_frame + map_render_frame::panel_lut
     ldw (r11)
     move r2, r0
     iwt r1, #TEST_ARCH_TRAPS
@@ -249,13 +257,13 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Q0 Back: back_ns_mask | back_ew_mask (exp: PANEL_N | PANEL_W = $01 | $08 = $09)
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ns_mask
     ldw (r7)
     move r2, r0
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ew_mask
     ldw (r7)
     with r0
     or r2
@@ -283,13 +291,13 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Q1 Back: back_ns_mask | back_ew_mask (exp: PANEL_S | PANEL_W = $04 | $08 = $0C)
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ns_mask
     ldw (r7)
     move r2, r0
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ew_mask
     ldw (r7)
     with r0
     or r2
@@ -317,13 +325,13 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Q2 Back: back_ns_mask | back_ew_mask (exp: PANEL_S | PANEL_E = $04 | $02 = $06)
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ns_mask
     ldw (r7)
     move r2, r0
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ew_mask
     ldw (r7)
     with r0
     or r2
@@ -351,13 +359,13 @@ run_case_2:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Q3 Back: back_ns_mask | back_ew_mask (exp: PANEL_N | PANEL_E = $01 | $02 = $03)
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ns_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ns_mask
     ldw (r7)
     move r2, r0
-    iwt r7, #gsu_map_render_frame + map_render_frame::back_ew_mask
+    iwt r7, #gsu_iso_render_frame + map_render_frame::back_ew_mask
     ldw (r7)
     with r0
     or r2
@@ -413,7 +421,7 @@ clear_screen_c3:
     iwt r3, #TEST_LATTICE
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #TEST_CACHED_YAW
-    call map_grid_compile_archetypes r1, r2, r3, r4, r5
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
 
     ; Build 1x1 map at (0, 0):
     ; h=0, PRIM_FLAT, top_tex=0 (solid floor 6), panel_tex=2 (parapet 9 with cutouts 0),
@@ -470,7 +478,7 @@ clear_screen_c3:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Render Pass 1
     iwt r1, #TEST_MAP_BUF
@@ -479,7 +487,7 @@ clear_screen_c3:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #1
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     ; Settle pipeline
     rpix
@@ -604,7 +612,7 @@ clear_screen_c4:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #0
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     iwt r1, #TEST_MAP_BUF
     iwt r2, #TEST_CAM
@@ -612,7 +620,7 @@ clear_screen_c4:
     iwt r4, #TEST_ARCH_TRAPS
     iwt r5, #1
     iwt r6, #0
-    call map_grid_render r1, r2, r3, r4, r5, r6
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
 
     rpix
     rpix

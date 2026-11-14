@@ -1,19 +1,20 @@
 -- test.lua - Mesen test script for Map Grid Painter's Traversal & Archetype Stamping
 io.stdout:setvbuf("no")
-test_setup = 0x323B
-test_stop  = 0x3732
-TEST_CASE_IDX = 0x42C2
-TEST_RESULT   = 0x42C4
+test_setup = 0x3309
+test_stop  = 0x3971
+TEST_CASE_IDX = 0x454C
+TEST_RESULT   = 0x454E
 
 local index = 1
 local fail_count = 0
-local TOTAL_CASES = 4
+local TOTAL_CASES = 5
 
 local case_names = {
     [1] = "Pass-0 Yaw-Dirty ARCH_TRAPS Compilation & Caching",
     [2] = "Yaw-Quadrant Back-to-Front Traversal Order Across All 4 Quadrants",
     [3] = "Bounding Box Culling Against Frame Halves (Pass 0 vs Pass 1)",
-    [4] = "Stepped PRIM_FLAT Map Grid Rendering & Watertight Seams"
+    [4] = "Stepped PRIM_FLAT Map Grid Rendering & Watertight Seams",
+    [5] = "Non-64px (stride_shift=7 / 128px) ROM Skirt & Floor v_offset Wrapping"
 }
 
 function runCase(idx)
@@ -82,6 +83,16 @@ function onTestStop(address, value)
         passed = (s0 ~= 0) and (s1 ~= 0) and (s2 ~= 0)
         detail = string.format("floor_00=%04X, floor_11=%04X, skirt_01=%04X",
             s0, s1, s2)
+
+    elseif index == 5 then
+        -- Case 5: Non-64px (stride_shift=7 / 128px) ROM Skirt & Floor v_offset Wrapping
+        -- s0: skirt s=0 at (80, 50) (exp 3)
+        -- s1: skirt s=1 at (80, 64) (exp 6, NOT broken <<10 sentinel 9)
+        -- s2: floor j=0 at (112, 46) (exp 4)
+        -- s3: floor j=1 at (80, 35) (exp 5, NOT broken <<11 sentinel 9)
+        passed = (s0 == 3) and (s1 == 6) and (s2 == 4) and (s3 == 5)
+        detail = string.format("skirt_s0=%d (exp 3), skirt_s1=%d (exp 6), floor_j0=%d (exp 4), floor_j1=%d (exp 5)",
+            s0, s1, s2, s3)
     end
 
     if passed then

@@ -10,9 +10,12 @@
 
 ; Include cached_trap struct
 .include "../../IsoEngine/triangle/cached_trap.i"
+.import TEXTURE_TABLE
 
 .segment "GSURAM"
 .align 2
+TEXTURE_TABLE_RAM: .res 40
+.export TEXTURE_TABLE_RAM
 TEST_CASE_IDX:  .res 2
 TEST_RESULT:    .res 32
 TEST_TRAP:      .res .sizeof(cached_trap)
@@ -21,7 +24,8 @@ TEST_TRAP:      .res .sizeof(cached_trap)
 GSU_Code:
     init_stack
 
-    ; Set ROMBR = $04 for GSU ROM data fetches
+    ; Copy ROM TEXTURE_TABLE (5 descriptors = 40 bytes) to GSURAM and set ROMBR = $04
+    rom_to_ram #TEXTURE_TABLE, #$04, #TEXTURE_TABLE_RAM, #40
     ibt r0, #$04
     romb
 
@@ -156,6 +160,8 @@ run_case_1:
     iwt r6, #0
     iwt r7, #0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample pixels at (x=0, y=10), (x=15, y=10), (x=16, y=10), (x=31, y=10), (x=32, y=10)
     ; Pixel at x=0 should equal pixel at x=16 and x=32 due to 16-pixel wrap!
@@ -312,6 +318,8 @@ run_case_2:
     iwt r6, #0
     iwt r7, #0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample pixels:
     ; y=19 (above Trap 1, should be 0/untouched)
@@ -466,6 +474,8 @@ run_case_3:
     iwt r6, #0
     iwt r7, #0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample pixels on line y=50:
     ; x=9  (outside, 0)
@@ -618,6 +628,8 @@ run_case_4:
     iwt r6, #0
     iwt r7, #0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample pixels:
     ; y=0 (rendered from top-clipped trap)
@@ -715,6 +727,8 @@ run_case_5:
     iwt r6, #0
     iwt r7, #0     ; Pass 0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample Pass 0 pixel at x=127:
     iwt r8, #TEST_RESULT
@@ -733,6 +747,8 @@ run_case_5:
     iwt r6, #0
     iwt r7, #1     ; Pass 1
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample Pass 1 pixel at x'=0 (which represents original X=128):
     iwt r8, #(TEST_RESULT + 2)
@@ -807,6 +823,8 @@ run_case_6:
     iwt r6, #0
     iwt r7, #0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Read background pixel at (x=10, y=90) and (x=11, y=90)
     iwt r8, #TEST_RESULT
@@ -873,6 +891,8 @@ run_case_6:
     iwt r6, #0
     iwt r7, #0
     call draw_cached_trap r1, r3, r4, r5, r6, r7
+    rpix
+    rpix
 
     ; Sample:
     ; (x=10, y=90): (0+0)%2 == 0 -> texel $00 (transparent!). Should retain initial background!
@@ -912,4 +932,4 @@ test_stop:
     nop
 
 ; Include the rasterizer under test
-.include "../../IsoEngine/triangle/draw_cached_trap.i"
+.include "../../gsu_iso/draw_cached_trap.i"

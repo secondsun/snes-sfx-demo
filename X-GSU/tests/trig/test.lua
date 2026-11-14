@@ -1,6 +1,6 @@
 test_setup = 0x0003
 test_stop  = 0x0059
-OUTPUT     = 0x0F04
+OUTPUT     = 0x0F0C
 
 local cases = {
     { r12 = 120, sin = 0x0000, cos = 0x4000 },

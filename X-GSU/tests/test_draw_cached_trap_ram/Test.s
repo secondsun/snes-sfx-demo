@@ -42,3 +42,20 @@ Main:
 
 :   wai
     bra :-
+
+; ==============================================================================
+; Deterministic Non-Uniform 16x16 Pattern Texture in ROM Bank $04 (GSUDATA)
+; Includes color 0 transparent cutouts and non-symmetric U/V gradients so any
+; UV drift in @skip_loop or @clip_u_loop produces an immediate pixel mismatch.
+; ==============================================================================
+.segment "GSUDATA"
+.export PARITY_ROM_TEX
+PARITY_ROM_TEX:
+.repeat 16, row
+    .repeat 16, col
+        .byte (((col * 3) + (row * 5)) .mod 15)
+    .endrepeat
+    .repeat 48
+        .byte $00
+    .endrepeat
+.endrepeat

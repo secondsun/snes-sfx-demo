@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for `gsu_iso_import_bank71` & Dynamic Stride
 io.stdout:setvbuf("no")
-test_setup    = 0x35F3
-test_stop     = 0x38C9
-TEST_CASE_IDX = 0x7EC8
-TEST_RESULT   = 0x7ECA
+test_setup    = 0x35A3
+test_stop     = 0x38DF
+TEST_CASE_IDX = 0x7EDE
+TEST_RESULT   = 0x7EE0
 
 local index = 1
 local fail_count = 0

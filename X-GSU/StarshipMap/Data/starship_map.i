@@ -15,7 +15,7 @@
 .ifndef ::__STARSHIP_MAP_I_DEFINED__
 ::__STARSHIP_MAP_I_DEFINED__ = 1
 
-.include "../../IsoEngine/map_grid.i"
+.include "../../gsu_iso/gsu_iso_map.i"
 .include "TEXTURES.i"
 
 .segment "GSUDATA"

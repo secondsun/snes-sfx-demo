@@ -4,9 +4,6 @@
 .import GSU_FRAME_HALF
 .import GSU_INIT_FLAG
 .import GSU_JOYPAD
-.import SHOWCASE_MAP_ROM
-.import MAP_BYTE_SIZE
-.import MAP_BUF
 
 
 ;This is the main vector of the Super NES code. it runs from cartidge with the 
@@ -25,18 +22,6 @@ Main:
         
         stz z:pos_y
 
-        ;Copy Showcase Map (MAP_BYTE_SIZE bytes) to GSURAM
-        RW_push set:a16i16
-        ldx #0
-:       lda f:SHOWCASE_MAP_ROM, x
-        sta f:MAP_BUF, x
-        inx
-        inx
-        cpx #MAP_BYTE_SIZE
-        bne :-
-        RW_pull
-
-        
         ;Configure GSU
         ;initGSU_4bpp_obj 
         initGSU_4bpp_160
