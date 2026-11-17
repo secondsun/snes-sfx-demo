@@ -28,6 +28,10 @@ __GSU_TRAP_RASTERIZER_MACRO__ = 1
 .include "../IsoEngine/triangle/cached_trap.i"
 .include "../common/util.i"
 
+.ifndef GSU_TRAP_SCREEN_H
+    GSU_TRAP_SCREEN_H = 160
+.endif
+
 .ifndef __TRAP_FRAME_DEFINED__
 __TRAP_FRAME_DEFINED__ = 1
 ; Stack-allocated trapezoid state frame (12 bytes, 6 words in $70 GSURAM)
@@ -69,7 +73,7 @@ function fn_name
 cbr_anchor:
     cache
 
-    ; Ensure cmode = 0 (transparency enabled: color 0 transparent, 1..15 opaque)
+    ; Ensure cmode = 0 (transparency enabled: color 0 transparent, 1..max opaque)
     ibt r0, #0
     cmode
 
@@ -98,8 +102,8 @@ cbr_anchor:
     blt @early_exit
     nop
 
-    ; Check if completely below screen: y >= 160
-    iwt r11, #160
+    ; Check if completely below screen: y >= GSU_TRAP_SCREEN_H
+    iwt r11, #GSU_TRAP_SCREEN_H
     from r4
     cmp r11
     bge @early_exit

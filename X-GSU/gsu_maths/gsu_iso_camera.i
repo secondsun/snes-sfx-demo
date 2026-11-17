@@ -14,6 +14,13 @@
 .include "../common/control.i"
 .include "./gsu_trig.i"
 
+.ifndef GSU_ISO_CENTER_X
+    GSU_ISO_CENTER_X = 128
+.endif
+.ifndef GSU_ISO_CENTER_Y
+    GSU_ISO_CENTER_Y = 80
+.endif
+
 .segment "GSUCODE"
 
 ; Updates an iso_camera struct with a new yaw angle index (1..120) and caches sin/cos.
@@ -229,8 +236,8 @@ function iso_camera_sync_cam_to_screen cam_ptr
     with term
     asr
 
-    ; cx = 128 + dx
-    iwt r0, #128
+    ; cx = GSU_ISO_CENTER_X + dx
+    iwt r0, #GSU_ISO_CENTER_X
     with term
     add r0
 
@@ -270,8 +277,8 @@ function iso_camera_sync_cam_to_screen cam_ptr
     with term
     asr
 
-    ; cy = 80 + dy
-    iwt r0, #80
+    ; cy = GSU_ISO_CENTER_Y + dy
+    iwt r0, #GSU_ISO_CENTER_Y
     with term
     add r0
 
@@ -312,8 +319,8 @@ function iso_camera_sync_screen_to_cam cam_ptr
     to val2
     ldw (ptr)
 
-    ; val1 = dx_q6 = (cx - 128) << 6
-    iwt r0, #128
+    ; val1 = dx_q6 = (cx - GSU_ISO_CENTER_X) << 6
+    iwt r0, #GSU_ISO_CENTER_X
     with val1
     sub r0
     with val1
@@ -329,8 +336,8 @@ function iso_camera_sync_screen_to_cam cam_ptr
     with val1
     add val1
 
-    ; val2 = dz_q6 = ((cy - 80) * 2) << 6 = (cy - 80) << 7
-    iwt r0, #80
+    ; val2 = dz_q6 = ((cy - GSU_ISO_CENTER_Y) * 2) << 6 = (cy - GSU_ISO_CENTER_Y) << 7
+    iwt r0, #GSU_ISO_CENTER_Y
     with val2
     sub r0
     with val2
@@ -531,10 +538,10 @@ clamp_bounds:
     iwt tmp, #256
     if_gt cx, tmp, { move cx, tmp }
 
-    ; Clamp center_y: [-48, 208] (80 +/- 128)
-    iwt tmp, #$FFD0 ; -48 in 16-bit signed
+    ; Clamp center_y: [GSU_ISO_CENTER_Y - 128, GSU_ISO_CENTER_Y + 128]
+    iwt tmp, #.loword(GSU_ISO_CENTER_Y - 128)
     if_lt cy, tmp, { move cy, tmp }
-    iwt tmp, #208
+    iwt tmp, #(GSU_ISO_CENTER_Y + 128)
     if_gt cy, tmp, { move cy, tmp }
 
     ; Store center_x and center_y back to ISO_CAM

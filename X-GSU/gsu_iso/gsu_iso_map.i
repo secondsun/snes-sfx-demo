@@ -26,6 +26,10 @@ __GSU_ISO_MAP_DEFINED__ = 1
 .include "../IsoEngine/triangle/compile_face_traps.i"
 .include "bank71_layout.i"
 
+.ifndef GSU_ISO_SCREEN_H
+    GSU_ISO_SCREEN_H = 160
+.endif
+
 .ifndef GSU_ISO_USE_ROM_TEXTURES
 _GSU_SKIP_ROM_TRAP_INST .set 1
 .endif
@@ -682,12 +686,12 @@ function gsu_iso_import_bank71 : status_code
 
 @reset_cam_translation:
     iwt r1, #(ISO_CAM + 6)
-    iwt r0, #128
-    stw (r1)                ; center_x = 128
+    iwt r0, #GSU_ISO_CENTER_X
+    stw (r1)                ; center_x
     inc r1
     inc r1
-    iwt r0, #80
-    stw (r1)                ; center_y = 80
+    iwt r0, #GSU_ISO_CENTER_Y
+    stw (r1)                ; center_y
     inc r1
     inc r1
     iwt r0, #0
@@ -6852,8 +6856,8 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     nop
 
 @vert_y_ok:
-    ; If ymin >= 160: cull
-    iwt r14, #160
+    ; If ymin >= GSU_ISO_SCREEN_H: cull
+    iwt r14, #GSU_ISO_SCREEN_H
     from r5
     sub r14
     blt :+
