@@ -1,0 +1,1403 @@
+{
+  "name": "level6_riovanes",
+  "cols": 13,
+  "rows": 11,
+  "atlasPath": "RIOVANES_ATLAS.sfxproj",
+  "cells": [
+    {
+      "col": 0,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 180,
+      "topTex": "top_00",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 1,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_00",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 1,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_00",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_01",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_02",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 1,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_03",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 1,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_03",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 1,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_04",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 1,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 1,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 1,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 2,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_14",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 2,
+      "baseHeight": 1,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 180,
+      "topTex": "top_06",
+      "skirtTex": "skirt_00",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 2,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_05",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 2,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_18",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 2,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_06",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 2,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_06",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 2,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_06",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 2,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_06",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 2,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_06",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 2,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 2,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 2,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 2,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 3,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_15",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 3,
+      "baseHeight": 2,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 180,
+      "topTex": "top_07",
+      "skirtTex": "skirt_07",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 3,
+      "baseHeight": 2,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 180,
+      "topTex": "top_07",
+      "skirtTex": "skirt_05",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 3,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_18",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 3,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 3,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_18",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 3,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 3,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_05",
+      "skirtTex": "skirt_19",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 3,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 3,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 3,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 3,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 3,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 4,
+      "baseHeight": 7,
+      "archetype": "PRIM_WEDGE_INNER_2H",
+      "rotation": 180,
+      "topTex": "top_01",
+      "skirtTex": "skirt_19",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 4,
+      "baseHeight": 10,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 180,
+      "topTex": "top_07",
+      "skirtTex": "skirt_08",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 4,
+      "baseHeight": 7,
+      "archetype": "PRIM_WEDGE_INNER_2H",
+      "rotation": 270,
+      "topTex": "top_07",
+      "skirtTex": "skirt_09",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 4,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_18",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 4,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_18",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 4,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 4,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 4,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 4,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 4,
+      "baseHeight": 8,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_02",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 4,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 4,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 4,
+      "baseHeight": 12,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 5,
+      "baseHeight": 10,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 90,
+      "topTex": "top_07",
+      "skirtTex": "skirt_10",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 5,
+      "baseHeight": 11,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_03",
+      "skirtTex": "skirt_08",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 5,
+      "baseHeight": 10,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 270,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 5,
+      "baseHeight": 7,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_09",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 5,
+      "baseHeight": 7,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 5,
+      "baseHeight": 9,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 5,
+      "baseHeight": 7,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 5,
+      "baseHeight": 7,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_05",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 5,
+      "baseHeight": 8,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_11",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 5,
+      "baseHeight": 8,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_04",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 5,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 5,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 5,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 6,
+      "baseHeight": 7,
+      "archetype": "PRIM_WEDGE_INNER_2H",
+      "rotation": 90,
+      "topTex": "top_07",
+      "skirtTex": "skirt_19",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 6,
+      "baseHeight": 10,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 6,
+      "baseHeight": 7,
+      "archetype": "PRIM_WEDGE_INNER_2H",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 6,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 6,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 6,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 6,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 6,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 6,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 6,
+      "baseHeight": 8,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 6,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 6,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 6,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 7,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_14",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 7,
+      "baseHeight": 2,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_14",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 7,
+      "baseHeight": 2,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_12",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 7,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 7,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 7,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 7,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 7,
+      "baseHeight": 6,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_05",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 7,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 7,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 7,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 7,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 7,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 8,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_14",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 8,
+      "baseHeight": 1,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_14",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 8,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_12",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 8,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 8,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 8,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 8,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 8,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 8,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_16",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 8,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 8,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 9,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_15",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 9,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_15",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 9,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 9,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 9,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 9,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 9,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 9,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 9,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 9,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 9,
+      "baseHeight": 4,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 9,
+      "baseHeight": 5,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_13",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "top_06",
+      "skirtTex": "skirt_17",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    },
+    {
+      "col": 12,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "top_07",
+      "tall2h": false
+    }
+  ]
+}

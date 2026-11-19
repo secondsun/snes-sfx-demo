@@ -7,7 +7,7 @@
 ; texels from Bank $71 (`draw_cached_trap_ram`).
 ; ==============================================================================
 .debuginfo +
-.include "../gsu_iso/gsu_iso_map.i"
+.include "../gsu_mesh/gsu_mesh.i"
 
 .segment "GSUCODE"
 GSU_Code:
@@ -39,12 +39,86 @@ GSU_Code:
     iwt r0, #$08
     cmode
 
+    ; Dispatch Hybrid 3D Mesh engine (GSU_SCENE_MODE != 0) vs Block MapGrid (== 0)
+    lm tmp, (GSU_SCENE_MODE)
+    moves tmp, tmp
+    bne @mesh_mode
+    nop
+    iwt r15, #@iso_mode
+    nop
+
+@mesh_mode:
+    lm tmp, (GSU_INIT_FLAG)
+    moves tmp, tmp
+    bne @mesh_ready
+    nop
+    call gsu_mesh_import_bank71
+@mesh_ready:
+    iwt tmp, #GSU_FRAME_HALF
+    ldb (tmp)
+    lob
+    moves r0, r0
+    beq @mesh_pass0
+    nop
+    iwt r1, #1
+    call gsu_mesh_render_pass
+    iwt r15, #finish_pass
+    nop
+@mesh_pass0:
+    lm tmp, (GSU_JOYPAD)
+    iwt cam_ptr, #ISO_CAM
+    call iso_camera_update_controls cam_ptr, tmp
+    call gsu_mesh_build_scene
+    iwt r1, #0
+    call gsu_mesh_render_pass
+    iwt r15, #finish_pass
+    nop
+
+@iso_mode:
     ; Import Bank-$71 `.tab` + `.map` if the 65816 host staged a new level/map
     lm tmp, (GSU_INIT_FLAG)
     moves tmp, tmp
     bne @scene_ready
     nop
     call gsu_iso_import_bank71
+
+    ; Auto-frame ISO_CAM::center_y (+8) to `GSU_ISO_CENTER_Y + 4 * max(base_height)`
+    ; so tall FFT stages (Orbonne +12h, Riovanes +12h, Bervenia +9h) fit on boot.
+    ibt r0, #0
+    ramb
+    iwt r1, #MAP_BUF
+    ldb (r1)
+    lob
+    move r6, r0             ; r6 = cols (R1..R15 required for umult Rn)
+    inc r1
+    ldb (r1)
+    lob
+    umult r6                ; r0 = rows * cols (16..256)
+    move r12, r0
+    iwt r1, #(MAP_BUF + 8)  ; cell[0].base_height (+0)
+    ibt r2, #0              ; r2 = max_bh
+    move r13, r15
+        ldb (r1)
+        lob
+        move r3, r0         ; r3 = cell.base_height
+        from r2
+        cmp r3
+        bge @keep_max_bh
+        nop
+        move r2, r3
+@keep_max_bh:
+        with r1
+        add #8
+        loop
+        nop
+    with r2
+    add r2
+    with r2
+    add r2                  ; r2 = 4 * max_bh
+    iwt r0, #GSU_ISO_CENTER_Y
+    add r2
+    iwt r1, #(ISO_CAM + 8)
+    stw (r1)
 
     ; On full level load (SFX_LOAD_MODE_LEVEL), start at classic 45-deg diamond yaw=15
     lm tmp, (GSU_LOAD_MODE)

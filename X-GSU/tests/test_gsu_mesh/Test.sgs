@@ -1,0 +1,329 @@
+; ==============================================================================
+; TEST_GSU_MESH - SuperFX GSU Hybrid 3D Mesh Engine Unit Test Suite
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../gsu_mesh/gsu_mesh.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+BANK70_SENTINEL:    .res 2
+
+.segment "GSUCODE"
+
+function clear_screen_buf
+    ibt r0, #0
+    ramb
+    iwt r1, #$C000
+    iwt r12, #($2800 / 2)
+    iwt r13, #@clr
+    ibt r0, #0
+@clr:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+; Counts pixels equal to color `r1` inside active 128x160 buffer (writes count to r0)
+function count_color_pixels
+    gsu_stack_push r1
+    iwt r4, #0              ; count
+    iwt r2, #0
+@cy:
+    iwt r1, #0
+@cx:
+    rpix
+    iwt r6, #$000F
+    and r6
+    move r5, r0
+    gsu_stack_peek r6
+    from r5
+    cmp r6
+    bne :+
+    nop
+    inc r4
+:
+    inc r1
+    iwt r6, #128
+    from r1
+    cmp r6
+    blt @cx
+    nop
+    inc r2
+    iwt r6, #160
+    from r2
+    cmp r6
+    blt @cy
+    nop
+    gsu_stack_pop r1
+    move r0, r4
+    return
+endfunction
+
+; Reads 1 pixel at (r1, r2) with 4bpp mask
+function read_pixel
+    rpix
+    iwt r6, #$000F
+    and r6
+    return
+endfunction
+
+GSU_Code:
+.export GSU_Code
+    init_stack
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+    ; Initialize RAMBR=$70 sentinel ($BEEF) for Case 4 postcondition check
+    iwt r0, #$BEEF
+    sm (BANK70_SENTINEL), r0
+
+test_setup:
+    nop
+    nop
+    iwt r12, #4
+    iwt r13, #test_loop
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ; Zero TEST_RESULT (16 words)
+    ibt r0, #0
+    ramb
+    iwt r1, #TEST_RESULT
+    iwt r12, #16
+    iwt r13, #@clr_res
+@clr_res:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+
+    lm r0, (TEST_CASE_IDX)
+    dec r0
+    bne :+
+    nop
+    iwt r15, #case_1
+    nop
+:
+    dec r0
+    bne :+
+    nop
+    iwt r15, #case_2
+    nop
+:
+    dec r0
+    bne :+
+    nop
+    iwt r15, #case_3
+    nop
+:
+    iwt r15, #case_4
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 1: gsu_mesh_import_bank71 Validation, Camera Setup & RAMBR==0
+; ------------------------------------------------------------------------------
+case_1:
+    call gsu_mesh_import_bank71
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)                        ; [0]: import status == 0
+    inc r8
+    inc r8
+    lm r0, (MESH_HDR_CACHE + sfx_mesh_header::magic)
+    stw (r8)                        ; [1]: magic == $4D53
+    inc r8
+    inc r8
+    lm r0, (MESH_HDR_CACHE + sfx_mesh_header::vertex_count)
+    stw (r8)                        ; [2]: vertex_count == 19
+    inc r8
+    inc r8
+    lm r0, (MESH_HDR_CACHE + sfx_mesh_header::face_count)
+    stw (r8)                        ; [3]: face_count == 5
+    inc r8
+    inc r8
+    lm r0, (ISO_CAM + 8)
+    stw (r8)                        ; [4]: ISO_CAM::center_y == 80
+    inc r8
+    inc r8
+    lm r0, (gsu_runtime_stride_shift)
+    stw (r8)                        ; [5]: stride_shift == 8
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 2: Seam-Crossing Flat Quad Across X=127..128 (Pass 0 + Pass 1)
+; ------------------------------------------------------------------------------
+case_2:
+    call gsu_mesh_build_scene
+
+    ; Pass 0 (left half 0..127)
+    call clear_screen_buf
+    iwt r1, #0
+    call gsu_mesh_render_pass
+    rpix
+    rpix
+
+    iwt r1, #120
+    iwt r2, #86
+    call read_pixel
+    sm (TEST_RESULT + 0), r0        ; [0]: (120, 86) == 2
+
+    iwt r1, #127
+    iwt r2, #81
+    call read_pixel
+    sm (TEST_RESULT + 2), r0        ; [1]: (127, 81) == 2
+
+    ; Pass 1 (right half 128..255)
+    call clear_screen_buf
+    iwt r1, #1
+    call gsu_mesh_render_pass
+    rpix
+    rpix
+
+    iwt r1, #0                      ; x=128
+    iwt r2, #81
+    call read_pixel
+    sm (TEST_RESULT + 4), r0        ; [2]: (128, 81) == 2
+
+    iwt r1, #8                      ; x=136
+    iwt r2, #86
+    call read_pixel
+    sm (TEST_RESULT + 6), r0        ; [3]: (136, 86) == 2
+
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 3: OT Depth Occlusion & CCW Backface Culling
+; ------------------------------------------------------------------------------
+case_3:
+    ; Reuse Pass 1 framebuffer? Rebuild & inspect both halves cleanly
+    call gsu_mesh_build_scene
+
+    ; Pass 0: check zero color-4 pixels (CCW face culled)
+    call clear_screen_buf
+    iwt r1, #0
+    call gsu_mesh_render_pass
+    rpix
+    rpix
+    iwt r1, #4
+    call count_color_pixels
+    sm (TEST_RESULT + 2), r0        ; [1]: pass0 color-4 pixels == 0
+
+    ; Pass 1: check zero color-4 pixels and near tri color 3 overwriting seam quad 2 at (128, 86)
+    call clear_screen_buf
+    iwt r1, #1
+    call gsu_mesh_render_pass
+    rpix
+    rpix
+
+    iwt r1, #0                      ; x=128
+    iwt r2, #86
+    call read_pixel
+    sm (TEST_RESULT + 0), r0        ; [0]: (128, 86) == 3 (near tri occludes far quad!)
+
+    iwt r1, #4
+    call count_color_pixels
+    sm (TEST_RESULT + 4), r0        ; [2]: pass1 color-4 pixels == 0
+
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 4: Hybrid Flat + Textured Hero Cutout (`$71:0000`) & RAMBR==0 Postcondition
+; ------------------------------------------------------------------------------
+case_4:
+    call gsu_mesh_build_scene
+
+    ; Pass 0: cutout (u=0..7, v=0..7 -> transparent, underlying color 7 preserved) & solid v>=8 (6)
+    call clear_screen_buf
+    iwt r1, #0
+    call gsu_mesh_render_pass
+    rpix
+    rpix
+
+    iwt r1, #122
+    iwt r2, #118
+    call read_pixel
+    sm (TEST_RESULT + 0), r0        ; [0]: cutout (122,118) -> 7 (backplate preserved!)
+
+    iwt r1, #122
+    iwt r2, #124
+    call read_pixel
+    sm (TEST_RESULT + 2), r0        ; [1]: hero bottom-left (122,124) -> 6
+
+    ; Pass 1: hero top-right (u>=8, v<8 -> 5) & bottom-right (v>=8 -> 6)
+    call clear_screen_buf
+    iwt r1, #1
+    call gsu_mesh_render_pass
+    rpix
+    rpix
+
+    iwt r1, #4                      ; x=132
+    iwt r2, #118
+    call read_pixel
+    sm (TEST_RESULT + 4), r0        ; [2]: hero top-right (132,118) -> 5
+
+    iwt r1, #4                      ; x=132
+    iwt r2, #124
+    call read_pixel
+    sm (TEST_RESULT + 6), r0        ; [3]: hero bottom-right (132,124) -> 6
+
+    ; Verify RAMBR == 0 via BANK70_SENTINEL ($BEEF)
+    iwt r1, #BANK70_SENTINEL
+    ldw (r1)
+    sm (TEST_RESULT + 8), r0        ; [4]: sentinel == $BEEF
+
+test_done:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
