@@ -24,6 +24,7 @@ STATE_BATTLE_ACTION_ANIM    = 8
 STATE_BATTLE_ENEMY_TURN     = 9
 STATE_VICTORY_BANNER        = 10
 STATE_GAME_OVER             = 11
+STATE_DEMO_CLEAR            = 12
 
 ; ------------------------------------------------------------------------------
 ; Input Focus Targets
@@ -106,6 +107,12 @@ str_msg_select_atk:         .asciiz "CHOOSE TARGET TO ATTACK."
 str_msg_enemy_turn:         .asciiz "ENEMY IS THINKING..."
 str_msg_victory:            .asciiz "ALL ENEMIES DEFEATED!"
 
+; Demo Clear / Final Victory Screen strings
+str_clear_title:            .asciiz "VICTORY!"
+str_clear_sub1:             .asciiz "ALL FOES DEFEATED!"
+str_clear_sub2:             .asciiz "SECRET TREASURE FOUND!"
+str_clear_prompt:           .asciiz "PRESS START TO REPLAY"
+
 ; ------------------------------------------------------------------------------
 ; game_state_init
 ; Initializes state machine variables and enters STATE_TITLE.
@@ -137,6 +144,8 @@ game_state_is_active_world:
         cmp     #STATE_TITLE
         beq     @inactive
         cmp     #STATE_GAME_OVER
+        beq     @inactive
+        cmp     #STATE_DEMO_CLEAR
         beq     @inactive
         sec
         rts
@@ -341,6 +350,63 @@ _gs_draw_game_over_screen:
         rts
 
 ; ------------------------------------------------------------------------------
+; _gs_draw_demo_clear_screen (Internal)
+; Draws the centered BG3 Demo Clear / Stage Victory screen (`PRESS START TO REPLAY`).
+; ------------------------------------------------------------------------------
+_gs_draw_demo_clear_screen:
+        RW_forced a8i16
+        jsr     bg3_ui_init
+        UI_DRAW_BOX   3, 5, 26, 15, UI_PAL_ALERT
+        UI_PRINT_STR  12, 8,  str_clear_title,  UI_PAL_ALERT
+        UI_PRINT_STR  7,  11, str_clear_sub1,   UI_PAL_ACTIVE
+        UI_PRINT_STR  5,  13, str_clear_sub2,   UI_PAL_ACTIVE
+        UI_PRINT_STR  5,  16, str_clear_prompt, UI_PAL_ALERT
+        rts
+
+; ------------------------------------------------------------------------------
+; game_state_check_demo_clear
+; Checks overall demo win condition: all NPCs defeated AND all secrets found.
+; Transitions to STATE_DEMO_CLEAR when satisfied.
+; ------------------------------------------------------------------------------
+game_state_check_demo_clear:
+        php
+        RW_forced a8i16
+        ; Must have loaded at least 1 NPC and found all interactables/secrets
+        lda     a:gmap_npc_count
+        beq     @not_clear
+        lda     a:player_secrets_found
+        cmp     a:gmap_interact_count
+        bcc     @not_clear
+
+        ; Verify every NPC in npc_table[0..gmap_npc_count-1] is defeated (ACTIVE==0 || HP==0)
+        stz     a:_gs_fmt_tens          ; loop index i
+        ldx     #$0000
+@chk_npc:
+        lda     a:_gs_fmt_tens
+        cmp     a:gmap_npc_count
+        bcs     @all_clear
+        lda     f:npc_table + NPC_OFF_ACTIVE, x
+        beq     @next_npc
+        lda     f:npc_table + NPC_OFF_HP, x
+        bne     @not_clear              ; Still alive!
+@next_npc:
+        RW a16
+        txa
+        clc
+        adc     #NPC_STRUCT_SIZE
+        tax
+        RW a8
+        inc     a:_gs_fmt_tens
+        bra     @chk_npc
+
+@all_clear:
+        lda     #STATE_DEMO_CLEAR
+        jsr     game_state_enter
+@not_clear:
+        plp
+        rts
+
+; ------------------------------------------------------------------------------
 ; game_state_enter
 ; Transitions to state A (0..11), automatically updating `ui_focus`,
 ; `side_menu_focused`, and refreshing BG3 windows.
@@ -391,6 +457,9 @@ game_state_enter:
 :       cmp     #STATE_VICTORY_BANNER
         bne     :+
         brl     @enter_victory_banner
+:       cmp     #STATE_DEMO_CLEAR
+        bne     :+
+        brl     @enter_demo_clear
 :       brl     @enter_game_over
 
 @enter_title:
@@ -528,8 +597,22 @@ game_state_enter:
         stz     a:ui_focus
         stz     a:gsu_render_enabled
         stz     a:_gs_menu_mode
+        stz     a:side_menu_dirty
+        stz     a:status_bar_dirty
         jsr     battle_highlights_clear
+        jsr     oam_mgr_init
         jsr     _gs_draw_game_over_screen
+        brl     @done
+
+@enter_demo_clear:
+        stz     a:ui_focus
+        stz     a:gsu_render_enabled
+        stz     a:_gs_menu_mode
+        stz     a:side_menu_dirty
+        stz     a:status_bar_dirty
+        jsr     battle_highlights_clear
+        jsr     oam_mgr_init
+        jsr     _gs_draw_demo_clear_screen
 
 @done:
         plp
@@ -552,8 +635,12 @@ game_state_tick:
         cmp     #STATE_TITLE
         beq     @tick_title
         cmp     #STATE_GAME_OVER
-        beq     @tick_game_over
-        cmp     #STATE_EXPLORE
+        bne     :+
+        brl     @tick_game_over
+:       cmp     #STATE_DEMO_CLEAR
+        bne     :+
+        brl     @tick_game_over
+:       cmp     #STATE_EXPLORE
         beq     @tick_explore
         cmp     #STATE_EXPLORE_MENU
         bne     :+
@@ -588,7 +675,16 @@ game_state_tick:
         jsr     explore_move_tick
         jsr     interactables_check_action
         jsr     npc_explore_ai_tick
+        lda     a:game_state
+        cmp     #STATE_EXPLORE
+        beq     :+
         brl     @redraw_hud
+:       jsr     game_state_check_demo_clear
+        lda     a:game_state
+        cmp     #STATE_DEMO_CLEAR
+        beq     :+
+        brl     @redraw_hud
+:       brl     @done
 
 @tick_title:
         ; Press START (or headless test hook boot_auto_start) to stage level & enter STATE_EXPLORE
