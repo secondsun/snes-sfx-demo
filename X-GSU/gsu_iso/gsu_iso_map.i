@@ -20,14 +20,39 @@ __GSU_ISO_MAP_DEFINED__ = 1
 .include "../common/var.i"
 .include "../common/util.i"
 
+; Viewport width config (default 256 for IsoEngine/RamMapDemo; 192 for IsoRPGDemo)
+.ifndef GSU_ISO_VIEWPORT_W
+    GSU_ISO_VIEWPORT_W = 256
+.endif
+.if GSU_ISO_VIEWPORT_W = 192
+    .ifndef GSU_ISO_CENTER_X
+        GSU_ISO_CENTER_X = 96
+    .endif
+.endif
+.ifndef GSU_TRAP_PASS1_MAX_X
+    GSU_TRAP_PASS1_MAX_X = (GSU_ISO_VIEWPORT_W - 128)
+.endif
+
 .include "../gsu_maths/gsu_iso_camera.i"
 .include "../IsoEngine/triangle/cached_trap.i"
 .include "../IsoEngine/triangle/compile_face_traps_def.i"
 .include "../IsoEngine/triangle/compile_face_traps.i"
 .include "bank71_layout.i"
+.include "scene_descriptor.i"
 
 .ifndef GSU_ISO_SCREEN_H
     GSU_ISO_SCREEN_H = 160
+.endif
+
+; Configurable tactical Cell Highlight BG1 palette indices (Issue #35)
+.ifndef GSU_HL_COLOR_MOVE
+    GSU_HL_COLOR_MOVE   = 12
+.endif
+.ifndef GSU_HL_COLOR_ATTACK
+    GSU_HL_COLOR_ATTACK = 13
+.endif
+.ifndef GSU_HL_COLOR_CURSOR
+    GSU_HL_COLOR_CURSOR = 14
 .endif
 
 .ifndef GSU_ISO_USE_ROM_TEXTURES
@@ -234,6 +259,17 @@ gsu_v16_shifted:            .res 2  ; 16 << gsu_runtime_stride_shift
 .export gsu_v16_shifted
 gsu_v32_shifted:            .res 2  ; 32 << gsu_runtime_stride_shift
 .export gsu_v32_shifted
+gsu_iso_active_desc_ptr:    .res 2  ; Pointer to active gsu_scene_descriptor (0 when unused)
+.export gsu_iso_active_desc_ptr
+.ifdef GSU_ISO_USE_SCENE_DESCRIPTOR
+gsu_iso_hl_enabled:         .res 2  ; Cached desc->highlights_enabled (0 = skip highlight pass)
+gsu_hl_lines_left:          .res 2  ; Scratch: highlight trap scanlines remaining
+gsu_hl_xL:                  .res 2  ; Scratch: highlight trap left X in Q8.8
+gsu_hl_xR:                  .res 2  ; Scratch: highlight trap right X in Q8.8
+gsu_hl_trap_ptr:            .res 2  ; Scratch: highlight trap pointer
+gsu_hl_max_x:               .res 2  ; Scratch: active frame half max local X (128 or VIEWPORT_W-128)
+gsu_hl_color:               .res 2  ; Scratch: resolved BG1 highlight palette color index
+.endif
 
 .ifndef GSU_ISO_NO_DEFAULT_BUFFERS
 TEXTURE_TABLE_RAM:          .res GSU_ISO_MAX_TAB_BYTES
@@ -260,6 +296,11 @@ ARCH_TRAPS:                 .tag arch_traps_table
 .export ARCH_TRAPS
 CACHED_YAW:                 .res 2
 .export CACHED_YAW
+.ifdef GSU_ISO_USE_SCENE_DESCRIPTOR
+.align 2
+GSU_SCENE_DESC:             .tag gsu_scene_descriptor
+.export GSU_SCENE_DESC
+.endif
 .endif
 
 ; Helper macro: dst_reg = (r0 * 16) << gsu_runtime_stride_shift
@@ -408,18 +449,18 @@ function gsu_iso_init_rom map_rom_ptr, map_byte_size, tab_rom_ptr, tab_byte_size
     iwt r1, #MAP_BUF
     call gsu_iso_prebake_map r1
 
-    ; 5. Initialize ISO_CAM: yaw = 1, center = (128, 80), cam = (0, 0)
+    ; 5. Initialize ISO_CAM: yaw = 1, center = (GSU_ISO_CENTER_X, GSU_ISO_CENTER_Y), cam = (0, 0)
     iwt r1, #ISO_CAM
     iwt r2, #1
     call iso_camera_set_yaw r1, r2
 
     iwt r1, #(ISO_CAM + 6)
-    iwt r0, #128
-    stw (r1)                ; center_x = 128
+    iwt r0, #GSU_ISO_CENTER_X
+    stw (r1)                ; center_x (128 for 256px, 96 for 192px)
     inc r1
     inc r1
-    iwt r0, #80
-    stw (r1)                ; center_y = 80
+    iwt r0, #GSU_ISO_CENTER_Y
+    stw (r1)                ; center_y (default 80)
     inc r1
     inc r1
     ibt r0, #0
@@ -5701,6 +5742,504 @@ gsu_iso_quadrant_tables:
     .byte $28, $04, $0B, $12, $19, $20, $03, $0A
     .byte $11, $18, $02, $09, $10, $01, $08, $00
 
+.ifdef GSU_ISO_USE_SCENE_DESCRIPTOR
+.include "sprite_mask.i"
+
+.segment "GSUCODE"
+
+; ==============================================================================
+; gsu_draw_highlight_trap
+; Lightweight checkerboard flat-color trapezoid rasterizer for Tactical Cell
+; Highlights (Issue #35). Stamps a 50% 1x1 checkerboard (`(x ^ y) & 1 == 0`)
+; over a pre-compiled `cached_trap` using `color_idx`, allowing underlying
+; terrain texture to show through while conforming pixel-for-pixel to Base
+; Elevation, Shape Archetype (Flat/Stairs/Wedge/Liquid), and camera yaw.
+;
+; In:
+;   trap_ptr   = r1: Pointer to `cached_trap` in Bank $70 GSURAM
+;   anchor_x   = r2: Cell screen anchor X (signed 16-bit)
+;   anchor_y   = r3: Cell screen anchor Y (signed 16-bit)
+;   frame_half = r4: Active frame half (0 = Pass 0, non-zero = Pass 1)
+;   color_idx  = r5: BG1 palette color index (1..15)
+; Postconditions:
+;   - `CMODE == 0`, `RAMBR == 0`
+; Clobbers:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13
+; ==============================================================================
+function gsu_draw_highlight_trap trap_ptr, anchor_x, anchor_y, frame_half, color_idx
+    register trap_ptr = r1, anchor_x = r2, anchor_y = r3, frame_half = r4, color_idx = r5
+
+    ; Set normal opaque color plotting and highlight color
+    ibt r0, #0
+    cmode
+    from color_idx
+    color
+
+    ; y = anchor_y + dy_start (+0)
+    ldw (trap_ptr)
+    with anchor_y
+    add r0                      ; r3 = y
+
+    ; line_count (+2)
+    from trap_ptr
+    to r7
+    add #2
+    to r8
+    ldw (r7)                    ; r8 = line_count
+
+    ; Early exit if line_count <= 0
+    from r8
+    sub #1
+    blt @hl_early_exit
+    nop
+
+    ; Vertical bounds check against [0 .. GSU_ISO_SCREEN_H - 1]
+    from anchor_y
+    add r8
+    sub #1
+    blt @hl_early_exit
+    nop
+
+    iwt r11, #GSU_ISO_SCREEN_H
+    from anchor_y
+    cmp r11
+    bge @hl_early_exit
+    nop
+
+    ; Top clipping: if y < 0, skip = -y, y = 0, line_count -= skip
+    moves anchor_y, anchor_y
+    bpl @hl_no_top_clip
+    nop
+    ibt r0, #0
+    sub anchor_y
+    move r9, r0                 ; r9 = skip
+    from r9
+    cmp r8
+    bge @hl_early_exit
+    nop
+    with r8
+    sub r9
+    ibt anchor_y, #0
+    bra @hl_top_clip_done
+    nop
+@hl_no_top_clip:
+    ibt r9, #0
+@hl_top_clip_done:
+    ; Bottom clipping: if y + line_count > GSU_ISO_SCREEN_H, clamp
+    from anchor_y
+    add r8
+    from r11
+    cmp r0
+    bge @hl_bottom_ok
+    nop
+    from r11
+    to r8
+    sub anchor_y
+@hl_bottom_ok:
+    from r8
+    sub #1
+    bge @hl_bounds_ok
+    nop
+@hl_early_exit:
+    return
+
+@hl_bounds_ok:
+    sm (gsu_hl_lines_left), r8
+    sm (gsu_hl_trap_ptr), trap_ptr
+
+    ; Compute anchor_x_eff in Q8.8 (matches draw_cached_trap.i) and max_x
+    move r11, anchor_x
+    moves frame_half, frame_half
+    beq @hl_pass0_x
+    nop
+    ibt r0, #$80
+    with r11
+    add r0                      ; anchor_x - 128
+    iwt r0, #(GSU_ISO_VIEWPORT_W - 128)
+    bra @hl_store_max_x
+    nop
+@hl_pass0_x:
+    iwt r0, #128
+@hl_store_max_x:
+    sm (gsu_hl_max_x), r0
+    with r11
+    lob
+    with r11
+    swap                        ; r11 = anchor_x_eff << 8 (Q8.8)
+
+    ; Initialize xL (+4) and xR (+6)
+    from trap_ptr
+    to r7
+    add #4
+    ldw (r7)
+    add r11
+    sm (gsu_hl_xL), r0
+
+    inc r7
+    inc r7
+    ldw (r7)
+    add r11
+    sm (gsu_hl_xR), r0
+
+    ; Advance xL, xR by top-clip skip lines if r9 > 0
+    moves r9, r9
+    beq @hl_skip_done
+    nop
+    move r12, r9
+    from trap_ptr
+    to r7
+    add #8                      ; r7 = &dxL_dy (+8)
+    to r5
+    ldw (r7)                    ; r5 = dxL_dy
+    inc r7
+    inc r7
+    to r6
+    ldw (r7)                    ; r6 = dxR_dy
+    lm r8, (gsu_hl_xL)
+    lm r9, (gsu_hl_xR)
+    iwt r13, #@hl_skip_loop
+@hl_skip_loop:
+    with r8
+    add r5
+    with r9
+    add r6
+    loop
+    nop
+    sm (gsu_hl_xL), r8
+    sm (gsu_hl_xR), r9
+@hl_skip_done:
+
+    ; r2 = PLOT Y coordinate (anchor_y)
+    move r2, anchor_y
+
+@hl_scanline_loop:
+    lm r3, (gsu_hl_xL)
+    lm r4, (gsu_hl_xR)
+
+    ; If both xL and xR have bit 15 set (both < 0 or both >= 128): skip
+    from r3
+    and r4
+    bmi @hl_skip_scanline
+    nop
+
+    iwt r11, #$00FF
+
+    ; Extract integer xR in r4 (clamped to 128 if bit 15 set)
+    moves r4, r4
+    bpl @hl_xR_pos
+    nop
+    iwt r4, #128
+    bra @hl_xR_ready
+    nop
+@hl_xR_pos:
+    with r4
+    swap
+    with r4
+    and r11
+@hl_xR_ready:
+
+    ; Extract signed integer xL in r3
+    moves r3, r3
+    bpl @hl_xL_pos
+    nop
+    with r3
+    swap
+    with r3
+    sex
+    bra @hl_xL_ready
+    nop
+@hl_xL_pos:
+    with r3
+    swap
+    with r3
+    and r11
+@hl_xL_ready:
+
+    ; Clamp xR against active half's max_x
+    lm r0, (gsu_hl_max_x)
+    from r4
+    cmp r0
+    blt @hl_xR_clamped
+    nop
+    move r4, r0
+@hl_xR_clamped:
+
+    ; Clamp xL against 0
+    moves r3, r3
+    bpl @hl_xL_clamped
+    nop
+    ibt r3, #0
+@hl_xL_clamped:
+
+    ; Align xL to 1x1 checkerboard parity: plot where (x ^ y) & 1 == 0
+    from r3
+    xor r2
+    and #1
+    beq @hl_parity_ok
+    nop
+    inc r3
+@hl_parity_ok:
+
+    ; Skip if xL >= xR
+    from r3
+    cmp r4
+    bge @hl_skip_scanline
+    nop
+
+    ; count = ((xR - xL) + 1) >> 1
+    from r4
+    sub r3
+    add #1
+    lsr
+    move r12, r0
+    move r1, r3                 ; PLOT X = xL
+    iwt r13, #@hl_px_loop
+@hl_px_loop:
+    plot                        ; plots color_idx at (r1, r2), r1 += 1
+    loop
+    inc r1                      ; delay slot: r1 += 1 again -> stride = +2
+
+@hl_skip_scanline:
+    ; Advance xL += dxL_dy, xR += dxR_dy
+    lm r7, (gsu_hl_trap_ptr)
+    with r7
+    add #8
+    to r5
+    ldw (r7)                    ; dxL_dy
+    inc r7
+    inc r7
+    to r6
+    ldw (r7)                    ; dxR_dy
+
+    lm r0, (gsu_hl_xL)
+    add r5
+    sm (gsu_hl_xL), r0
+
+    lm r0, (gsu_hl_xR)
+    add r6
+    sm (gsu_hl_xR), r0
+
+    inc r2                      ; y++
+    lm r0, (gsu_hl_lines_left)
+    dec r0
+    sm (gsu_hl_lines_left), r0
+    moves r0, r0
+    beq @hl_scanlines_done
+    nop
+    iwt r15, #@hl_scanline_loop
+    nop
+@hl_scanlines_done:
+
+    return
+endfunction
+
+; ==============================================================================
+; gsu_iso_stamp_cell_highlight
+; Stamps a checkerboard highlight across the current cell's projected top face
+; (Step 3B, between Step 3 Archetype and Step 4 `@step_4_unit_hook`).
+;
+; In:
+;   hl_code = r1: Tactical highlight code (1=Move, 2=Attack, 3=Cursor)
+; Clobbers:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function gsu_iso_stamp_cell_highlight hl_code
+    register hl_code = r1
+
+    ; Map highlight code (1..3) -> BG1 palette color index
+    from hl_code
+    sub #GSU_HIGHLIGHT_MOVE
+    beq @hl_col_move
+    nop
+    from hl_code
+    sub #GSU_HIGHLIGHT_ATTACK
+    beq @hl_col_attack
+    nop
+    from hl_code
+    sub #GSU_HIGHLIGHT_CURSOR
+    beq @hl_col_cursor
+    nop
+    return
+
+@hl_col_move:
+    iwt r0, #GSU_HL_COLOR_MOVE
+    bra @hl_col_ready
+    nop
+@hl_col_attack:
+    iwt r0, #GSU_HL_COLOR_ATTACK
+    bra @hl_col_ready
+    nop
+@hl_col_cursor:
+    iwt r0, #GSU_HL_COLOR_CURSOR
+@hl_col_ready:
+    sm (gsu_hl_color), r0
+
+    ; Inspect cell archetype_id
+    iwt r7, #gsu_iso_render_frame + map_render_frame::archetype_id
+    ldw (r7)
+    move r8, r0                 ; r8 = archetype_id
+    iwt r2, #$001F
+    from r8
+    to r1
+    and r2                      ; r1 = base archetype A
+
+    ; PRIM_FLAT (0), PRIM_PILLAR (10), PRIM_FOLIAGE_CROSS (11) highlight flat_traps
+    moves r1, r1
+    bne @hl_chk_pillar
+    nop
+    iwt r15, #@hl_use_flat
+    nop
+@hl_chk_pillar:
+    iwt r0, #PRIM_PILLAR
+    from r1
+    cmp r0
+    bne @hl_chk_foliage
+    nop
+    iwt r15, #@hl_use_flat
+    nop
+@hl_chk_foliage:
+    iwt r0, #PRIM_FOLIAGE_CROSS
+    from r1
+    cmp r0
+    bne @hl_non_flat
+    nop
+    iwt r15, #@hl_use_flat
+    nop
+@hl_non_flat:
+
+    ; Non-flat archetype (Wedge, Stairs, Liquid): lookup arch_lut[(A << 2) | R]
+    with r1
+    add r1
+    with r1
+    add r1                      ; r1 = A << 2
+    move r0, r8
+    with r0
+    add r0
+    with r0
+    add r0
+    swap
+    iwt r2, #3
+    with r0
+    and r2                      ; r0 = R (0..3)
+    with r1
+    add r0                      ; (A << 2) | R
+    with r1
+    add r1                      ; byte offset (* 2)
+
+    iwt r0, #128
+    from r1
+    cmp r0
+    blt @hl_lut_ok
+    nop
+    return
+@hl_lut_ok:
+
+    iwt r7, #gsu_iso_render_frame + map_render_frame::arch_traps_ptr
+    ldw (r7)
+    move r6, r0                 ; r6 = arch_traps_ptr
+    iwt r2, #326                ; offset of arch_lut
+    with r0
+    add r2
+    with r0
+    add r1
+    move r7, r0
+    ldw (r7)                    ; r0 = entry_offset
+    with r0
+    add r6
+    move r1, r0                 ; r1 = &trap_count
+    ldw (r1)
+    move r9, r0                 ; r9 = trap_count
+    moves r9, r9
+    bne @hl_arch_has_traps
+    nop
+    return
+@hl_arch_has_traps:
+    inc r1
+    inc r1                      ; r1 = first cached_trap
+
+    ; Loop over archetype traps, stamping only top-surface traps (tex_id == 0)
+@hl_arch_loop:
+    move r7, r1
+    iwt r2, #24
+    with r7
+    add r2
+    ldw (r7)                    ; original template surface type (0=top, 1=skirt, 2=panel)
+    moves r0, r0
+    bne @hl_arch_next
+    nop
+
+    gsu_stack_push r9
+    gsu_stack_push r1
+
+    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
+    to r2
+    ldw (r7)
+    inc r7
+    inc r7
+    to r3
+    ldw (r7)
+    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
+    to r4
+    ldw (r7)
+    lm r5, (gsu_hl_color)
+    call gsu_draw_highlight_trap r1, r2, r3, r4, r5
+
+    gsu_stack_pop r1
+    gsu_stack_pop r9
+
+@hl_arch_next:
+    iwt r7, #.sizeof(cached_trap)
+    with r1
+    add r7
+    dec r9
+    bne @hl_arch_loop
+    nop
+    return
+
+@hl_use_flat:
+    iwt r7, #gsu_iso_render_frame + map_render_frame::arch_traps_ptr
+    ldw (r7)
+    move r1, r0
+    ldw (r1)
+    move r9, r0                 ; r9 = flat_count
+    moves r9, r9
+    beq @hl_done
+    nop
+    inc r1
+    inc r1                      ; r1 = &flat_traps[0]
+
+@hl_flat_loop:
+    gsu_stack_push r9
+    gsu_stack_push r1
+
+    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
+    to r2
+    ldw (r7)
+    inc r7
+    inc r7
+    to r3
+    ldw (r7)
+    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
+    to r4
+    ldw (r7)
+    lm r5, (gsu_hl_color)
+    call gsu_draw_highlight_trap r1, r2, r3, r4, r5
+
+    gsu_stack_pop r1
+    gsu_stack_pop r9
+
+    iwt r7, #.sizeof(cached_trap)
+    with r1
+    add r7
+    dec r9
+    bne @hl_flat_loop
+    nop
+
+@hl_done:
+    return
+endfunction
+.endif ; GSU_ISO_USE_SCENE_DESCRIPTOR
+
 .segment "GSUCODE"
 
 ; ==============================================================================
@@ -5792,6 +6331,39 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     inc r7
     from r12
     stw (r7)
+
+.ifdef GSU_ISO_USE_SCENE_DESCRIPTOR
+    ; Sync Scene Render Descriptor per-frame hooks (#34 entity LUT + #35 highlights)
+    lm r1, (gsu_iso_active_desc_ptr)
+    moves r1, r1
+    beq @desc_hooks_inactive
+    nop
+    ; Cache highlights_enabled (+12)
+    from r1
+    to r7
+    add #gsu_scene_descriptor::highlights_enabled
+    ldw (r7)
+    sm (gsu_iso_hl_enabled), r0
+    ; On Pass 0 (frame_half == 0), rebuild O(1) cell_entity_lut and clear entity_out[].visible
+    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
+    ldw (r7)
+    moves r0, r0
+    bne @desc_hooks_ready
+    nop
+    move r2, r8                 ; r2 = cols
+    call gsu_sprite_mask_build_lut r1, r2
+    bra @desc_hooks_ready
+    nop
+@desc_hooks_inactive:
+    ibt r0, #0
+    sm (gsu_iso_hl_enabled), r0
+    sm (gsu_entity_lut_active), r0
+@desc_hooks_ready:
+    ; Reload cam_ptr from frame (clobbered if gsu_sprite_mask_build_lut ran)
+    iwt r7, #gsu_iso_render_frame + map_render_frame::cam_ptr
+    to cam_ptr
+    ldw (r7)
+.endif
 
     ; 2. Determine Yaw Quadrant loop directions from cos_yaw (+4) and sin_yaw (+2)
     move r7, cam_ptr         ; cam_ptr
@@ -6905,7 +7477,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     nop
 
 @check_half_1:
-    ; Pass 1 (Half 1): screen X in [128, 256)
+    ; Pass 1 (Half 1): screen X in [128, GSU_ISO_VIEWPORT_W)
     ; If xmax < 128: cull
     iwt r14, #128
     from r4
@@ -6916,8 +7488,8 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     jmp r13
     nop
 :
-    ; If xmin >= 256: cull
-    iwt r14, #256
+    ; If xmin >= GSU_ISO_VIEWPORT_W: cull
+    iwt r14, #GSU_ISO_VIEWPORT_W
     from r3
     sub r14
     blt :+
@@ -7439,7 +8011,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     add #0
     bne @step_3_not_flat
     nop
-    iwt r13, #@step_4_unit_hook
+    iwt r13, #@step_3b_cell_highlight
     jmp r13
     nop
 @step_3_not_flat:
@@ -7498,7 +8070,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     add #0
     bne @arch_trap_count_ok
     nop
-    iwt r13, #@step_4_unit_hook
+    iwt r13, #@step_3b_cell_highlight
     jmp r13
     nop
 @arch_trap_count_ok:
@@ -7611,18 +8183,91 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     with r1
     add r7
     dec r14
-    beq @step_4_unit_hook
+    beq @step_3b_cell_highlight
     nop
     iwt r13, #@archetype_trap_loop
     jmp r13
     nop
 
+@step_3b_cell_highlight:
+    ; --------------------------------------------------------------------------
+    ; Step 3B: Per-Cell Tactical Highlight Pass (Issue #35)
+    ; Runs after Step 3 terrain and BEFORE Step 4 units & Step 5 front panels.
+    ; Zero overhead when `GSU_ISO_USE_SCENE_DESCRIPTOR` is undefined or
+    ; `desc->highlights_enabled == 0`.
+    ; --------------------------------------------------------------------------
+.ifdef GSU_ISO_USE_SCENE_DESCRIPTOR
+    lm r0, (gsu_iso_hl_enabled)
+    moves r0, r0
+    beq @step_4_unit_hook
+    nop
+    ; Compute cell_idx = j_cur * cols + i_cur
+    iwt r7, #gsu_iso_render_frame + map_render_frame::cols
+    ldw (r7)
+    iwt r7, #gsu_iso_render_frame + map_render_frame::j_cur
+    to r1
+    ldw (r7)
+    umult r1                    ; r0 = j_cur * cols
+    iwt r7, #gsu_iso_render_frame + map_render_frame::i_cur
+    to r1
+    ldw (r7)
+    add r1                      ; r0 = cell_idx
+    ; Read desc->cell_highlights[cell_idx] (+208)
+    iwt r1, #gsu_scene_descriptor::cell_highlights
+    lm r7, (gsu_iso_active_desc_ptr)
+    with r7
+    add r1
+    with r7
+    add r0
+    ldb (r7)
+    lob
+    moves r0, r0
+    beq @step_4_unit_hook
+    nop
+    move r1, r0                 ; r1 = highlight code (1..3)
+    call gsu_iso_stamp_cell_highlight r1
+.endif
+
 @step_4_unit_hook:
     ; --------------------------------------------------------------------------
-    ; Step 4: On-Cell Unit / Sprite Hook (reserved callback before front parapets)
+    ; Step 4: On-Cell Unit / Sprite Mask Cutout Hook (ADR 0005 / Issue #34)
+    ; Runs after terrain & highlights, BEFORE Step 5 front Edge Panels.
+    ; O(1) `cell_entity_lut[cell_idx]` check skips empty cells immediately.
     ; --------------------------------------------------------------------------
 @unit_hook:
+.ifdef GSU_ISO_USE_SCENE_DESCRIPTOR
+    lm r0, (gsu_entity_lut_active)
+    moves r0, r0
+    beq @step_4_unit_done
     nop
+    ; Compute cell_idx = j_cur * cols + i_cur
+    iwt r7, #gsu_iso_render_frame + map_render_frame::cols
+    ldw (r7)
+    iwt r7, #gsu_iso_render_frame + map_render_frame::j_cur
+    to r1
+    ldw (r7)
+    umult r1                    ; r0 = j_cur * cols
+    iwt r7, #gsu_iso_render_frame + map_render_frame::i_cur
+    to r1
+    ldw (r7)
+    add r1                      ; r0 = cell_idx
+    ; O(1) lookup in cell_entity_lut[cell_idx]
+    iwt r7, #cell_entity_lut
+    with r7
+    add r0
+    ldb (r7)
+    lob
+    iwt r1, #GSU_ENTITY_NONE
+    cmp r1
+    beq @step_4_unit_done
+    nop
+    move r2, r0                 ; r2 = entity slot index (0..7)
+    lm r1, (gsu_iso_active_desc_ptr)
+    call gsu_sprite_mask_stamp_cell r1, r2
+@step_4_unit_done:
+.else
+    nop
+.endif
 
     ; --------------------------------------------------------------------------
     ; Step 5: Front Edge Panels (camera-facing edges in current yaw quadrant)
@@ -7802,5 +8447,122 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
 @render_done:
     return
 endfunction
+
+.ifndef GSU_ISO_NO_DEFAULT_BUFFERS
+; ==============================================================================
+; gsu_iso_render_from_descriptor
+; Pure-renderer entry point (ADR 0006) driven by a 65816-written
+; `gsu_scene_descriptor` in Bank $70 GSURAM. Never polls `GSU_JOYPAD` or calls
+; `iso_camera_update_controls`.
+;
+; Behavior:
+;   - Pass 0 (`frame_half == 0`):
+;       1. Reads `cam_yaw`, `cam_center_x`, `cam_center_y` from `desc_ptr`.
+;       2. Updates `ISO_CAM::center_x` (+6) and `ISO_CAM::center_y` (+8).
+;       3. If `cam_yaw != CACHED_YAW`, updates `ISO_CAM` trig via
+;          `iso_camera_set_yaw` and recompiles archetypes via
+;          `gsu_iso_compile_archetypes`.
+;       4. Recomputes grid screen origin via `gsu_iso_update_origin`.
+;       5. Calls `gsu_iso_render` for Pass 0 (`X in [0..127]`).
+;   - Pass 1 (`frame_half != 0`):
+;       Calls `gsu_iso_render` for Pass 1 (`X in [128..GSU_ISO_VIEWPORT_W-1]`)
+;       reusing the Pass-0 cached archetypes and grid origin.
+;
+; In:
+;   desc_ptr   = r1: Pointer to `gsu_scene_descriptor` in Bank $70 GSURAM
+;   frame_half = r2: Active frame half (0 = Pass 0, 1 = Pass 1)
+; Postconditions:
+;   - `RAMBR == 0` ($70) and `ROMBR == $04` on return
+;   - `gsu_iso_active_desc_ptr` records `desc_ptr` for intra-cell hooks
+;   - Caller flushes plot caches (`rpix; rpix`), 8 NOPs, and `stop`
+; Clobbers:
+;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
+; ==============================================================================
+function gsu_iso_render_from_descriptor desc_ptr, frame_half
+    register desc_ptr = r1, frame_half = r2
+
+    ; Ensure ROMBR = $04 (trig/reciprocal LUTs) and RAMBR = 0 ($70 working RAM)
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+    ; Publish active descriptor pointer for intra-cell hooks (#34/#35)
+    sm (gsu_iso_active_desc_ptr), desc_ptr
+
+    ; Pass 1 skips camera sync, archetype compilation & origin update
+    moves frame_half, frame_half
+    bne @desc_pass1
+    nop
+
+    ; --- Pass 0: Read camera state from Scene Render Descriptor ---
+    ; desc_ptr + 0 = cam_yaw, +2 = cam_center_x, +4 = cam_center_y
+    move r7, desc_ptr
+    to r3
+    ldw (r7)                    ; r3 = desc.cam_yaw
+    inc r7
+    inc r7
+    to r4
+    ldw (r7)                    ; r4 = desc.cam_center_x
+    inc r7
+    inc r7
+    to r5
+    ldw (r7)                    ; r5 = desc.cam_center_y
+
+    ; Write center_x (+6) and center_y (+8) into ISO_CAM
+    iwt r7, #(ISO_CAM + 6)
+    from r4
+    stw (r7)                    ; ISO_CAM.center_x = cam_center_x
+    inc r7
+    inc r7
+    from r5
+    stw (r7)                    ; ISO_CAM.center_y = cam_center_y
+
+    ; Recompile archetypes only when cam_yaw != CACHED_YAW
+    lm r6, (CACHED_YAW)
+    from r3
+    cmp r6
+    beq @desc_yaw_clean
+    nop
+
+    iwt r1, #ISO_CAM
+    move r2, r3                 ; r2 = desc.cam_yaw
+    call iso_camera_set_yaw r1, r2
+
+    iwt r1, #ISO_CAM
+    iwt r2, #ISO_BASIS
+    iwt r3, #LATTICE_V2
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #CACHED_YAW
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
+
+@desc_yaw_clean:
+    ; Recompute grid screen origin from ISO_CAM
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    call gsu_iso_update_origin r1, r2
+
+    ; Render Pass 0 (left half X in [0..127])
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+    return
+
+@desc_pass1:
+    ; Render Pass 1 (right half X in [128..GSU_ISO_VIEWPORT_W-1])
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+    return
+endfunction
+.endif ; !GSU_ISO_NO_DEFAULT_BUFFERS
 
 .endif ; __GSU_ISO_MAP_DEFINED__

@@ -1,0 +1,771 @@
+; ==============================================================================
+; SPRITE_MASK - GSU Unit Test Suite for Issues #34 (Sprite Mask Cutouts & OAM
+;               (sx, sy) Writeback) and #35 (Per-Cell Tactical Cell Highlights)
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+GSU_ISO_USE_SCENE_DESCRIPTOR = 1
+GSU_ISO_VIEWPORT_W           = 192
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../gsu_iso/gsu_iso_map.i"
+
+.import MASK_PATTERN_16x4
+.import MASK_SOLID_16x8
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+.export TEST_CASE_IDX
+TEST_RESULT:        .res 32
+.export TEST_RESULT
+TEST_SLOT:          .tag gsu_entity_mask_slot
+
+.segment "GSUCODE"
+
+; Helper: clear 4bpp framebuffer at $70:C000..$70:E7FF
+function clear_fb
+    ibt r0, #0
+    ramb
+    iwt r1, #$C000
+    iwt r12, #($2800 / 2)
+    iwt r13, #@clr_fb_loop
+    ibt r0, #0
+@clr_fb_loop:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+; Helper: fill solid rectangle [x0..x0+w-1, y0..y0+h-1] with color `col`
+; In: r1=x0, r2=y0, r3=w, r4=h, r5=col
+function fill_rect x0, y0, w_in, h_in, col_in
+    register x0 = r1, y0 = r2, w_in = r3, h_in = r4, col_in = r5
+    ibt r0, #0
+    cmode
+    from col_in
+    color
+    move r6, x0                 ; r6 = saved x0
+@fr_row:
+    move r1, r6
+    move r12, w_in
+    iwt r13, #@fr_col
+@fr_col:
+    plot
+    loop
+    nop
+    inc r2
+    dec h_in
+    bne @fr_row
+    nop
+    return
+endfunction
+
+; Helper: read pixel color at (r1, r2) via rpix -> r0
+function read_px px_x, px_y
+    register px_x = r1, px_y = r2
+    rpix
+    lob
+    return
+endfunction
+
+; Helper: fill a 32x32 solid color texture at Bank-$71 offset 0 (stride 64)
+function init_b71_solid_tex col_val
+    register col_val = r1
+    ibt r0, #1
+    ramb
+    iwt r4, #0
+    iwt r5, #32
+@b71_row:
+    move r6, r4
+    iwt r12, #32
+    iwt r13, #@b71_col
+    move r0, col_val
+@b71_col:
+    stb (r6)
+    loop
+    inc r6
+    iwt r7, #64
+    with r4
+    add r7
+    dec r5
+    bne @b71_row
+    nop
+    ibt r0, #0
+    ramb
+
+    ; Descriptor 0 in TEXTURE_TABLE_RAM: offset=0, u_mask=31, v_mask_shifted=31<<6, v_off_mask=31<<6
+    iwt r7, #TEXTURE_TABLE_RAM
+    ibt r0, #0
+    stw (r7)
+    inc r7
+    inc r7
+    iwt r0, #31
+    stw (r7)
+    inc r7
+    inc r7
+    iwt r0, #(31 << 6)
+    stw (r7)
+    inc r7
+    inc r7
+    iwt r0, #(31 << 6)
+    stw (r7)
+
+    iwt r0, #6
+    sm (gsu_runtime_stride_shift), r0
+    iwt r0, #(16 << 6)
+    sm (gsu_v16_shifted), r0
+    iwt r0, #(32 << 6)
+    sm (gsu_v32_shifted), r0
+    return
+endfunction
+
+; Helper: initialize 4x4 flat map in MAP_BUF (all cells h=0, PRIM_FLAT, top_tex=0)
+function init_4x4_flat_map
+    iwt r7, #MAP_BUF
+    ibt r0, #4
+    stb (r7)                    ; cols = 4
+    inc r7
+    stb (r7)                    ; rows = 4
+    inc r7
+    ibt r0, #0
+    stw (r7)                    ; origin_x = 0 (updated by gsu_iso_update_origin)
+    inc r7
+    inc r7
+    stw (r7)                    ; origin_z = 0
+    inc r7
+    inc r7
+    stw (r7)                    ; reserved = 0
+    inc r7
+    inc r7
+
+    ; 16 cells * 8 bytes = 64 words of 0 (base_height=0, PRIM_FLAT, tex=0, drops=0)
+    iwt r12, #64
+    iwt r13, #@map_clr
+    ibt r0, #0
+@map_clr:
+    stw (r7)
+    inc r7
+    loop
+    inc r7
+    return
+endfunction
+
+; ==============================================================================
+; Main Test Dispatcher
+; ==============================================================================
+GSU_Code:
+.export GSU_Code
+    init_stack
+
+    ; Ensure ROMBR = $04 and RAMBR = $00
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+test_setup:
+.export test_setup
+    nop
+    nop
+
+test_start:
+.export test_start
+    nop
+    nop
+
+    lm r0, (TEST_CASE_IDX)
+    sub #1
+    bne @chk_c2
+    nop
+    iwt r15, #@run_case_1
+    nop
+@chk_c2:
+    lm r0, (TEST_CASE_IDX)
+    sub #2
+    bne @chk_c3
+    nop
+    iwt r15, #@run_case_2
+    nop
+@chk_c3:
+    lm r0, (TEST_CASE_IDX)
+    sub #3
+    bne @chk_c4
+    nop
+    iwt r15, #@run_case_3
+    nop
+@chk_c4:
+    lm r0, (TEST_CASE_IDX)
+    sub #4
+    bne @chk_done
+    nop
+    iwt r15, #@run_case_4
+    nop
+@chk_done:
+    iwt r15, #@all_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 1: Exact 1-Bit MSB-First Sprite Mask Punching & Surrounding Pixels
+; ------------------------------------------------------------------------------
+@run_case_1:
+    call clear_fb
+
+    ; Fill background [20..51, 20..51] with color 7
+    iwt r1, #20
+    iwt r2, #20
+    iwt r3, #32
+    iwt r4, #32
+    ibt r5, #7
+    call fill_rect r1, r2, r3, r4, r5
+
+    ; Configure TEST_SLOT for MASK_PATTERN_16x4 (16x4, no HFLIP, bank $04)
+    iwt r7, #TEST_SLOT
+    ibt r0, #1
+    stb (r7)                    ; active = 1
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_bank)
+    ibt r0, #$04
+    stb (r7)
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_addr)
+    iwt r0, #.loword(MASK_PATTERN_16x4)
+    stw (r7)
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_w)
+    iwt r0, #16
+    stb (r7)
+    inc r7
+    ibt r0, #4
+    stb (r7)                    ; mask_h = 4
+    inc r7
+    ibt r0, #0
+    stb (r7)                    ; flags = 0 (no HFLIP)
+
+    ; Punch at (24, 24) on Pass 0
+    iwt r1, #TEST_SLOT
+    iwt r2, #24
+    iwt r3, #24
+    ibt r4, #0
+    call gsu_punch_sprite_mask r1, r2, r3, r4
+
+    ; Flush plot caches before reading back
+    rpix
+    rpix
+
+    ; Sample 10 pixels into TEST_RESULT[0..9]
+    iwt r1, #23
+    iwt r2, #24
+    call read_px r1, r2         ; [0]: left outside -> 7
+    sm (TEST_RESULT + 0), r0
+
+    iwt r1, #24
+    iwt r2, #24
+    call read_px r1, r2         ; [1]: row0 col0 ($80 bit7=1) -> 0
+    sm (TEST_RESULT + 2), r0
+
+    iwt r1, #25
+    iwt r2, #24
+    call read_px r1, r2         ; [2]: row0 col1 ($80 bit6=0) -> 7
+    sm (TEST_RESULT + 4), r0
+
+    iwt r1, #39
+    iwt r2, #24
+    call read_px r1, r2         ; [3]: row0 col15 ($01 bit0=1) -> 0
+    sm (TEST_RESULT + 6), r0
+
+    iwt r1, #40
+    iwt r2, #24
+    call read_px r1, r2         ; [4]: right outside -> 7
+    sm (TEST_RESULT + 8), r0
+
+    iwt r1, #24
+    iwt r2, #25
+    call read_px r1, r2         ; [5]: row1 col0 ($FF) -> 0
+    sm (TEST_RESULT + 10), r0
+
+    iwt r1, #32
+    iwt r2, #25
+    call read_px r1, r2         ; [6]: row1 col8 ($00) -> 7
+    sm (TEST_RESULT + 12), r0
+
+    iwt r1, #31
+    iwt r2, #26
+    call read_px r1, r2         ; [7]: row2 col7 ($00) -> 7
+    sm (TEST_RESULT + 14), r0
+
+    iwt r1, #32
+    iwt r2, #26
+    call read_px r1, r2         ; [8]: row2 col8 ($FF) -> 0
+    sm (TEST_RESULT + 16), r0
+
+    iwt r1, #24
+    iwt r2, #28
+    call read_px r1, r2         ; [9]: below sprite -> 7
+    sm (TEST_RESULT + 18), r0
+
+    iwt r15, #@all_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 2: Horizontal Flip (GSU_ENTITY_FLAG_HFLIP)
+; ------------------------------------------------------------------------------
+@run_case_2:
+    call clear_fb
+
+    iwt r1, #20
+    iwt r2, #20
+    iwt r3, #32
+    iwt r4, #32
+    ibt r5, #5
+    call fill_rect r1, r2, r3, r4, r5
+
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_bank)
+    ibt r0, #$04
+    stb (r7)
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_addr)
+    iwt r0, #.loword(MASK_PATTERN_16x4)
+    stw (r7)
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_w)
+    iwt r0, #16
+    stb (r7)
+    inc r7
+    ibt r0, #4
+    stb (r7)
+    inc r7
+    ibt r0, #GSU_ENTITY_FLAG_HFLIP
+    stb (r7)                    ; flags = HFLIP
+
+    iwt r1, #TEST_SLOT
+    iwt r2, #24
+    iwt r3, #24
+    ibt r4, #0
+    call gsu_punch_sprite_mask r1, r2, r3, r4
+
+    rpix
+    rpix
+
+    ; Row 1 ($FF, $00) flipped -> cols 0..7 untouched (5), cols 8..15 punched (0)
+    iwt r1, #24
+    iwt r2, #25
+    call read_px r1, r2         ; [0]: 5
+    sm (TEST_RESULT + 0), r0
+
+    iwt r1, #31
+    iwt r2, #25
+    call read_px r1, r2         ; [1]: 5
+    sm (TEST_RESULT + 2), r0
+
+    iwt r1, #32
+    iwt r2, #25
+    call read_px r1, r2         ; [2]: 0
+    sm (TEST_RESULT + 4), r0
+
+    iwt r1, #39
+    iwt r2, #25
+    call read_px r1, r2         ; [3]: 0
+    sm (TEST_RESULT + 6), r0
+
+    ; Row 2 ($00, $FF) flipped -> cols 0..7 punched (0), cols 8..15 untouched (5)
+    iwt r1, #24
+    iwt r2, #26
+    call read_px r1, r2         ; [4]: 0
+    sm (TEST_RESULT + 8), r0
+
+    iwt r1, #32
+    iwt r2, #26
+    call read_px r1, r2         ; [5]: 5
+    sm (TEST_RESULT + 10), r0
+
+    iwt r15, #@all_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 3: Pass 0 / Pass 1 Frame-Half Clipping (192px) & Top Vertical Clipping
+; ------------------------------------------------------------------------------
+@run_case_3:
+    call clear_fb
+
+    ; 3A: Pass 0 right-edge clip at X=128 (straddle sx=124, mask_w=16)
+    iwt r1, #120
+    iwt r2, #40
+    ibt r3, #8
+    ibt r4, #4
+    ibt r5, #9
+    call fill_rect r1, r2, r3, r4, r5
+    ; Sentinel at (0, 40) = 6 to prove no X-wrap corruption
+    iwt r1, #0
+    iwt r2, #40
+    ibt r3, #2
+    ibt r4, #2
+    ibt r5, #6
+    call fill_rect r1, r2, r3, r4, r5
+
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_bank)
+    ibt r0, #$04
+    stb (r7)
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_addr)
+    iwt r0, #.loword(MASK_SOLID_16x8)
+    stw (r7)
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_w)
+    iwt r0, #16
+    stb (r7)
+    inc r7
+    ibt r0, #4
+    stb (r7)
+    inc r7
+    ibt r0, #0
+    stb (r7)
+
+    iwt r1, #TEST_SLOT
+    iwt r2, #124
+    iwt r3, #40
+    ibt r4, #0                  ; Pass 0
+    call gsu_punch_sprite_mask r1, r2, r3, r4
+    rpix
+    rpix
+
+    iwt r1, #123
+    iwt r2, #40
+    call read_px r1, r2         ; [0]: 9
+    sm (TEST_RESULT + 0), r0
+
+    iwt r1, #124
+    iwt r2, #40
+    call read_px r1, r2         ; [1]: 0
+    sm (TEST_RESULT + 2), r0
+
+    iwt r1, #127
+    iwt r2, #40
+    call read_px r1, r2         ; [2]: 0
+    sm (TEST_RESULT + 4), r0
+
+    iwt r1, #0
+    iwt r2, #40
+    call read_px r1, r2         ; [3]: sentinel 6 untouched
+    sm (TEST_RESULT + 6), r0
+
+    ; 3B: Pass 1 clipping (left seam X=128 -> local 0; right edge X=192 -> local 64)
+    call clear_fb
+    iwt r1, #0
+    iwt r2, #40
+    iwt r3, #16
+    ibt r4, #4
+    ibt r5, #9
+    call fill_rect r1, r2, r3, r4, r5
+    iwt r1, #60
+    iwt r2, #40
+    ibt r3, #8
+    ibt r4, #4
+    ibt r5, #9
+    call fill_rect r1, r2, r3, r4, r5
+
+    ; Punch at sx=124 on Pass 1 -> local [-4..11] -> local [0..11] punched, 12 untouched
+    iwt r1, #TEST_SLOT
+    iwt r2, #124
+    iwt r3, #40
+    ibt r4, #1                  ; Pass 1
+    call gsu_punch_sprite_mask r1, r2, r3, r4
+
+    ; Punch at sx=188 on Pass 1 -> local [60..75] -> local [60..63] punched, 64 untouched!
+    iwt r1, #TEST_SLOT
+    iwt r2, #188
+    iwt r3, #40
+    ibt r4, #1                  ; Pass 1
+    call gsu_punch_sprite_mask r1, r2, r3, r4
+    rpix
+    rpix
+
+    iwt r1, #0
+    iwt r2, #40
+    call read_px r1, r2         ; [4]: 0
+    sm (TEST_RESULT + 8), r0
+
+    iwt r1, #12
+    iwt r2, #40
+    call read_px r1, r2         ; [5]: 9
+    sm (TEST_RESULT + 10), r0
+
+    iwt r1, #63
+    iwt r2, #40
+    call read_px r1, r2         ; [6]: 0
+    sm (TEST_RESULT + 12), r0
+
+    iwt r1, #64
+    iwt r2, #40
+    call read_px r1, r2         ; [7]: 9 (strictly clipped at 192px viewport!)
+    sm (TEST_RESULT + 14), r0
+
+    ; 3C: Top vertical clipping (sy = -2 with MASK_PATTERN_16x4 -> row 2 ($00,$FF) at y=0)
+    call clear_fb
+    iwt r1, #20
+    iwt r2, #0
+    iwt r3, #24
+    ibt r4, #4
+    ibt r5, #9
+    call fill_rect r1, r2, r3, r4, r5
+
+    iwt r7, #(TEST_SLOT + gsu_entity_mask_slot::mask_addr)
+    iwt r0, #.loword(MASK_PATTERN_16x4)
+    stw (r7)
+
+    iwt r1, #TEST_SLOT
+    iwt r2, #24
+    iwt r3, #$FFFE              ; sy = -2
+    ibt r4, #0
+    call gsu_punch_sprite_mask r1, r2, r3, r4
+    rpix
+    rpix
+
+    iwt r1, #24
+    iwt r2, #0
+    call read_px r1, r2         ; [8]: row2 col0 ($00) -> 9
+    sm (TEST_RESULT + 16), r0
+
+    iwt r1, #32
+    iwt r2, #0
+    call read_px r1, r2         ; [9]: row2 col8 ($FF) -> 0
+    sm (TEST_RESULT + 18), r0
+
+    iwt r15, #@all_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 4: Full `gsu_iso_render` Integration (O(1) LUT, @step_4_unit_hook
+;         `entity_out` Writeback, Cutout Over Terrain, & Cell Highlight #35)
+; ------------------------------------------------------------------------------
+@run_case_4:
+    call clear_fb
+    ibt r1, #3                  ; solid terrain color 3 in Bank $71
+    call init_b71_solid_tex r1
+    call init_4x4_flat_map
+
+    ; Zero GSU_SCENE_DESC (464 bytes = 232 words)
+    iwt r7, #GSU_SCENE_DESC
+    iwt r12, #(GSU_SCENE_DESC_BYTES / 2)
+    iwt r13, #@desc_clr
+    ibt r0, #0
+@desc_clr:
+    stw (r7)
+    inc r7
+    loop
+    inc r7
+
+    ; Populate Scene Descriptor:
+    ;   cam_yaw = 15 (45 deg), cam_center_x = 96, cam_center_y = 80
+    ;   viewport_width = 192, entity_count = 1, highlights_enabled = 1
+    iwt r7, #GSU_SCENE_DESC
+    iwt r0, #15
+    stw (r7)                    ; +0: cam_yaw = 15
+    inc r7
+    inc r7
+    iwt r0, #96
+    stw (r7)                    ; +2: cam_center_x = 96
+    inc r7
+    inc r7
+    iwt r0, #80
+    stw (r7)                    ; +4: cam_center_y = 80
+    inc r7
+    inc r7
+    ibt r0, #1
+    stw (r7)                    ; +6: cam_dirty = 1
+    inc r7
+    inc r7
+    iwt r0, #192
+    stw (r7)                    ; +8: viewport_width = 192
+    inc r7
+    inc r7
+    ibt r0, #1
+    stw (r7)                    ; +10: entity_count = 1
+    inc r7
+    inc r7
+    ibt r0, #1
+    stw (r7)                    ; +12: highlights_enabled = 1
+
+    ; Entity 0 at cell (i=1, j=1), sub_x=2, sub_y=-1, anchor_y=0, 16x8 solid mask
+    iwt r7, #(GSU_SCENE_DESC + gsu_scene_descriptor::entities)
+    ibt r0, #1
+    stb (r7)                    ; +0: active = 1
+    inc r7
+    stb (r7)                    ; +1: cell_i = 1
+    inc r7
+    stb (r7)                    ; +2: cell_j = 1
+    inc r7
+    ibt r0, #$04
+    stb (r7)                    ; +3: mask_bank = $04
+    inc r7
+    iwt r0, #.loword(MASK_SOLID_16x8)
+    stw (r7)                    ; +4: mask_addr
+    inc r7
+    inc r7
+    ibt r0, #2
+    stw (r7)                    ; +6: sub_x_offset = +2
+    inc r7
+    inc r7
+    iwt r0, #$FFFF
+    stw (r7)                    ; +8: sub_y_offset = -1
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                    ; +10: anchor_y_offset = 0
+    inc r7
+    inc r7
+    iwt r0, #16
+    stb (r7)                    ; +12: mask_w = 16
+    inc r7
+    ibt r0, #8
+    stb (r7)                    ; +13: mask_h = 8
+    inc r7
+    ibt r0, #0
+    stb (r7)                    ; +14: flags = 0
+
+    ; Highlight cell (0, 0) = GSU_HIGHLIGHT_MOVE (1 -> color 12)
+    iwt r7, #(GSU_SCENE_DESC + gsu_scene_descriptor::cell_highlights + 0)
+    ibt r0, #GSU_HIGHLIGHT_MOVE
+    stb (r7)
+
+    ; Force CACHED_YAW dirty ($FFFF) so archetypes compile for yaw=15
+    iwt r0, #$FFFF
+    sm (CACHED_YAW), r0
+
+    ; Render Pass 0 via gsu_iso_render_from_descriptor(GSU_SCENE_DESC, 0)
+    iwt r1, #GSU_SCENE_DESC
+    ibt r2, #0
+    call gsu_iso_render_from_descriptor r1, r2
+    rpix
+    rpix
+
+    ; [0] = cell_entity_lut[0] (exp $FF)
+    iwt r7, #cell_entity_lut
+    ldb (r7)
+    lob
+    sm (TEST_RESULT + 0), r0
+
+    ; [1] = cell_entity_lut[1*4 + 1] = [5] (exp 0)
+    iwt r7, #(cell_entity_lut + 5)
+    ldb (r7)
+    lob
+    sm (TEST_RESULT + 2), r0
+
+    ; [2] = entity_out[0].sx, [3] = entity_out[0].sy, [4] = entity_out[0].visible (exp 1)
+    iwt r7, #(GSU_SCENE_DESC + gsu_scene_descriptor::entity_out)
+    to r5
+    ldw (r7)
+    sm (TEST_RESULT + 4), r5    ; sx
+    inc r7
+    inc r7
+    to r6
+    ldw (r7)
+    sm (TEST_RESULT + 6), r6    ; sy
+    inc r7
+    inc r7
+    ldw (r7)
+    sm (TEST_RESULT + 8), r0    ; visible
+
+    ; [5] = pixel at center of entity 0's punched cutout (sx+8, sy+4) -> exp 0!
+    from r5
+    to r1
+    add #8
+    from r6
+    to r2
+    add #4
+    call read_px r1, r2
+    sm (TEST_RESULT + 10), r0
+
+    ; [6],[7] = two adjacent pixels near center of highlighted cell (0,0):
+    ;   cell (0,0) center = (origin_x + (Sx.x+Sz.x)>>1, origin_z + (Sx.y+Sz.y)>>1)
+    iwt r7, #ISO_BASIS
+    to r3
+    ldw (r7)                    ; Sx.x
+    inc r7
+    inc r7
+    to r4
+    ldw (r7)                    ; Sx.y
+    inc r7
+    inc r7
+    ldw (r7)                    ; Sz.x
+    with r3
+    add r0
+    with r3
+    asr
+    inc r7
+    inc r7
+    ldw (r7)                    ; Sz.y
+    with r4
+    add r0
+    with r4
+    asr
+
+    iwt r7, #(MAP_BUF + map_header::origin_x)
+    ldw (r7)
+    with r3
+    add r0                      ; r3 = cell(0,0) center X
+    inc r7
+    inc r7
+    ldw (r7)
+    with r4
+    add r0                      ; r4 = cell(0,0) center Y
+
+    ; Align r3 to even parity ((r3 ^ r4) & 1 == 0) so [6] is highlight (12) and [7] is terrain (3)!
+    from r3
+    xor r4
+    and #1
+    beq @c4_parity_ok
+    nop
+    inc r3
+@c4_parity_ok:
+    move r1, r3
+    move r2, r4
+    call read_px r1, r2         ; [6]: highlight pixel -> exp 12 (GSU_HL_COLOR_MOVE)
+    sm (TEST_RESULT + 12), r0
+
+    from r3
+    to r1
+    add #1
+    move r2, r4
+    call read_px r1, r2         ; [7]: adjacent checkerboard pixel -> exp 3 (terrain)
+    sm (TEST_RESULT + 14), r0
+
+@all_done:
+    ; Dual rpix flush + 8 settling NOPs before stop (FX3 invariant)
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+test_stop:
+.export test_stop
+    nop
+    nop
+    lm r0, (TEST_CASE_IDX)
+    sub #5
+    bge @halt_gsu
+    nop
+    iwt r15, #test_start
+    nop
+@halt_gsu:
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop

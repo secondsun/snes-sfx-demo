@@ -1,0 +1,1571 @@
+{
+  "name": "demo_level",
+  "cols": 12,
+  "rows": 12,
+  "atlasPath": "DEMO_ATLAS.sfxproj",
+  "cells": [
+    {
+      "col": 0,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_PILLAR",
+      "rotation": 0,
+      "topTex": "stone_wall",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "N"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "N"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "N"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 1,
+      "baseHeight": 3,
+      "archetype": "PRIM_PILLAR",
+      "rotation": 0,
+      "topTex": "stone_wall",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 2,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "W"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 2,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 2,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 2,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 2,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "E"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 3,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "panelTex": "parapet",
+      "panels": [
+        "E"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 4,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 3,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "W"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 3,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 3,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 3,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 3,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "terrace_tile",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "E"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 4,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "panelTex": "parapet",
+      "panels": [
+        "S"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 3,
+      "row": 4,
+      "baseHeight": 3,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "panelTex": "parapet",
+      "panels": [
+        "S",
+        "E"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 4,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 4,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 4,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 4,
+      "baseHeight": 1,
+      "archetype": "PRIM_STAIRS",
+      "rotation": 0,
+      "topTex": "stairs",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 4,
+      "baseHeight": 1,
+      "archetype": "PRIM_STAIRS",
+      "rotation": 0,
+      "topTex": "stairs",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 4,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "S"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 4,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "panelTex": "parapet",
+      "panels": [
+        "S",
+        "E"
+      ],
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 5,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 5,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 5,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 5,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_WEDGE_STRAIGHT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "brick_skirt",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 8,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 8,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 8,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 8,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 8,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "cobble",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 9,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "water",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "water",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 9,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 9,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 10,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "water",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "water",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 10,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 10,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FOLIAGE_CROSS",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "panelTex": "foliage",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 11,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 11,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 8,
+      "row": 11,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 9,
+      "row": 11,
+      "baseHeight": 1,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "stone_floor",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 10,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    },
+    {
+      "col": 11,
+      "row": 11,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "grass",
+      "skirtTex": "stone_wall",
+      "tall2h": false
+    }
+  ],
+  "gameplay": {
+    "playerSpawn": {
+      "col": 2,
+      "row": 9,
+      "facing": "north"
+    },
+    "npcs": [
+      {
+        "id": "patrol_slime",
+        "col": 4,
+        "row": 6,
+        "spriteId": 3,
+        "aiType": "patrol",
+        "aggroRange": 2,
+        "patrolWaypoints": [
+          {
+            "col": 4,
+            "row": 6
+          },
+          {
+            "col": 6,
+            "row": 6
+          },
+          {
+            "col": 6,
+            "row": 7
+          },
+          {
+            "col": 4,
+            "row": 7
+          }
+        ],
+        "hp": 12,
+        "atk": 5,
+        "def": 1,
+        "speed": 4,
+        "movePoints": 3
+      },
+      {
+        "id": "guardian_knight",
+        "col": 8,
+        "row": 2,
+        "spriteId": 4,
+        "aiType": "guard",
+        "aggroRange": 2,
+        "hp": 18,
+        "atk": 7,
+        "def": 2,
+        "speed": 3,
+        "movePoints": 3
+      }
+    ],
+    "interactables": [
+      {
+        "id": "hidden_chest",
+        "col": 2,
+        "row": 3,
+        "kind": "chest",
+        "closedSpriteId": 5,
+        "openSpriteId": 6,
+        "rewardKind": "atk_buff",
+        "rewardValue": 3,
+        "messageId": 0
+      }
+    ]
+  }
+}

@@ -31,6 +31,16 @@ __GSU_TRAP_RASTERIZER_MACRO__ = 1
 .ifndef GSU_TRAP_SCREEN_H
     GSU_TRAP_SCREEN_H = 160
 .endif
+.ifndef GSU_TRAP_PASS1_MAX_X
+    GSU_TRAP_PASS1_MAX_X = 128
+.endif
+
+.if GSU_TRAP_PASS1_MAX_X < 128
+.segment "GSURAM"
+.align 2
+gsu_trap_max_x: .res 2
+.segment "GSUCODE"
+.endif
 
 .ifndef __TRAP_FRAME_DEFINED__
 __TRAP_FRAME_DEFINED__ = 1
@@ -219,6 +229,15 @@ cbr_anchor:
     inc r3              ; r3 = frame_base + 10 (trap_ptr)
     from r1
     stw (r3)            ; store trap_ptr at frame_base + 10
+.if ::GSU_TRAP_PASS1_MAX_X < 128
+    iwt r0, #128
+    moves r7, r7        ; frame_half == 0 -> max_x = 128; frame_half != 0 -> GSU_TRAP_PASS1_MAX_X
+    beq @store_max_x
+    nop
+    ibt r0, #::GSU_TRAP_PASS1_MAX_X
+@store_max_x:
+    sm (gsu_trap_max_x), r0
+.endif
 
     ; If top clipping skipped scanlines (r9 > 0): advance edges by skip now
     moves r9, r9
@@ -410,6 +429,16 @@ scanline_loop:
     with r3
     and r11
 @xL_resolved:
+.if ::GSU_TRAP_PASS1_MAX_X < 128
+    ; Clamp xR_int (r4) to active half's max_x (128 on Pass 0, e.g. 64 on Pass 1 for 192px)
+    lm r0, (gsu_trap_max_x)
+    from r4
+    cmp r0
+    blt @xR_clamped
+    nop
+    move r4, r0
+@xR_clamped:
+.endif
 
     ; If xL_int >= xR_int: nothing to draw on this scanline
     from r3

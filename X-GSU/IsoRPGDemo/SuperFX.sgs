@@ -1,0 +1,89 @@
+; ==============================================================================
+; SuperFX.sgs - IsoRPGDemo Pure-Renderer SuperFX GSU Program (ADR 0006)
+;
+; Renders the 192x160 4bpp isometric viewport driven strictly by the 65816-owned
+; `GSU_SCENE_DESC` (`gsu_scene_descriptor`) in Bank $70 GSURAM:
+;   - Pass 0 (`GSU_FRAME_HALF == 0`): X in [0..127]  ($2800 bytes at $70:8000)
+;   - Pass 1 (`GSU_FRAME_HALF == 1`): X in [128..191] ($1400 bytes at $70:8000)
+; Never polls `GSU_JOYPAD` or modifies camera controls.
+; ==============================================================================
+.debuginfo +
+
+GSU_ISO_VIEWPORT_W           = 192
+GSU_ISO_USE_SCENE_DESCRIPTOR = 1
+
+.include "../gsu_iso/gsu_iso_map.i"
+
+.segment "GSUCODE"
+GSU_Code:
+.export GSU_Code
+
+    init_stack
+    register fb_ptr, frame_half, tmp
+
+    ; Ensure ROMBR = $04 (trig/reciprocal LUTs) and RAMBR = 0 ($70 working RAM)
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+    ; Read active frame half (0 = Pass 0 128x160, 1 = Pass 1 64x160)
+    iwt tmp, #GSU_FRAME_HALF
+    ldb (tmp)
+    lob
+    move frame_half, r0
+
+    ; Clear active half-screen buffer at $70:8000
+    ; Pass 0 = $1400 words ($2800 B), Pass 1 = $0A00 words ($1400 B)
+    iwt r0, #0
+    cmode
+    iwt fb_ptr, #$8000
+    moves frame_half, frame_half
+    bne @clear_pass1
+    nop
+    iwt r12, #$1400
+    bra @do_clear
+    nop
+@clear_pass1:
+    iwt r12, #$0A00
+@do_clear:
+    cache
+    move r13, r15
+        stw (fb_ptr)
+        inc fb_ptr
+        loop
+        inc fb_ptr
+    nop
+
+    ; Enable 4bpp transparency (color 0 transparent)
+    iwt r0, #$08
+    cmode
+
+    ; Import Bank-$71 `.tab` + `.map` if the 65816 host staged a new level
+    lm tmp, (GSU_INIT_FLAG)
+    moves tmp, tmp
+    bne @scene_ready
+    nop
+    call gsu_iso_import_bank71
+@scene_ready:
+
+    ; Pure-renderer entry: consume 65816 Scene Render Descriptor
+    iwt r1, #GSU_SCENE_DESC
+    move r2, frame_half
+    call gsu_iso_render_from_descriptor r1, r2
+
+    ; Flush dual 8-pixel plot caches + 8-NOP RAM settling before stop
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop

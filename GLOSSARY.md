@@ -90,4 +90,26 @@ _Avoid_: Data backend, pack reader, ROM loader
 The dedicated cartridge RAM region into which the host CPU stages the active Texture Atlas, Texture Table, and Map Grid for coprocessor consumption.
 _Avoid_: Expansion buffer, texture RAM, map bank
 
+### Sprite Mask
+A 1-bit-per-pixel silhouette bitmap stored in a dedicated ROM bank and punched as transparent (`color 0`) into the `BG1` framebuffer during depth-sorted rendering so hardware OAM sprites underneath `BG1` show through with exact 3D occlusion.
+_Avoid_: Alpha mask, depth mask, cutout sheet
+
+### Scene Render Descriptor
+The shared GSURAM control block written by the 65816 host CPU each frame to specify camera state, entity mask placements, and tactical cell highlights for the GSU renderer.
+_Avoid_: Frame packet, render command buffer, GSU state
+
+### Cell Highlight
+A per-cell tactical overlay state on the Map Grid (reachable movement, attack range, or active cursor) rendered onto a Map Cell's top surface during the GSU pass.
+_Avoid_: Tile tint, range marker, grid glow
+
+### Interactable
+An object placed on a Map Cell—such as a hidden chest or switch—that the player can activate when adjacent, often occluded behind terrain or Edge Panels until the Isometric Camera is rotated.
+_Avoid_: Trigger object, prop, pickup
+
+### Side Menu
+The dedicated 64-pixel-wide SNES-controlled vertical command and status window positioned to the right of the 192-pixel `BG1` isometric viewport.
+_Avoid_: Sidebar, right panel, sub-window
+
+
+
 
