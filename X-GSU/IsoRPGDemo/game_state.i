@@ -44,6 +44,9 @@ pending_level_load:         .res 1  ; Non-zero => MAIN_LOOP stages Bank $71 & st
 state_timer:                .res 2  ; Frame counter reset on every state transition
 _gs_menu_mode:              .res 1  ; 0 = none, 1 = explore menu, 2 = battle menu
 boot_auto_start:            .res 1  ; Test hook (0 on real boot; non-zero auto-starts from Title)
+                            .res 1  ; 16-bit write guard pad for headless input injection
+active_stage_idx:           .res 1  ; 0 = Courtyard (gsu_iso), 1 = Orbonne Monastery (gsu_mesh)
+                            .res 1  ; 16-bit write guard pad for headless input injection
 _gs_fmt_tens:               .res 1  ; Scratch for 2-digit decimal formatter
 
 ; Live WRAM-formatted Exploration Side Menu stat strings (6 chars + NUL)
@@ -53,7 +56,7 @@ str_stat_def:               .res 7  ; "DEF  4\0"
 str_stat_secr:              .res 7  ; "SECR 0\0"
 
 .export game_state, game_prev_state, ui_focus, gsu_render_enabled, pending_level_load
-.export boot_auto_start
+.export boot_auto_start, active_stage_idx
 .export str_stat_hp, str_stat_atk, str_stat_def, str_stat_secr
 
 ; ------------------------------------------------------------------------------
@@ -64,6 +67,10 @@ str_stat_secr:              .res 7  ; "SECR 0\0"
 ; Title Screen & Game Over strings
 str_title_name:             .asciiz "ISO RPG DEMO"
 str_title_sub:              .asciiz "SUPERFX TACTICAL RPG"
+str_title_stage0_sel:       .asciiz "> COURTYARD (ISO)   "
+str_title_stage0_unsel:     .asciiz "  COURTYARD (ISO)   "
+str_title_stage1_sel:       .asciiz "> ORBONNE (3D MESH) "
+str_title_stage1_unsel:     .asciiz "  ORBONNE (3D MESH) "
 str_title_prompt:           .asciiz "PRESS START"
 str_title_hint:             .asciiz "L/R:ROTATE  SEL:MENU"
 
@@ -95,6 +102,7 @@ str_hdr_victory:            .asciiz "VICTORY!"
 
 ; Status Bar Messages (<= 30 chars)
 str_msg_explore_1:          .asciiz "FORT ZEAKDEN - COURTYARD"
+str_msg_explore_1_orbonne:  .asciiz "ORBONNE MONASTERY (3D MESH)"
 str_msg_explore_2:          .asciiz "L/R:ROTATE  SEL:SIDE MENU"
 str_msg_menu_open:          .asciiz "D-PAD:SELECT A:OK B/SEL:BACK"
 str_msg_status_ok:          .asciiz "KNIGHT LV.1  ATK:8 DEF:4"
@@ -128,7 +136,12 @@ game_state_init:
         stz     a:_gs_menu_mode
         stz     a:state_timer
         stz     a:state_timer + 1
-        jsr     battle_highlights_clear
+        ; Clamp active_stage_idx to 0..1 (preserves headless Mesen inputs override)
+        lda     a:active_stage_idx
+        cmp     #$02
+        bcc     :+
+        stz     a:active_stage_idx
+:       jsr     battle_highlights_clear
         lda     #STATE_TITLE
         jsr     game_state_enter
         plp
@@ -326,13 +339,26 @@ _gs_setup_battle_menu:
 ; _gs_draw_title_screen (Internal)
 ; Draws the centered BG3 Title Screen (`ISO RPG DEMO` + `PRESS START`).
 ; ------------------------------------------------------------------------------
+_gs_draw_title_stage_choices:
+        RW_forced a8i16
+        lda     a:active_stage_idx
+        bne     @sel_stage1
+        UI_PRINT_STR  6,  11, str_title_stage0_sel,   UI_PAL_ALERT
+        UI_PRINT_STR  6,  12, str_title_stage1_unsel, UI_PAL_DISABLED
+        rts
+@sel_stage1:
+        UI_PRINT_STR  6,  11, str_title_stage0_unsel, UI_PAL_DISABLED
+        UI_PRINT_STR  6,  12, str_title_stage1_sel,   UI_PAL_ALERT
+        rts
+
 _gs_draw_title_screen:
         RW_forced a8i16
         jsr     bg3_ui_init
         UI_DRAW_BOX   4, 5, 24, 15, UI_PAL_ACTIVE
-        UI_PRINT_STR  10, 8,  str_title_name,   UI_PAL_ALERT
-        UI_PRINT_STR  6,  10, str_title_sub,    UI_PAL_ACTIVE
-        UI_PRINT_STR  10, 14, str_title_prompt, UI_PAL_ALERT
+        UI_PRINT_STR  10, 7,  str_title_name,   UI_PAL_ALERT
+        UI_PRINT_STR  6,  9,  str_title_sub,    UI_PAL_ACTIVE
+        jsr     _gs_draw_title_stage_choices
+        UI_PRINT_STR  10, 15, str_title_prompt, UI_PAL_ALERT
         UI_PRINT_STR  6,  17, str_title_hint,   UI_PAL_DISABLED
         rts
 
@@ -485,7 +511,13 @@ game_state_enter:
         cmp     #STATE_GAME_OVER
         bne     @explore_redraw
 @explore_welcome:
+        lda     a:active_stage_idx
+        bne     @welcome_orbonne
         UI_SET_MESSAGE str_msg_explore_1
+        bra     @welcome_hint
+@welcome_orbonne:
+        UI_SET_MESSAGE str_msg_explore_1_orbonne
+@welcome_hint:
         UI_SET_MESSAGE str_msg_explore_2
 @explore_redraw:
         lda     #$01
@@ -687,6 +719,15 @@ game_state_tick:
 :       brl     @done
 
 @tick_title:
+        ; D-Pad Up/Down toggles Stage 0 (Courtyard ISO) vs Stage 1 (Orbonne 3D Mesh)
+        lda     z:SFX_joy1trig + 1
+        bit     #(>JOY_UP | >JOY_DOWN)
+        beq     @chk_title_start
+        lda     a:active_stage_idx
+        eor     #$01
+        sta     a:active_stage_idx
+        jsr     _gs_draw_title_stage_choices
+@chk_title_start:
         ; Press START (or headless test hook boot_auto_start) to stage level & enter STATE_EXPLORE
         lda     a:boot_auto_start
         bne     @do_start_game

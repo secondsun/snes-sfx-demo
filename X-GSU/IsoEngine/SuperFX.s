@@ -131,26 +131,17 @@ Vblank:
         ;display off
 
 transfer:
-        ;screen off
-        lda #inidisp(OFF, DISP_BRIGHTNESS_MAX)
-        sta INIDISP
-
-
-        ;update v offset
-        ;lda $213F
-        ;sta BG1VOFS
-        ;stz BG1VOFS
-        lda #$0
-        ;sta BG1HOFS
-        ;sta BG1HOFS
         ;if frame finished?
-
-
         gsuRunning
         beq :+
         endVBlank
+
+        ;screen off only when half-frame DMA is ready
+:       lda #inidisp(OFF, DISP_BRIGHTNESS_MAX)
+        sta INIDISP
+
         ;Which VRAM bank do we draw to
-:       RW_push set:a16
+        RW_push set:a16
         lda z:SFX_joy1cont
         sta f:GSU_JOYPAD
         RW_pull

@@ -20,7 +20,8 @@ __ISORPG_INPUT_ROUTER__ = 1
 ; ------------------------------------------------------------------------------
 ; Camera Constants (1..120 yaw index, 3 deg/step; 90 deg = 30 steps)
 ; ------------------------------------------------------------------------------
-CAM_YAW_DEFAULT             = 15    ; Classic 45-deg isometric diamond view
+CAM_YAW_DEFAULT             = 15    ; Classic 45-deg isometric diamond view (Stage 0)
+CAM_YAW_ORBONNE             = 75    ; Orbonne Monastery cathedral front view (Stage 1)
 CAM_YAW_MIN                 = 1
 CAM_YAW_MAX                 = 120
 CAM_YAW_CARDINAL_STEP       = 30    ; 90 degrees (30 * 3 deg)
@@ -58,8 +59,16 @@ CAM_YAW_EASE_STEPS:         .byte 1, 1, 1, 2, 2, 3, 3, 4, 3, 3, 2, 2, 1, 1, 1
 ; ------------------------------------------------------------------------------
 input_router_init:
         php
-        RW_forced a16i16
+        RW_forced a8i16
+        lda     a:active_stage_idx
+        bne     @yaw_orbonne
+        RW a16
         lda     #CAM_YAW_DEFAULT
+        bra     @set_yaw
+@yaw_orbonne:
+        RW_forced a16i16
+        lda     #CAM_YAW_ORBONNE
+@set_yaw:
         sta     a:cam_yaw_cur
         sta     a:cam_yaw_target
         lda     #CAM_CENTER_X_DEFAULT

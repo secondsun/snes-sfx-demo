@@ -164,6 +164,7 @@ gmap_rows:                          .res 1
 gmap_total_cells:                   .res 2
 gmap_npc_count:                     .res 1
 gmap_interact_count:                .res 1
+gmap_is_mesh:                       .res 1  ; 0 = .map MapGrid, 1 = .mgrid Hybrid 3D Mesh
 
 ; Player state (shared by Exploration Mode #39 and Battle Mode #40)
 player_col:                         .res 1
@@ -210,7 +211,7 @@ _gmap_tmp_h1:                       .res 1
 _gmap_tmp_h2:                       .res 1
 _gmap_chk_idx:                      .res 1
 
-.export gmap_cols, gmap_rows, gmap_total_cells, gmap_npc_count, gmap_interact_count
+.export gmap_cols, gmap_rows, gmap_total_cells, gmap_npc_count, gmap_interact_count, gmap_is_mesh
 .export player_col, player_row, player_facing
 .export player_hp, player_max_hp, player_atk, player_def, player_speed
 .export player_mp, player_max_mp, player_secrets_found, player_flee_grace_timer
@@ -226,10 +227,11 @@ _gmap_chk_idx:                      .res 1
 .segment "HIRAM"
 gmap_walk_grid:                     .res 256
 gmap_height_grid:                   .res 256
+gmap_mesh_y_grid:                   .res 512  ; 256 x signed s16 Q10.6 floor Y for gsu_mesh camera tracking
 npc_table:                          .res (MAX_NPCS * NPC_STRUCT_SIZE)
 interact_table:                     .res (MAX_INTERACTABLES * INTERACT_STRUCT_SIZE)
 
-.export gmap_walk_grid, gmap_height_grid, npc_table, interact_table
+.export gmap_walk_grid, gmap_height_grid, gmap_mesh_y_grid, npc_table, interact_table
 
 ; ==============================================================================
 ; Boot / Level-Load Parser (`CODE` / ROM0 — runs ONLY while GSU is stopped!)
@@ -373,9 +375,51 @@ level_loader_load:
 @copy_walk_done:
 
         ; ------------------------------------------------------------------
-        ; Copy `.map` Cell `base_height` (byte +0 of each 8B map_cell after 8B hdr)
-        ; -> f:gmap_height_grid
+        ; Copy Elevation Heights -> f:gmap_height_grid (and optional Q10.6 Y
+        ; -> f:gmap_mesh_y_grid when lvl_map_ptr points to an `SFX_MGRID_MAGIC`
+        ; "$474D" companion mesh grid instead of a `.map` binary).
         ; ------------------------------------------------------------------
+        ldy     #$0000
+        lda     [lvl_map_ptr], y
+        cmp     #$4D                    ; 'M'
+        bne     @load_iso_map_heights
+        iny
+        lda     [lvl_map_ptr], y
+        cmp     #$47                    ; 'G'
+        bne     @load_iso_map_heights
+
+        ; Hybrid Mesh Grid (`.mgrid`): 12B hdr + total_cells*2 Q10.6 Y + total_cells u8 1h heights
+        lda     #$01
+        sta     a:gmap_is_mesh
+        RW a16
+        lda     a:gmap_total_cells
+        asl
+        sta     a:_lvl_dst_x            ; byte count of y_grid (total_cells * 2)
+        RW a8
+        ldx     #$0000
+        ldy     #$000C                  ; Skip 12-byte sfx_mesh_grid_header
+@copy_mgrid_y:
+        cpx     a:_lvl_dst_x
+        bcs     @copy_mgrid_y_done
+        lda     [lvl_map_ptr], y
+        sta     f:gmap_mesh_y_grid, x
+        iny
+        inx
+        bra     @copy_mgrid_y
+@copy_mgrid_y_done:
+        ; Y now points right at trailing normalized 1h height bytes
+        ldx     #$0000
+@copy_mgrid_h:
+        cpx     a:gmap_total_cells
+        bcs     @copy_heights_done
+        lda     [lvl_map_ptr], y
+        sta     f:gmap_height_grid, x
+        iny
+        inx
+        bra     @copy_mgrid_h
+
+@load_iso_map_heights:
+        stz     a:gmap_is_mesh
         ldx     #$0000
         ldy     #$0008                  ; Skip 8-byte map_header
 @copy_heights:

@@ -198,7 +198,6 @@ cbr_anchor:
     to r8
     add #4              ; r8 = trap_ptr + 4 (xL_start)
     ldw (r8)            ; r0 = xL_start
-    with r0
     add r11             ; r0 = xL = xL_start + anchor_x_eff
     stw (r3)            ; store xL at frame_base + 2
 
@@ -207,7 +206,6 @@ cbr_anchor:
     inc r3
     inc r3              ; r3 = frame_base + 4 (xR)
     ldw (r8)            ; r0 = xR_start
-    with r0
     add r11             ; r0 = xR = xR_start + anchor_x_eff
     stw (r3)            ; store xR at frame_base + 4
 
@@ -239,62 +237,61 @@ cbr_anchor:
     sm (gsu_trap_max_x), r0
 .endif
 
-    ; If top clipping skipped scanlines (r9 > 0): advance edges by skip now
+    ; If top clipping skipped scanlines (r9 > 0): constant-time lmult edge advance
     moves r9, r9
     beq @skip_done
     nop
-    move r12, r9        ; r12 = skip count
-    iwt r13, #@skip_loop
-@skip_loop:
+    move r7, r6         ; preserve v_offset across lmult
+    move r3, r4         ; r3 = frame_base (before lmult clobbers r4)
+    inc r3
+    inc r3              ; r3 = frame_base + 2 (xL)
+    move r6, r9         ; r6 = skip count
+
     from r1
     to r11
     add #8              ; r11 = trap_ptr + 8 (dxL_dy)
-    move r3, r4
-    inc r3
-    inc r3              ; r3 = frame_base + 2 (xL)
 
-    ; xL += dxL_dy (use r8 as scratch instead of r14 to avoid ROM buffer stalls)
-    to r8
+    ; xL += dxL_dy * skip
     ldw (r11)
+    lmult               ; r4 = low16(dxL_dy * skip)
     ldw (r3)
-    add r8
+    add r4
     stw (r3)
 
-    ; xR += dxR_dy
+    ; xR += dxR_dy * skip
     inc r3
     inc r3
     inc r11
     inc r11             ; r11 = trap_ptr + 10 (dxR_dy)
-    to r8
     ldw (r11)
+    lmult
     ldw (r3)
-    add r8
+    add r4
     stw (r3)
 
-    ; uL += du_dy
+    ; uL += du_dy * skip
     inc r3
     inc r3
     with r11
     add #6              ; r11 = trap_ptr + 16 (du_dy)
-    to r8
     ldw (r11)
+    lmult
     ldw (r3)
-    add r8
+    add r4
     stw (r3)
 
-    ; vL += dv_dy
+    ; vL += dv_dy * skip
     inc r3
     inc r3
     inc r11
     inc r11             ; r11 = trap_ptr + 18 (dv_dy)
-    to r8
     ldw (r11)
+    lmult
     ldw (r3)
-    add r8
+    add r4
     stw (r3)
 
-    loop
-    nop
+    move r6, r7         ; restore v_offset
 @skip_done:
 
     ; Read tex_id (+24 of cached_trap) and lookup TEXTURE_TABLE_RAM in Bank $70
@@ -308,23 +305,23 @@ cbr_anchor:
     add r0              ; tex_id * 4
     add r0              ; tex_id * 8
     iwt r11, #TEXTURE_TABLE_RAM
-    add r11
-    move r11, r0
+    with r11
+    add r0
 
-    ldw (r11)           ; r0 = base_offset (ROM $8000+ or Bank-$71 $0000..$7FFF)
-    move r9, r0
+    to r9
+    ldw (r11)           ; r9 = base_offset (ROM $8000+ or Bank-$71 $0000..$7FFF)
     inc r11
     inc r11
-    ldw (r11)           ; r0 = u_mask
-    move r7, r0
+    to r7
+    ldw (r11)           ; r7 = u_mask
     inc r11
     inc r11
-    ldw (r11)           ; r0 = v_mask_shifted
-    move r8, r0
+    to r8
+    ldw (r11)           ; r8 = v_mask_shifted
     inc r11
     inc r11
-    ldw (r11)           ; r0 = v_offset_mask
-    move r11, r0
+    to r11
+    ldw (r11)           ; r11 = v_offset_mask
 
     ; Mask UV offsets and add to uL, vL
     with r6
@@ -339,18 +336,16 @@ cbr_anchor:
     with r5
     and r12             ; r5 = masked u_offset
 
-    move r3, r4
-    with r3
-    add #6              ; r3 = frame_base + 6 (uL)
+    from r10
+    to r3
+    sub #6              ; r3 = frame_base + 6 (uL)
     ldw (r3)
-    with r0
     add r5
     stw (r3)            ; uL += masked u_offset
 
     inc r3
     inc r3              ; r3 = frame_base + 8 (vL)
     ldw (r3)
-    with r0
     add r6
     stw (r3)            ; vL += masked v_offset
 
@@ -394,8 +389,11 @@ scanline_loop:
     ; If both xL and xR have bit 15 set (both < 0 or both >= 128):
     from r3
     and r4
-    bmi @skip_scanline
+    bpl :+
     nop
+    iwt r15, #@skip_scanline
+    nop
+:
 
     iwt r11, #$00FF
 
@@ -457,22 +455,30 @@ scanline_loop:
     ldw (r1)            ; r1 = v_cur = vL (held in r1 instead of r14 -> zero ROM stalls!)
 
     ; Clip left edge against 0 (`moves` sets OV = bit 7, so test S == 0 via `bpl`):
+    ; Constant-time lmult: v_cur += dv_dx * clip_left, u_cur += du_dx * clip_left
     moves r3, r3
     bpl @no_clip_left
     nop
+    move r12, r4        ; preserve xR_int across lmult (lmult clobbers r4)
     ibt r0, #0
-    sub r3              ; r0 = -r3
-    move r12, r0        ; r12 = clip_left
-    ibt r3, #0          ; x_start = 0
+    sub r3              ; r0 = clip_left = -xL_int
+    move r13, r0        ; r13 = clip_left
 
-    iwt r13, #@clip_u_loop
-@clip_u_loop:
-    with r11
-    add r5              ; u_cur += du_dx
+    from r13
+    lmult               ; r4 = low16(clip_left * dv_dx) [r6 is already dv_dx]
     with r1
-    add r6              ; v_cur += dv_dx (no R14 prefetch stall!)
-    loop
-    nop
+    add r4              ; v_cur += dv_dx * clip_left
+
+    move r3, r6         ; preserve dv_dx in r3
+    move r6, r5         ; r6 = du_dx
+    from r13
+    lmult               ; r4 = low16(clip_left * du_dx)
+    with r11
+    add r4              ; u_cur += du_dx * clip_left
+
+    move r6, r3         ; restore dv_dx
+    move r4, r12        ; restore xR_int
+    ibt r3, #0          ; x_start = 0
 
 @no_clip_left:
     ; Compute pixel_count = x_end - x_start = r4 - r3

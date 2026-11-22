@@ -12,7 +12,7 @@
 GSU_ISO_VIEWPORT_W           = 192
 GSU_ISO_USE_SCENE_DESCRIPTOR = 1
 
-.include "../gsu_iso/gsu_iso_map.i"
+.include "../gsu_mesh/gsu_mesh.i"
 
 .segment "GSUCODE"
 GSU_Code:
@@ -59,19 +59,38 @@ GSU_Code:
     iwt r0, #$08
     cmode
 
-    ; Import Bank-$71 `.tab` + `.map` if the 65816 host staged a new level
+    ; Dispatch Hybrid 3D Mesh engine (GSU_SCENE_MODE != 0) vs MapGrid (== 0)
+    lm tmp, (GSU_SCENE_MODE)
+    moves tmp, tmp
+    bne @mesh_mode
+    nop
+
+    ; --- MapGrid Mode (gsu_iso) ---
     lm tmp, (GSU_INIT_FLAG)
     moves tmp, tmp
-    bne @scene_ready
+    bne @iso_scene_ready
     nop
     call gsu_iso_import_bank71
-@scene_ready:
-
-    ; Pure-renderer entry: consume 65816 Scene Render Descriptor
+@iso_scene_ready:
     iwt r1, #GSU_SCENE_DESC
     move r2, frame_half
     call gsu_iso_render_from_descriptor r1, r2
+    bra @pass_finish
+    nop
 
+@mesh_mode:
+    ; --- Hybrid 3D Mesh Mode (gsu_mesh + companion sfx_mesh_grid) ---
+    lm tmp, (GSU_INIT_FLAG)
+    moves tmp, tmp
+    bne @mesh_scene_ready
+    nop
+    call gsu_mesh_import_bank71
+@mesh_scene_ready:
+    iwt r1, #GSU_SCENE_DESC
+    move r2, frame_half
+    call gsu_mesh_render_from_descriptor r1, r2
+
+@pass_finish:
     ; Flush dual 8-pixel plot caches + 8-NOP RAM settling before stop
     rpix
     rpix

@@ -1,0 +1,421 @@
+; ==============================================================================
+; TEST_GSU_MESH_DESCRIPTOR - SuperFX GSU Hybrid Mesh Descriptor Unit Test Suite
+; Tests `gsu_mesh_render_from_descriptor` in 192x160 mode:
+;   1. Companion sfx_mesh_grid import (`MESH_HAS_GRID == 1`) & default HL colors
+;   2. Entity Sprite Mask cutout across Pass 0/Pass 1 seam (x=127..128) & 192px clip
+;   3. 3D polygon occlusion of under-BG1 Sprite Mask cutout (nearer wall > entity)
+;   4. 50% checkerboard tactical cell highlights (underneath entity, above floor)
+; ==============================================================================
+.include "../../common/stack.i"
+.include "../../common/function.i"
+.include "../../common/structs.i"
+.include "../../common/var.i"
+.include "../../common/util.i"
+.include "../../common/control.i"
+.include "libSFX.i"
+
+GSU_ISO_VIEWPORT_W           = 192
+GSU_ISO_USE_SCENE_DESCRIPTOR = 1
+
+.segment "GSUCODE"
+GSU_Entry:
+    iwt r15, #GSU_Code
+    nop
+
+.include "../../gsu_mesh/gsu_mesh.i"
+.import TestSolidMask16x24
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX:      .res 2
+TEST_RESULT:        .res 32
+
+.segment "GSUCODE"
+
+function clear_screen_buf
+    ibt r0, #0
+    ramb
+    iwt r1, #$C000
+    iwt r12, #($2800 / 2)
+    iwt r13, #@clr
+    ibt r0, #0
+@clr:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+function zero_descriptor
+    ibt r0, #0
+    ramb
+    iwt r1, #GSU_SCENE_DESC
+    iwt r12, #(GSU_SCENE_DESC_BYTES / 2)
+    iwt r13, #@zloop
+    ibt r0, #0
+@zloop:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+    return
+endfunction
+
+function read_pixel
+    rpix
+    iwt r6, #$000F
+    and r6
+    return
+endfunction
+
+; Populates base camera header in GSU_SCENE_DESC: yaw=120 (0 deg), center=(96,80), vw=192
+function setup_desc_camera
+    iwt r1, #GSU_SCENE_DESC
+    iwt r0, #120
+    stw (r1)                ; +0: cam_yaw = 120 (sin=0, cos=1)
+    inc r1
+    inc r1
+    iwt r0, #96
+    stw (r1)                ; +2: cam_center_x = 96
+    inc r1
+    inc r1
+    iwt r0, #80
+    stw (r1)                ; +4: cam_center_y = 80
+    inc r1
+    inc r1
+    ibt r0, #1
+    stw (r1)                ; +6: cam_dirty = 1
+    inc r1
+    inc r1
+    iwt r0, #192
+    stw (r1)                ; +8: viewport_width = 192
+    return
+endfunction
+
+; Populates entity slot r1 (0..7) at cell (r2=i, r3=j) using TestSolidMask16x24
+function setup_entity_slot
+    ; slot_ptr = GSU_SCENE_DESC + 16 + (slot << 4)
+    move r4, r1
+    with r4
+    add r4
+    with r4
+    add r4
+    with r4
+    add r4
+    with r4
+    add r4
+    iwt r0, #(GSU_SCENE_DESC + gsu_scene_descriptor::entities)
+    add r4
+    move r7, r0
+
+    ibt r0, #1
+    stb (r7)                ; +0: active = 1
+    inc r7
+    from r2
+    stb (r7)                ; +1: cell_i
+    inc r7
+    from r3
+    stb (r7)                ; +2: cell_j
+    inc r7
+    ibt r0, #$04
+    stb (r7)                ; +3: mask_bank = $04 (GSUDATA)
+    inc r7
+    iwt r0, #.loword(TestSolidMask16x24)
+    stw (r7)                ; +4: mask_addr
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +6: sub_x_offset = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +8: sub_y_offset = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +10: anchor_y_offset = 0
+    inc r7
+    inc r7
+    iwt r0, #16
+    stb (r7)                ; +12: mask_w = 16
+    inc r7
+    iwt r0, #24
+    stb (r7)                ; +13: mask_h = 24
+    inc r7
+    ibt r0, #0
+    stb (r7)                ; +14: flags = 0
+    inc r7
+    stb (r7)                ; +15: reserved = 0
+    return
+endfunction
+
+GSU_Code:
+.export GSU_Code
+    init_stack
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+test_setup:
+    nop
+    nop
+    iwt r12, #4
+    iwt r13, #test_loop
+test_loop:
+    gsu_stack_push r12
+    gsu_stack_push r13
+
+    ibt r0, #0
+    ramb
+    iwt r1, #TEST_RESULT
+    iwt r12, #16
+    iwt r13, #@clr_res
+@clr_res:
+    stw (r1)
+    inc r1
+    loop
+    inc r1
+
+    lm r0, (TEST_CASE_IDX)
+    dec r0
+    bne :+
+    nop
+    iwt r15, #case_1
+    nop
+:
+    dec r0
+    bne :+
+    nop
+    iwt r15, #case_2
+    nop
+:
+    dec r0
+    bne :+
+    nop
+    iwt r15, #case_3
+    nop
+:
+    iwt r15, #case_4
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 1: gsu_mesh_import_bank71 loads .msh + companion sfx_mesh_grid
+; ------------------------------------------------------------------------------
+case_1:
+    call gsu_mesh_import_bank71
+    iwt r8, #TEST_RESULT
+    from r3
+    stw (r8)                        ; [0]: import err == 0
+    inc r8
+    inc r8
+    lm r0, (MESH_HAS_GRID)
+    stw (r8)                        ; [1]: MESH_HAS_GRID == 1
+    inc r8
+    inc r8
+    lm r0, (MESH_HL_COLOR_MOVE)
+    stw (r8)                        ; [2]: default HL MOVE == 12
+    inc r8
+    inc r8
+    lm r0, (MESH_HL_COLOR_ATTACK)
+    stw (r8)                        ; [3]: default HL ATTACK == 13
+    inc r8
+    inc r8
+    lm r0, (MESH_HL_COLOR_CURSOR)
+    stw (r8)                        ; [4]: default HL CURSOR == 14
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 2: Seam-Crossing Sprite Mask Cutout at (1,1) + 192px Viewport Clipping
+;   Cell (1,1): floor_cx=128, floor_cy=104 -> sx=120, sy=80, cutout x=[120..135], y=[80..103]
+;   Pass 0: (126, 98) = 0 (cutout), (112, 98) = 2 (floor outside mask)
+;   Pass 1: (0, 98) [x=128] = 0 (cutout), (14, 98) [x=142] = 2 (floor outside mask)
+;   192px clip on Face 3 (x=180..212): Pass 1 (56, 86) [x=184] = 5, (66, 86) [x=194] = 0!
+; ------------------------------------------------------------------------------
+case_2:
+    call zero_descriptor
+    call setup_desc_camera
+    ibt r0, #1
+    sm (GSU_SCENE_DESC + gsu_scene_descriptor::entity_count), r0
+    ibt r1, #0
+    ibt r2, #1                      ; col = 1
+    ibt r3, #1                      ; row = 1
+    call setup_entity_slot
+
+    ; Pass 0
+    call clear_screen_buf
+    iwt r1, #GSU_SCENE_DESC
+    ibt r2, #0
+    call gsu_mesh_render_from_descriptor r1, r2
+    rpix
+    rpix
+
+    lm r0, (GSU_SCENE_DESC + gsu_scene_descriptor::entity_out + 0)
+    sm (TEST_RESULT + 0), r0        ; [0]: entity_out[0].sx == 120
+    lm r0, (GSU_SCENE_DESC + gsu_scene_descriptor::entity_out + 2)
+    sm (TEST_RESULT + 2), r0        ; [1]: entity_out[0].sy == 80
+    lm r0, (GSU_SCENE_DESC + gsu_scene_descriptor::entity_out + 4)
+    sm (TEST_RESULT + 4), r0        ; [2]: entity_out[0].visible == 1
+
+    iwt r1, #126
+    iwt r2, #98
+    call read_pixel
+    sm (TEST_RESULT + 6), r0        ; [3]: Pass 0 inside cutout (126,98) == 0
+
+    iwt r1, #112
+    iwt r2, #98
+    call read_pixel
+    sm (TEST_RESULT + 8), r0        ; [4]: Pass 0 floor outside mask (112,98) == 2
+
+    ; Pass 1
+    call clear_screen_buf
+    iwt r1, #GSU_SCENE_DESC
+    ibt r2, #1
+    call gsu_mesh_render_from_descriptor r1, r2
+    rpix
+    rpix
+
+    iwt r1, #0                      ; screen x=128
+    iwt r2, #98
+    call read_pixel
+    sm (TEST_RESULT + 10), r0       ; [5]: Pass 1 inside cutout (128,98) == 0
+
+    iwt r1, #56                     ; screen x=184 (< 192, inside Face 3)
+    iwt r2, #86
+    call read_pixel
+    sm (TEST_RESULT + 12), r0       ; [6]: Pass 1 inside 192px viewport (184,86) == 5
+
+    iwt r1, #66                     ; screen x=194 (>= 192, MUST be clipped!)
+    iwt r2, #86
+    call read_pixel
+    sm (TEST_RESULT + 14), r0       ; [7]: Pass 1 past 192px viewport (194,86) == 0
+
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 3: 3D Polygon Occlusion of Under-BG1 Sprite Mask Cutout
+;   Entity 0 on cell (0,0): floor_cx=96, floor_cy=88 -> sx=88, sy=64, bucket=131+2=133
+;   Face 2 (Nearer Wall, color=3): sx=84..108, sy=57..98, bucket=138 > 133!
+;   Wall MUST paint back color 3 over the cutout at (96, 80)!
+; ------------------------------------------------------------------------------
+case_3:
+    call zero_descriptor
+    call setup_desc_camera
+    ibt r0, #1
+    sm (GSU_SCENE_DESC + gsu_scene_descriptor::entity_count), r0
+    ibt r1, #0
+    ibt r2, #0                      ; col = 0
+    ibt r3, #0                      ; row = 0 (behind Face 2 wall!)
+    call setup_entity_slot
+
+    call clear_screen_buf
+    iwt r1, #GSU_SCENE_DESC
+    ibt r2, #0
+    call gsu_mesh_render_from_descriptor r1, r2
+    rpix
+    rpix
+
+    lm r0, (GSU_SCENE_DESC + gsu_scene_descriptor::entity_out + 0)
+    sm (TEST_RESULT + 0), r0        ; [0]: entity_out[0].sx == 88
+    lm r0, (GSU_SCENE_DESC + gsu_scene_descriptor::entity_out + 2)
+    sm (TEST_RESULT + 2), r0        ; [1]: entity_out[0].sy == 64
+    lm r0, (GSU_SCENE_DESC + gsu_scene_descriptor::entity_out + 4)
+    sm (TEST_RESULT + 4), r0        ; [2]: entity_out[0].visible == 1
+
+    iwt r1, #96
+    iwt r2, #80
+    call read_pixel
+    sm (TEST_RESULT + 6), r0        ; [3]: occluded center (96,80) == 3 (wall paints over mask!)
+
+    iwt r15, #test_done
+    nop
+
+; ------------------------------------------------------------------------------
+; Case 4: 50% Checkerboard Tactical Cell Highlights + Entity Layering
+;   Cell (0,1) [idx=2]: ATTACK highlight (color 13) over floor color 2
+;     Center (96, 104): (96^104)&1 == 0 -> color 13; (97, 104): (97^104)&1 == 1 -> floor 2!
+;   Cell (1,1) [idx=3]: MOVE highlight (color 12) + Entity 0 cutout (x=120..135, y=80..103)
+;     Outside mask at (116, 104): (116^104)&1 == 0 -> color 12
+;     Inside mask at (126, 100): punched color 0 OVER the Move highlight!
+; ------------------------------------------------------------------------------
+case_4:
+    call zero_descriptor
+    call setup_desc_camera
+    ibt r0, #1
+    sm (GSU_SCENE_DESC + gsu_scene_descriptor::entity_count), r0
+    sm (GSU_SCENE_DESC + gsu_scene_descriptor::highlights_enabled), r0
+    ibt r1, #0
+    ibt r2, #1
+    ibt r3, #1
+    call setup_entity_slot
+
+    ; cell_highlights[2] = ATTACK (2), cell_highlights[3] = MOVE (1)
+    iwt r7, #(GSU_SCENE_DESC + gsu_scene_descriptor::cell_highlights + 2)
+    ibt r0, #GSU_HIGHLIGHT_ATTACK
+    stb (r7)
+    inc r7
+    ibt r0, #GSU_HIGHLIGHT_MOVE
+    stb (r7)
+
+    call clear_screen_buf
+    iwt r1, #GSU_SCENE_DESC
+    ibt r2, #0
+    call gsu_mesh_render_from_descriptor r1, r2
+    rpix
+    rpix
+
+    iwt r1, #96
+    iwt r2, #104
+    call read_pixel
+    sm (TEST_RESULT + 0), r0        ; [0]: (96,104) checker ON -> 13 (ATTACK)
+
+    iwt r1, #97
+    iwt r2, #104
+    call read_pixel
+    sm (TEST_RESULT + 2), r0        ; [1]: (97,104) checker OFF -> 2 (underlying floor)
+
+    iwt r1, #116
+    iwt r2, #104
+    call read_pixel
+    sm (TEST_RESULT + 4), r0        ; [2]: (116,104) MOVE highlight outside mask -> 12
+
+    iwt r1, #126
+    iwt r2, #100
+    call read_pixel
+    sm (TEST_RESULT + 6), r0        ; [3]: (126,100) entity mask cutout over MOVE -> 0
+
+test_done:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+    nop
+    nop
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    loop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop

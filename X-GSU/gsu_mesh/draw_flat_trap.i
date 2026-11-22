@@ -17,6 +17,15 @@ __GSU_MESH_DRAW_FLAT_TRAP__ = 1
 .ifndef GSU_TRAP_SCREEN_H
     GSU_TRAP_SCREEN_H = 160
 .endif
+.ifndef GSU_TRAP_PASS1_MAX_X
+    GSU_TRAP_PASS1_MAX_X = 128
+.endif
+
+.if GSU_TRAP_PASS1_MAX_X < 128
+.segment "GSURAM"
+.align 2
+gsu_flat_max_x: .res 2
+.endif
 
 .segment "GSUCODE"
 
@@ -138,6 +147,15 @@ flat_cbr_anchor:
     lob
     with r11
     swap
+.if ::GSU_TRAP_PASS1_MAX_X < 128
+    iwt r0, #128
+    moves r7, r7
+    beq @flat_store_max_x
+    nop
+    ibt r0, #::GSU_TRAP_PASS1_MAX_X
+@flat_store_max_x:
+    sm (gsu_flat_max_x), r0
+.endif
 
     ; Load edge initial X and slopes into permanent loop registers:
     ;   r7 = xL (Q8.8), r4 = xR (Q8.8 temporarily), r5 = dxL_dy, r6 = dxR_dy
@@ -164,19 +182,24 @@ flat_cbr_anchor:
     to r6
     ldw (r3)            ; r6 = dxR_dy
 
-    ; Advance edges if top-clipped (r9 = skip > 0)
+    ; Constant-time top-clip edge advance if skip (r9) > 0:
+    ;   xR += dxR_dy * skip, xL += dxL_dy * skip
     moves r9, r9
     beq @skip_done
     nop
-    move r12, r9
-    iwt r13, #@skip_loop
-@skip_loop:
+    move r12, r4        ; preserve xR across lmult (lmult clobbers r4)
+    from r9
+    lmult               ; r4 = low16(skip * dxR_dy) [r6 is already dxR_dy]
+    with r12
+    add r4
+    move r11, r6        ; preserve dxR_dy
+    move r6, r5         ; r6 = dxL_dy
+    from r9
+    lmult               ; r4 = low16(skip * dxL_dy)
     with r7
-    add r5
-    with r4
-    add r6
-    loop
-    nop
+    add r4
+    move r6, r11        ; restore dxR_dy
+    move r4, r12        ; restore xR
 @skip_done:
 
     ; Arrange final register-resident scanline loop state:
@@ -208,6 +231,15 @@ flat_cbr_anchor:
     with r4
     and r11
 @xR_resolved:
+.if ::GSU_TRAP_PASS1_MAX_X < 128
+    lm r0, (gsu_flat_max_x)
+    from r4
+    cmp r0
+    blt @flat_xR_clamped
+    nop
+    move r4, r0
+@flat_xR_clamped:
+.endif
 
     ; Resolve xL_int into r3 (sign-extended if negative), clamped at >= 0
     moves r3, r3

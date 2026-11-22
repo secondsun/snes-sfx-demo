@@ -448,7 +448,57 @@ _exp_project_cam_world_to_screen:
         sbc     a:_exp_tmp
         sta     a:cam_center_y
 
+        ; Hybrid 3D Mesh stages (`gmap_is_mesh != 0`) can have non-zero floor Y
+        ; (e.g. Orbonne courtyard y = -130px). Shift `cam_center_y` by
+        ; `+(y_px * 7/8)` so the player's standing elevation stays centered at Y ~ 96.
         RW a8
+        lda     a:gmap_is_mesh
+        beq     @cam_y_ready
+        RW a16
+        lda     a:player_row
+        and     #$00FF
+        tay
+        RW a8
+        lda     a:player_col
+        jsr     gmap_cell_index         ; X = cell_idx (0..255)
+        RW a16
+        txa
+        asl
+        tax                             ; X = cell_idx * 2
+        lda     f:gmap_mesh_y_grid, x   ; signed Q10.6 floor Y
+        cmp     #$8000
+        beq     @cam_y_mesh_done
+        ; y_px = arithmetic_shift_right(y_q106, 6)
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        sta     a:_exp_u                ; _exp_u = y_px (signed)
+        ; y_bias = y_px - (y_px >> 3) ~= 0.875 * y_px
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        cmp     #$8000
+        ror
+        sta     a:_exp_tmp
+        lda     a:_exp_u
+        sec
+        sbc     a:_exp_tmp
+        clc
+        adc     a:cam_center_y
+        sta     a:cam_center_y
+@cam_y_mesh_done:
+        RW a8
+@cam_y_ready:
         lda     #$01
         sta     a:cam_dirty
         plp

@@ -47,18 +47,31 @@ USE_DEMO_LEVEL_DATA = 1
 
 .import GSU_Code
 .import GSU_SCENE_DESC
+.import GSU_SCENE_MODE
+
+BANK71_MESH_ADDR = $9030
 
 ; ------------------------------------------------------------------------------
 ; Zero-Page Pipeline & Sync State
 ; ------------------------------------------------------------------------------
 .segment "ZEROPAGE"
 VRAM_screen_select:     .res 1  ; 0 = write VRAM_screen_1, 1 = write VRAM_screen_2
-SFX_buffer_position:    .res 1  ; 0=P0A, 1=P0B, 2=P0C, 3=P1A, 4=P1B
+SFX_buffer_position:    .res 1  ; 0=P0A($1400), 1=P0B($1400), 2=P1A($1000), 3=P1B($0400)
 vblank_frame_tick:      .res 1  ; Incremented every VBlank for 60fps main-loop sync
 last_frame_tick:        .res 1  ; Last processed vblank_frame_tick in MAIN_LOOP
-pending_gsu_kick:       .res 1  ; 1 = main_loop must publish GSURAM descriptor & kick GSU Pass 0
+pending_gsu_kick:       .res 1  ; 1 = main_loop checks dirty scene & kicks GSU Pass 0
+pending_entity_latch:   .res 1  ; 1 = main_loop runs entity_sync_latch_oam before Pass 1B flip
+scene_force_render:     .res 1  ; 1 = force next GSU frame regardless of descriptor diff
 
-.export VRAM_screen_select, SFX_buffer_position, vblank_frame_tick
+.export VRAM_screen_select, SFX_buffer_position, vblank_frame_tick, pending_gsu_kick
+
+.segment "LORAM"
+; Exact 400-byte snapshot of GSU_SCENE_DESC inputs (hdr+16, entities+128, highlights+256)
+; for zero-overhead static-frame render skipping in main_loop.
+scene_desc_prev_hdr:    .res 16
+scene_desc_prev_ent:    .res 128
+scene_desc_prev_hl:     .res 256
+_sd_dirty:              .res 1
 
 ; ==============================================================================
 ; ROM0 Boot & Bank-$71 Level / Sprite Asset Staging (`CODE`)
@@ -76,11 +89,38 @@ load_rpg_level:
         php
         RW_forced a8i16
 
-        ; Stage isometric level (atlas .bin, .tab, .pal -> CGRAM 0..15, .map -> $71:8808)
-        SFX_LOAD_LEVEL Level0Def
+        ; Stage active stage into Bank $71 (Stage 0 = Courtyard gsu_iso, Stage 1 = Orbonne gsu_mesh)
+        lda     a:active_stage_idx
+        bne     @stage_orbonne_mesh
 
-        ; Acquire bus briefly to upload OAM sprites & clear GSU_SCENE_DESC
+        SFX_LOAD_LEVEL Level0Def
         jsr     _sfx_acquire_gsu_bus
+        RW a16
+        lda     #$0000
+        sta     f:GSU_SCENE_MODE
+        RW a8
+        bra     @upload_sprites
+
+@stage_orbonne_mesh:
+        ; Stage ORBONNE_MESH.{bin,tab,pal} + companion orbonne_mesh.mgrid ($71:8808)
+        SFX_LOAD_LEVEL Level1Def
+        jsr     _sfx_acquire_gsu_bus
+        ; Copy level1_orbonne.msh -> $71:9030 and enable gsu_mesh mode (GSU_SCENE_MODE = 1)
+        RW a16
+        lda     #.loword(Level1MeshBin)
+        sta     a:sfx_src_lo
+        lda     #^Level1MeshBin
+        sta     a:sfx_src_hi
+        lda     #(Level1MeshBinEnd - Level1MeshBin)
+        sta     a:sfx_copy_size
+        lda     #BANK71_MESH_ADDR
+        sta     a:sfx_dst_addr
+        jsr     sfx_asset_copy_to_bank71
+        lda     #$0001
+        sta     f:GSU_SCENE_MODE
+        RW a8
+
+@upload_sprites:
 
         ; Upload 4bpp OAM CHR -> VRAM $C000 & OBJ Palettes -> CGRAM 128..255
 .ifdef USE_DEMO_LEVEL_DATA
@@ -131,8 +171,10 @@ load_rpg_level:
         cpx     #screenbuffer_pass0
         bcc     @clr_fb
 
-        ; Parse .gmap gameplay layer & .map base heights into WRAM while GSU is stopped
+        ; Parse .gmap gameplay layer & .map/.mgrid heights into WRAM while GSU is stopped
         RW a8
+        lda     a:active_stage_idx
+        bne     @parse_stage1_gmap
         ldx     #.loword(Level0GmapBin)
         stx     z:lvl_gmap_ptr
         lda     #^Level0GmapBin
@@ -141,6 +183,17 @@ load_rpg_level:
         stx     z:lvl_map_ptr
         lda     #^Level0MapBin
         sta     z:lvl_map_ptr + 2
+        bra     @run_level_loader
+@parse_stage1_gmap:
+        ldx     #.loword(Level1GmapBin)
+        stx     z:lvl_gmap_ptr
+        lda     #^Level1GmapBin
+        sta     z:lvl_gmap_ptr + 2
+        ldx     #.loword(Level1MgridBin)
+        stx     z:lvl_map_ptr
+        lda     #^Level1MgridBin
+        sta     z:lvl_map_ptr + 2
+@run_level_loader:
         jsr     level_loader_load
 
         ; Release bus (restores GSU_SCMR, SFX_inidisp, clears sfx_gsu_load_lock)
@@ -242,6 +295,8 @@ Main2:
         stz     z:vblank_frame_tick
         stz     z:last_frame_tick
         stz     z:pending_gsu_kick
+        stz     z:pending_entity_latch
+        stz     z:scene_force_render
 
         lda     #inidisp(ON, DISP_BRIGHTNESS_MAX)
         sta     z:SFX_inidisp
@@ -281,18 +336,29 @@ main_loop:
         jsr     explore_snap_camera_to_player
         jsr     input_router_publish_descriptor
         jsr     entity_sync_publish_descriptor
+        jsr     scene_desc_diff_and_snapshot
 
         ; Reset 192x160 double-buffer pipeline to Pass 0 and launch GSU
         stz     z:SFX_buffer_position
         stz     z:VRAM_screen_select
         stz     z:pending_gsu_kick
+        stz     z:pending_entity_latch
+        stz     z:scene_force_render
         stz     a:pending_level_load
         lda     #$01
         sta     a:gsu_render_enabled
         gsuOn
-        bra     main_loop
+        brl     main_loop
 
 @run_logic:
+        ; If Pass 1A completed, latch GSU entity_out[] into OAM Tier 1 during active
+        ; display (zero VBlank CPU cost!) so Pass 1B flips BG12NBA + OAM atomically.
+        lda     z:pending_entity_latch
+        beq     @no_ent_latch
+        jsr     entity_sync_latch_oam
+        stz     z:pending_entity_latch
+@no_ent_latch:
+
         ; 60fps UI OAM rebuild (Tier 2 slots 32..127; preserves Tier 1 slots 0..31)
         jsr     oam_begin_frame
         jsr     oam_update_damage_popups
@@ -302,19 +368,94 @@ main_loop:
         jsr     game_state_tick
 
         ; If VBlank Pass 1B completed, publish updated Scene Render Descriptor in active
-        ; display (zero VBlank overhead!) and kick next GSU Pass 0 frame
+        ; display and skip redundant GSU Pass 0 renders when scene inputs are unchanged.
         lda     z:pending_gsu_kick
         beq     @no_kick
         lda     a:pending_level_load
         bne     @no_kick
         jsr     input_router_publish_descriptor
         jsr     entity_sync_publish_descriptor
+        jsr     scene_desc_diff_and_snapshot
+        ora     z:scene_force_render
+        beq     @no_kick
+        stz     z:scene_force_render
         lda     #$00
         sta     f:GSU_FRAME_HALF
         stz     z:pending_gsu_kick
         gsuOn
 @no_kick:
-        bra     main_loop
+        brl     main_loop
+
+; ------------------------------------------------------------------------------
+; scene_desc_diff_and_snapshot
+; Compares 65816->GSU input fields of `GSU_SCENE_DESC` against WRAM shadow
+; (`scene_desc_prev_*`), updates shadow in-place, and returns A != 0 if any
+; camera, entity, or tactical highlight word changed (ignoring `cam_dirty`).
+; MUST be called while GSU is stopped (`gsuRunning == 0`).
+; ------------------------------------------------------------------------------
+scene_desc_diff_and_snapshot:
+        php
+        RW_forced a8i16
+        stz     a:_sd_dirty
+
+        RW a16
+        ; 1. Header (+0..+15, skip +6 = cam_dirty)
+        ldx     #$0000
+@cmp_hdr:
+        cpx     #gsu_scene_descriptor::cam_dirty
+        beq     @hdr_next
+        lda     f:GSU_SCENE_DESC, x
+        cmp     a:scene_desc_prev_hdr, x
+        beq     @hdr_next
+        sta     a:scene_desc_prev_hdr, x
+        RW a8
+        lda     #$01
+        sta     a:_sd_dirty
+        RW a16
+@hdr_next:
+        inx
+        inx
+        cpx     #16
+        bcc     @cmp_hdr
+
+        ; 2. Entities (+16..+143, 128 bytes)
+        ldx     #$0000
+@cmp_ent:
+        lda     f:GSU_SCENE_DESC + gsu_scene_descriptor::entities, x
+        cmp     a:scene_desc_prev_ent, x
+        beq     @ent_next
+        sta     a:scene_desc_prev_ent, x
+        RW a8
+        lda     #$01
+        sta     a:_sd_dirty
+        RW a16
+@ent_next:
+        inx
+        inx
+        cpx     #(GSU_SCENE_MAX_ENTITIES * GSU_ENTITY_SLOT_BYTES)
+        bcc     @cmp_ent
+
+        ; 3. Tactical Highlights (+208..+463, 256 bytes)
+        ldx     #$0000
+@cmp_hl:
+        lda     f:GSU_SCENE_DESC + gsu_scene_descriptor::cell_highlights, x
+        cmp     a:scene_desc_prev_hl, x
+        beq     @hl_next
+        sta     a:scene_desc_prev_hl, x
+        RW a8
+        lda     #$01
+        sta     a:_sd_dirty
+        RW a16
+@hl_next:
+        inx
+        inx
+        cpx     #256
+        bcc     @cmp_hl
+
+        RW a8
+        lda     a:_sd_dirty
+        plp
+        rts
 
 ; Long-call trampolines in `MAIN_LOOP` ($7E) for `VBLANK` ($00) NMI handler
 entity_sync_latch_oam_far:
@@ -348,7 +489,7 @@ Vblank:
         beq     :+
         endVBlank
 :
-        ; Skip GSU BG1 pipeline on Title Screen / Game Over or while main_loop is publishing descriptor
+        ; Skip GSU BG1 pipeline on Title Screen / Game Over or while scene is static/idle
         lda     a:gsu_render_enabled
         bne     :+
         brl     @vbl_flush_ui
@@ -366,8 +507,11 @@ Vblank:
         brl     @draw_screen1
 
 ; --- Backbuffer = VRAM_screen_2 ($4000) ---
-; Pass 0 ($2800 B) split into 3 chunks ($0E00 + $0E00 + $0C00) and Pass 1 ($1400 B)
-; split into 2 chunks ($0A00 + $0A00) so every VBlank stays strictly inside NTSC VBlank.
+; 4-VBlank NTSC-safe DMA pipeline:
+;   Pass 0A: $1400 B (5,120 B, BG1-only VBlank)
+;   Pass 0B: $1400 B (5,120 B, BG1-only VBlank) + launch GSU Pass 1
+;   Pass 1A: $1000 B (4,096 B) + 544 B OAM + request active-display entity latch
+;   Pass 1B: $0400 B (1,024 B) + atomic BG12NBA flip + 544 B OAM + BG3 dirty flush
 @draw_screen2:
         lda     z:SFX_buffer_position
         bne     :+
@@ -377,52 +521,46 @@ Vblank:
         brl     @screen2_pass0b
 :       cmp     #$02
         bne     :+
-        brl     @screen2_pass0c
-:       cmp     #$03
-        bne     :+
         brl     @screen2_pass1a
 :
-        ; Pass 1B ($0600 B -> $4000 + $3600) + BG12NBA flip + OAM latch; defer descriptor publish to main_loop
-        VRAM_memcpy (VRAM_screen_2 + screenbuffer_pass0 + $0E00), (screenbuffer + $0E00), $0600
+        ; Pass 1B: wait if main_loop has not yet committed entity_sync_latch_oam
+        lda     z:pending_entity_latch
+        beq     :+
+        brl     @vbl_flush_ui
+:       VRAM_memcpy (VRAM_screen_2 + screenbuffer_pass0 + $1000), (screenbuffer + $1000), $0400
         stz     z:SFX_buffer_position
         stz     z:VRAM_screen_select
         lda     #bg12nba(VRAM_screen_2, 0)
         sta     BG12NBA
-        jsl     entity_sync_latch_oam_far   ; ADR 0005: exact BG12NBA-synced entity commit
         lda     #$01
-        sta     z:pending_gsu_kick          ; main_loop publishes GSURAM descriptor & kicks GSU Pass 0
-        brl     @vbl_flush_oam_only
+        sta     z:pending_gsu_kick
+        brl     @vbl_flush_ui
 
 @screen2_pass1a:
-        ; Pass 1A ($0E00 B -> $4000 + $2800)
-        VRAM_memcpy (VRAM_screen_2 + screenbuffer_pass0), screenbuffer, $0E00
-        lda     #$04
+        ; Pass 1A ($1000 B -> $4000 + $2800), defer entity_sync_latch_oam to active display
+        VRAM_memcpy (VRAM_screen_2 + screenbuffer_pass0), screenbuffer, $1000
+        lda     #$03
         sta     z:SFX_buffer_position
+        lda     #$01
+        sta     z:pending_entity_latch
         brl     @vbl_flush_oam_only
 
 @screen2_pass0a:
-        ; Pass 0A ($0E00 B -> $4000 + $0000)
-        VRAM_memcpy VRAM_screen_2, screenbuffer, $0E00
+        ; Pass 0A ($1400 B -> $4000 + $0000)
+        VRAM_memcpy VRAM_screen_2, screenbuffer, $1400
         lda     #$01
         sta     z:SFX_buffer_position
-        brl     @vbl_flush_oam_only
+        brl     @vbl_tick_only
 
 @screen2_pass0b:
-        ; Pass 0B ($0E00 B -> $4000 + $0E00)
-        VRAM_memcpy (VRAM_screen_2 + $0E00), (screenbuffer + $0E00), $0E00
+        ; Pass 0B ($1400 B -> $4000 + $1400), then launch GSU Pass 1
+        VRAM_memcpy (VRAM_screen_2 + $1400), (screenbuffer + $1400), $1400
         lda     #$02
-        sta     z:SFX_buffer_position
-        brl     @vbl_flush_oam_only
-
-@screen2_pass0c:
-        ; Pass 0C ($0C00 B -> $4000 + $1C00), then launch GSU Pass 1
-        VRAM_memcpy (VRAM_screen_2 + $1C00), (screenbuffer + $1C00), $0C00
-        lda     #$03
         sta     z:SFX_buffer_position
         lda     #$01
         sta     f:GSU_FRAME_HALF
         gsuOn
-        brl     @vbl_flush_oam_only
+        brl     @vbl_tick_only
 
 ; --- Backbuffer = VRAM_screen_1 ($0000) ---
 @draw_screen1:
@@ -434,60 +572,59 @@ Vblank:
         brl     @screen1_pass0b
 :       cmp     #$02
         bne     :+
-        brl     @screen1_pass0c
-:       cmp     #$03
-        bne     :+
         brl     @screen1_pass1a
 :
-        ; Pass 1B ($0600 B -> $0000 + $3600) + BG12NBA flip + OAM latch; defer descriptor publish to main_loop
-        VRAM_memcpy (VRAM_screen_1 + screenbuffer_pass0 + $0E00), (screenbuffer + $0E00), $0600
+        ; Pass 1B: wait if main_loop has not yet committed entity_sync_latch_oam
+        lda     z:pending_entity_latch
+        beq     :+
+        brl     @vbl_flush_ui
+:       VRAM_memcpy (VRAM_screen_1 + screenbuffer_pass0 + $1000), (screenbuffer + $1000), $0400
         stz     z:SFX_buffer_position
         lda     #$01
         sta     z:VRAM_screen_select
         lda     #bg12nba(VRAM_screen_1, 0)
         sta     BG12NBA
-        jsl     entity_sync_latch_oam_far   ; ADR 0005: exact BG12NBA-synced entity commit
         lda     #$01
-        sta     z:pending_gsu_kick          ; main_loop publishes GSURAM descriptor & kicks GSU Pass 0
-        brl     @vbl_flush_oam_only
+        sta     z:pending_gsu_kick
+        brl     @vbl_flush_ui
 
 @screen1_pass1a:
-        ; Pass 1A ($0E00 B -> $0000 + $2800)
-        VRAM_memcpy (VRAM_screen_1 + screenbuffer_pass0), screenbuffer, $0E00
-        lda     #$04
+        ; Pass 1A ($1000 B -> $0000 + $2800), defer entity_sync_latch_oam to active display
+        VRAM_memcpy (VRAM_screen_1 + screenbuffer_pass0), screenbuffer, $1000
+        lda     #$03
         sta     z:SFX_buffer_position
+        lda     #$01
+        sta     z:pending_entity_latch
         brl     @vbl_flush_oam_only
 
 @screen1_pass0a:
-        ; Pass 0A ($0E00 B -> $0000 + $0000)
-        VRAM_memcpy VRAM_screen_1, screenbuffer, $0E00
+        ; Pass 0A ($1400 B -> $0000 + $0000)
+        VRAM_memcpy VRAM_screen_1, screenbuffer, $1400
         lda     #$01
         sta     z:SFX_buffer_position
-        brl     @vbl_flush_oam_only
+        brl     @vbl_tick_only
 
 @screen1_pass0b:
-        ; Pass 0B ($0E00 B -> $0000 + $0E00)
-        VRAM_memcpy (VRAM_screen_1 + $0E00), (screenbuffer + $0E00), $0E00
+        ; Pass 0B ($1400 B -> $0000 + $1400), then launch GSU Pass 1
+        VRAM_memcpy (VRAM_screen_1 + $1400), (screenbuffer + $1400), $1400
         lda     #$02
-        sta     z:SFX_buffer_position
-        brl     @vbl_flush_oam_only
-
-@screen1_pass0c:
-        ; Pass 0C ($0C00 B -> $0000 + $1C00), then launch GSU Pass 1
-        VRAM_memcpy (VRAM_screen_1 + $1C00), (screenbuffer + $1C00), $0C00
-        lda     #$03
         sta     z:SFX_buffer_position
         lda     #$01
         sta     f:GSU_FRAME_HALF
         gsuOn
 
-; --- BG1-DMA VBlank: OAM only (max 3,584 B BG1 + 544 B OAM = 4,128 B << 5.4 KB NTSC budget) ---
+; --- High-Bandwidth BG1-Only VBlank ($1400 B = 5,120 B, ~31 SL) ---
+@vbl_tick_only:
+        inc     z:vblank_frame_tick
+        endVBlank
+
+; --- BG1-DMA + OAM VBlank ($1000 B BG1 + 544 B OAM = 4,640 B) ---
 @vbl_flush_oam_only:
         jsl     oam_vblank_flush_far    ; 544 B -> OAM
         inc     z:vblank_frame_tick
         endVBlank
 
-; --- Non-BG1-DMA VBlank: OAM + Dirty-Flag BG3 (544 B + 2,048 B = 2,592 B) ---
+; --- UI / Pass 1B VBlank: OAM + Dirty-Flag BG3 (544 B + 2,048 B = 2,592 B) ---
 @vbl_flush_ui:
         jsl     oam_vblank_flush_far    ; 544 B -> OAM
         jsl     bg3_vblank_flush_far    ; 2 KB -> BG3 map (only if bg3_dirty != 0)
@@ -500,13 +637,21 @@ Vblank:
 .segment "RODATA"
 .include "backgroundMap.s"
 
-; Level 0 (Placeholder Test Map until #41 lands: Fort Zeakden 9x13)
+; Stage 0: Handcrafted 12x12 Courtyard (gsu_iso MapGrid)
 Level0Def:
         .word   $0000
         def_rom_asset Level0AtlasBin, (Level0AtlasBinEnd - Level0AtlasBin)
         def_rom_asset Level0AtlasTab, (Level0AtlasTabEnd - Level0AtlasTab)
         def_rom_asset Level0AtlasPal, 32
         def_rom_asset Level0MapBin,   (Level0MapBinEnd - Level0MapBin)
+
+; Stage 1: Orbonne Monastery FFT Hybrid 3D Mesh (gsu_mesh + companion .mgrid at $71:8808)
+Level1Def:
+        .word   $0001
+        def_rom_asset Level1AtlasBin, (Level1AtlasBinEnd - Level1AtlasBin)
+        def_rom_asset Level1AtlasTab, (Level1AtlasTabEnd - Level1AtlasTab)
+        def_rom_asset Level1AtlasPal, 32
+        def_rom_asset Level1MgridBin, (Level1MgridBinEnd - Level1MgridBin)
 
 ; ==============================================================================
 ; Bank $05 (`ROM_MASKS`): Dedicated 1-bit Sprite Masks (GSU ROMB = $05)
@@ -623,3 +768,24 @@ Level0AtlasBinEnd:
 Level0AtlasBin:     .incbin "Data/DEMO_ATLAS.bin"
 Level0AtlasBinEnd:
 .endif
+
+; ==============================================================================
+; Bank $89 (`ROM9`): Stage 1 Orbonne Monastery 32 KB Hero Texture Sheet (.bin)
+; ==============================================================================
+.segment "ROM9"
+Level1AtlasBin:     .incbin "../RamMapDemo/Data/ORBONNE_MESH.bin"
+Level1AtlasBinEnd:
+
+; ==============================================================================
+; Bank $8A (`ROM10`): Stage 1 Orbonne Monastery Metadata, .msh, .mgrid & .gmap
+; ==============================================================================
+.segment "ROM10"
+Level1AtlasTab:     .incbin "../RamMapDemo/Data/ORBONNE_MESH.tab"
+Level1AtlasTabEnd:
+Level1AtlasPal:     .incbin "../RamMapDemo/Data/ORBONNE_MESH.pal"
+Level1MeshBin:      .incbin "../RamMapDemo/Data/level1_orbonne.msh"
+Level1MeshBinEnd:
+Level1MgridBin:     .incbin "Data/orbonne_mesh.mgrid"
+Level1MgridBinEnd:
+Level1GmapBin:      .incbin "Data/orbonne_mesh.gmap"
+Level1GmapBinEnd:
