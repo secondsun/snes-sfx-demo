@@ -1733,83 +1733,84 @@ endfunction
 ;   r0, r6, r7, r8, r9
 ; ==============================================================================
 function _gsu_mesh_project_pt
-    lm r6, (ISO_CAM + 2)    ; sin_yaw (Q2.14)
-    from r3
-    to r7
-    fmult                   ; r7 = vx * sin
-    from r5
-    to r8
-    fmult                   ; r8 = vz * sin
+    register vx = r3, vy = r4, vz = r5, mul_b = r6
+    register rz_q4, tmp, rx_q4
 
-    lm r6, (ISO_CAM + 4)    ; cos_yaw (Q2.14)
-    from r3
-    to r9
-    fmult                   ; r9 = vx * cos
-    from r5
+    lm mul_b, (ISO_CAM + 2) ; sin_yaw (Q2.14)
+    from vx
+    to rz_q4
+    fmult                   ; rz_q4 = vx * sin
+    from vz
+    to tmp
+    fmult                   ; tmp = vz * sin
+
+    lm mul_b, (ISO_CAM + 4) ; cos_yaw (Q2.14)
+    from vx
+    to rx_q4
+    fmult                   ; rx_q4 = vx * cos
+    from vz
     fmult                   ; r0 = vz * cos
-    with r7
-    add r0                  ; r7 = rz_q4 = vx * sin + vz * cos
-    with r9
-    sub r8                  ; r9 = rx_q4 = vx * cos - vz * sin
+    with rz_q4
+    add r0                  ; rz_q4 = vx * sin + vz * cos
+    with rx_q4
+    sub tmp                 ; rx_q4 = vx * cos - vz * sin
 
     ; sx = ((rx_q4 + 8) >> 4) + center_x
-    iwt r6, #8
-    with r9
-    add r6
-    iwt r6, #$1000
-    from r9
+    with rx_q4
+    add #8
+    iwt mul_b, #$1000
+    from rx_q4
     fmult
-    lm r6, (ISO_CAM + 6)
-    add r6
+    lm mul_b, (ISO_CAM + 6)
+    add mul_b
     sm (MESH_PROJ_OUT_SX), r0
 
     ; sy = ((((rz_q4 >> 1) - fmult(vy, $376D)) + 8) >> 4) + center_y
-    iwt r6, #$376D
-    from r4
+    iwt mul_b, #$376D
+    from vy
     fmult
-    move r8, r7
-    with r8
+    move tmp, rz_q4
+    with tmp
     asr
-    with r8
+    with tmp
     sub r0
-    iwt r6, #8
-    with r8
-    add r6
-    iwt r6, #$1000
-    from r8
+    with tmp
+    add #8
+    iwt mul_b, #$1000
+    from tmp
     fmult
-    lm r6, (ISO_CAM + 8)
-    add r6
+    lm mul_b, (ISO_CAM + 8)
+    add mul_b
     sm (MESH_PROJ_OUT_SY), r0
 
     ; bucket = clamp((((7/8)*rz_q4 + 0.5*vy) >> 6) + 128, 0, 255)
-    move r8, r7
-    with r8
+    move tmp, rz_q4
+    with tmp
     asr
-    with r8
+    with tmp
     asr
-    with r8
+    with tmp
     asr
-    from r7
-    sub r8
-    move r8, r0
-    iwt r6, #$2000
-    from r4
+    from rz_q4
+    sub tmp
+    move tmp, r0
+    iwt mul_b, #$2000
+    from vy
     fmult
-    with r8
+    with tmp
     add r0
-    iwt r6, #$0400
-    from r8
+    iwt mul_b, #$0400
+    from tmp
     fmult
-    iwt r6, #128
-    add r6
+    iwt mul_b, #128
+    add mul_b
     moves r0, r0
     bpl :+
     nop
     ibt r0, #0
 :
-    iwt r6, #256
-    cmp r6
+    iwt mul_b, #256
+    cmp mul_b
     blt :+
     nop
     iwt r0, #255

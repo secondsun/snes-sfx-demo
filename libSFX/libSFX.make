@@ -196,8 +196,10 @@ $(obj_dir)/%.o700 : %.s700
 
 $(obj_dir)/%.ogs : %.sgs
 	@mkdir -pv $(dir $@)
-	$(sfx_opt) -c $< -o $(obj_dir)/$*.opt.sgs -I $(dir $<) -I ./ -I $(libsfx_inc)
+	$(sfx_opt) -c $< -o $(obj_dir)/$*.opt.sgs --depfile $(obj_dir)/$*.d --dep-target $@ -I $(dir $<) -I ./ -I $(libsfx_inc)
 	$(as) $(asflags) $(pkg_asflags) -I $(dir $<) -D TARGET_GSU -o $@ $(obj_dir)/$*.opt.sgs
+
+-include $(obj_gsu:.ogs=.d)
 
 # libSFX obj : src
 $(obj_dir_sfx)/%.o : $(libsfx_inc)/%.s

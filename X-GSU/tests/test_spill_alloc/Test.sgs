@@ -1,0 +1,311 @@
+; ==============================================================================
+; test_spill_alloc/Test.sgs - SuperFX Hardware Unit Test for R10 Stack Spilling
+;
+; Exercises sfx-optimizer's Chaitin-Briggs R10 stack spill lowering on real
+; emulated SuperFX (FX3) hardware in Mesen CE:
+;   Case 1: 14 simultaneously live variables (param + 13 locals) -> sum = 191
+;   Case 2: Spilled variables accessed inside `forR` (+4B backuploop deltaSp) -> 273
+;   Case 3: Flag-preserving spilled decrement loop (`sub #1; bne`) -> 128
+;   Case 4: Passing spilled arg to `call` and receiving into spilled dest -> 111
+; All 4 cases also verify exact `r10` stack balance (delta == 0).
+; ==============================================================================
+.include "libSFX.i"
+.include "../../common/function.i"
+.include "../../common/stack.i"
+.include "../../common/control.i"
+
+.segment "GSURAM"
+.align 2
+TEST_CASE_IDX: .res 2
+TEST_RESULT:   .res 8   ; +0=value, +2=r10_before, +4=r10_after, +6=sentinel
+.export TEST_CASE_IDX, TEST_RESULT
+
+.segment "GSUCODE"
+
+GSU_Code:
+    init_stack
+    iwt r0, #$BEEF
+    sm (TEST_RESULT + 6), r0
+
+test_setup:
+.export test_setup
+    nop
+    nop
+    nop
+    nop
+
+    lm r1, (TEST_CASE_IDX)
+    sm (TEST_RESULT + 2), r10
+
+    from r1
+    sub #1
+    beq @case1
+    nop
+    from r1
+    sub #2
+    beq @case2
+    nop
+    from r1
+    sub #3
+    beq @case3
+    nop
+    bra @case4
+    nop
+
+@case1:
+    iwt r2, #100
+    call sum_thirteen r2 : r3
+    sm (TEST_RESULT + 0), r3
+    bra @done
+    nop
+
+@case2:
+    iwt r2, #3
+    call spill_in_loop r2 : r3
+    sm (TEST_RESULT + 0), r3
+    bra @done
+    nop
+
+@case3:
+    iwt r2, #5
+    call spill_flag_loop r2 : r3
+    sm (TEST_RESULT + 0), r3
+    bra @done
+    nop
+
+@case4:
+    iwt r2, #10
+    call spill_call_bridge r2 : r3
+    sm (TEST_RESULT + 0), r3
+
+@done:
+    sm (TEST_RESULT + 4), r10
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+test_stop:
+.export test_stop
+    nop
+    bra test_setup
+    nop
+
+; ------------------------------------------------------------------------------
+; Helper callee for Case 4
+; ------------------------------------------------------------------------------
+function add_ten x : out
+    from x
+    to out
+    add #10
+    return out
+endfunction
+
+; ------------------------------------------------------------------------------
+; Case 1: 14 simultaneously live variables (param + 13 locals)
+; Expected for a=100: 100 + (1+2+...+13) = 191
+; ------------------------------------------------------------------------------
+function sum_thirteen a : total
+    register v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13
+    ibt v1, #1
+    ibt v2, #2
+    ibt v3, #3
+    ibt v4, #4
+    ibt v5, #5
+    ibt v6, #6
+    ibt v7, #7
+    ibt v8, #8
+    ibt v9, #9
+    ibt v10, #10
+    ibt v11, #11
+    ibt v12, #12
+    ibt v13, #13
+    move total, a
+    with total
+    add v1
+    with total
+    add v2
+    with total
+    add v3
+    with total
+    add v4
+    with total
+    add v5
+    with total
+    add v6
+    with total
+    add v7
+    with total
+    add v8
+    with total
+    add v9
+    with total
+    add v10
+    with total
+    add v11
+    with total
+    add v12
+    with total
+    add v13
+    return total
+endfunction
+
+; ------------------------------------------------------------------------------
+; Case 2: Spilled variables read inside `forR` (+4B backuploop stack delta)
+; Expected for n=3: 3 * (1+2+...+13) = 273
+; ------------------------------------------------------------------------------
+function spill_in_loop n : acc
+    register v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13
+    ibt v1, #1
+    ibt v2, #2
+    ibt v3, #3
+    ibt v4, #4
+    ibt v5, #5
+    ibt v6, #6
+    ibt v7, #7
+    ibt v8, #8
+    ibt v9, #9
+    ibt v10, #10
+    ibt v11, #11
+    ibt v12, #12
+    ibt v13, #13
+    ibt acc, #0
+    forR n
+        with acc
+        add v1
+        with acc
+        add v2
+        with acc
+        add v3
+        with acc
+        add v4
+        with acc
+        add v5
+        with acc
+        add v6
+        with acc
+        add v7
+        with acc
+        add v8
+        with acc
+        add v9
+        with acc
+        add v10
+        with acc
+        add v11
+        with acc
+        add v12
+        with acc
+        add v13
+    endfor
+    return acc
+endfunction
+
+; ------------------------------------------------------------------------------
+; Case 3: Flag-preserving spilled decrement loop (`with cnt; sub #1; bne`)
+; Expected for iters=5: 5*10 + (1+2+...+12) = 50 + 78 = 128
+; ------------------------------------------------------------------------------
+function spill_flag_loop iters : acc
+    register v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, cnt
+    ibt v1, #1
+    ibt v2, #2
+    ibt v3, #3
+    ibt v4, #4
+    ibt v5, #5
+    ibt v6, #6
+    ibt v7, #7
+    ibt v8, #8
+    ibt v9, #9
+    ibt v10, #10
+    ibt v11, #11
+    ibt v12, #12
+    move cnt, iters
+    ibt acc, #0
+@dec_loop:
+    with acc
+    add #10
+    with cnt
+    sub #1
+    bne @dec_loop
+    nop
+    with acc
+    add v1
+    with acc
+    add v2
+    with acc
+    add v3
+    with acc
+    add v4
+    with acc
+    add v5
+    with acc
+    add v6
+    with acc
+    add v7
+    with acc
+    add v8
+    with acc
+    add v9
+    with acc
+    add v10
+    with acc
+    add v11
+    with acc
+    add v12
+    return acc
+endfunction
+
+; ------------------------------------------------------------------------------
+; Case 4: `call` passing spilled arg and storing return value into spilled dest
+; Expected for base=10: 10 + (1+10) + 2+3+...+13 = 10 + 101 = 111
+; ------------------------------------------------------------------------------
+function spill_call_bridge base : total
+    register v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13
+    ibt v1, #1
+    ibt v2, #2
+    ibt v3, #3
+    ibt v4, #4
+    ibt v5, #5
+    ibt v6, #6
+    ibt v7, #7
+    ibt v8, #8
+    ibt v9, #9
+    ibt v10, #10
+    ibt v11, #11
+    ibt v12, #12
+    ibt v13, #13
+    call add_ten v1 : v1
+    move total, base
+    with total
+    add v1
+    with total
+    add v2
+    with total
+    add v3
+    with total
+    add v4
+    with total
+    add v5
+    with total
+    add v6
+    with total
+    add v7
+    with total
+    add v8
+    with total
+    add v9
+    with total
+    add v10
+    with total
+    add v11
+    with total
+    add v12
+    with total
+    add v13
+    return total
+endfunction

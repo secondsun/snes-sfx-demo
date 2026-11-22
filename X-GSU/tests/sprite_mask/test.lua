@@ -1,11 +1,11 @@
 -- test.lua - Mesen CE headless test script for `sprite_mask` (Issues #34 & #35)
 io.stdout:setvbuf("no")
 
-test_setup    = 0x3C28
-test_start    = 0x3C2A
-test_stop     = 0x413C
-TEST_CASE_IDX = 0x8A28
-TEST_RESULT   = 0x8A2A
+test_setup    = 0x3B11
+test_start    = 0x3B13
+test_stop     = 0x3FA7
+TEST_CASE_IDX = 0x8892
+TEST_RESULT   = 0x8894
 
 local index = 1
 local fail_count = 0
