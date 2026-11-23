@@ -1,0 +1,78 @@
+name: SNES SuperFX ROM CI
+
+on:
+  push:
+    branches:
+      - prototype
+      - main
+      - master
+  pull_request:
+    branches:
+      - prototype
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build-roms:
+    name: Build SuperFX ROMs (--Werror)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout snes-sfx-demo
+        uses: actions/checkout@v4
+        with:
+          path: snes-sfx-demo
+
+      - name: Checkout sfx-optimizer
+        uses: actions/checkout@v4
+        with:
+          repository: secondsun/sfx-optimizer
+          ref: prototype
+          path: sfx-optimizer
+
+      - name: Set up JDK 26
+        uses: actions/setup-java@v4
+        with:
+          java-version: "26"
+          distribution: "temurin"
+          cache: "maven"
+
+      - name: Configure GitHub Packages Authentication
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ~/.m2
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>github-retro-common</id>
+                <username>${GITHUB_ACTOR}</username>
+                <password>${GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Package sfx-optimizer.jar
+        working-directory: sfx-optimizer
+        run: |
+          chmod +x ./mvnw
+          ./mvnw --batch-mode --no-transfer-progress package -DskipTests
+
+      - name: Build Production SuperFX ROMs with --Werror
+        working-directory: snes-sfx-demo
+        run: |
+          make -C X-GSU/IsoEngine clean all SFX_OPT_FLAGS="--Werror --stats"
+          make -C X-GSU/StarshipMap clean all SFX_OPT_FLAGS="--Werror --stats"
+          make -C X-GSU/RamMapDemo clean all SFX_OPT_FLAGS="--Werror --stats"
+          make -C X-GSU/IsoRPGDemo clean all SFX_OPT_FLAGS="--Werror --stats"
+
+      - name: Build R10 Spill Hardware Unit Test ROM
+        working-directory: snes-sfx-demo
+        run: make -C X-GSU/tests/test_spill_alloc clean all

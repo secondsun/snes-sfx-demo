@@ -15,6 +15,7 @@
 **/.git
 **/.git/
 **/.github/
+!/.github/
 **/.circleci/
 **/.cirrus.yml
 **/.travis.yml

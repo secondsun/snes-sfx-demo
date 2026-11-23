@@ -16,7 +16,7 @@ rom		:= $(name).sfc
 
 # Default rule
 .SUFFIXES:
-.PHONY: clean
+.PHONY: all default clean
 
 default: $(rom)
 
@@ -32,6 +32,7 @@ make_bp		:= $(libsfx_bin)/make_breakpoints
 ifndef sfx_opt
 sfx_opt		:= java -jar $(libsfx_dir)/../../sfx-optimizer/target/sfx-optimizer.jar
 endif
+SFX_OPT_FLAGS	?=
 
 rwildcard = $(strip $(filter $(if $2,$2,%),$(foreach f,$(wildcard $1*),$(eval t = $(call rwildcard,$f/)) $(if $t,$t,$f))))
 
@@ -196,7 +197,7 @@ $(obj_dir)/%.o700 : %.s700
 
 $(obj_dir)/%.ogs : %.sgs
 	@mkdir -pv $(dir $@)
-	$(sfx_opt) -c $< -o $(obj_dir)/$*.opt.sgs --depfile $(obj_dir)/$*.d --dep-target $@ -I $(dir $<) -I ./ -I $(libsfx_inc)
+	$(sfx_opt) -c $< -o $(obj_dir)/$*.opt.sgs --depfile $(obj_dir)/$*.d --dep-target $@ $(SFX_OPT_FLAGS) -I $(dir $<) -I ./ -I $(libsfx_inc)
 	$(as) $(asflags) $(pkg_asflags) -I $(dir $<) -D TARGET_GSU -o $@ $(obj_dir)/$*.opt.sgs
 
 -include $(obj_gsu:.ogs=.d)

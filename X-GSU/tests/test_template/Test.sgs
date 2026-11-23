@@ -41,12 +41,20 @@ init_stack
 	nop
 	
 	;Clean up the test and write the value under test to OUTPUT
-	;Here the lua script *MAY* stop emulation, read the values in OUTPUT, and report the test status
-	;LUA can set a breakpoint using this label
+	;SuperFX RAM stores are pipelined: settle with 8 NOPs before test_stop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	;Here the lua script intercepts execution, reads OUTPUT, and calls emu.stop(0/1)
+	;Looping back to test_setup supports multi-case suites and avoids un-settled `stop` warnings
 	test_stop:
 	nop
-	nop
-	stop
+	bra test_setup
 	nop
 
 
