@@ -1,0 +1,700 @@
+{
+  "name": "protagonist_room",
+  "cols": 8,
+  "rows": 8,
+  "atlasPath": "PROTAGONIST_ROOM_ATLAS.sfxproj",
+  "cells": [
+    {
+      "col": 0,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_end_foot_2legs",
+      "panels": [
+        "S"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 2,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bookshelf_side_brown",
+      "panels": [
+        "E"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 4,
+      "row": 0,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "bookshelf_top",
+      "skirtTex": "bookshelf_back_edge",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 0,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "bookshelf_top",
+      "skirtTex": "bookshelf_back",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 0,
+      "baseHeight": 2,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "bookshelf_top",
+      "skirtTex": "bookshelf_back",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 0,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bookshelf_side_brown",
+      "panels": [
+        "W"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 0,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_side_foot_west",
+      "panels": [
+        "E"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 1,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "bed_cyan_top",
+      "skirtTex": "overlook_carpet",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_side_foot_east",
+      "panels": [
+        "W"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 3,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bookshelf_books",
+      "panels": [
+        "N"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 5,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bookshelf_books",
+      "panels": [
+        "N"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 6,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bookshelf_books",
+      "panels": [
+        "N"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 7,
+      "row": 1,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_side_mid_west",
+      "panels": [
+        "E"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 1,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "bed_mid_top",
+      "skirtTex": "overlook_carpet",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_side_mid_east",
+      "panels": [
+        "W"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 3,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 2,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_side_head_west",
+      "panels": [
+        "E"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 1,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_LIQUID_SHALLOW",
+      "rotation": 0,
+      "topTex": "bed_pillow_top",
+      "skirtTex": "overlook_carpet",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_side_head_east",
+      "panels": [
+        "W"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 3,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 3,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "panelTex": "bed_end_head_2legs",
+      "panels": [
+        "N"
+      ],
+      "tall2h": true
+    },
+    {
+      "col": 2,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 4,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 5,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 6,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 0,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 1,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 2,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 3,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 4,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 5,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 6,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    },
+    {
+      "col": 7,
+      "row": 7,
+      "baseHeight": 0,
+      "archetype": "PRIM_FLAT",
+      "rotation": 0,
+      "topTex": "overlook_carpet",
+      "skirtTex": "void_1h",
+      "tall2h": false
+    }
+  ]
+}

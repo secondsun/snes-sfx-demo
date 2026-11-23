@@ -1,0 +1,165 @@
+; ==============================================================================
+; SuperFX.sgs - "A nice little room for our protagonist" GSU Program
+;
+; Imports relocatable `.tab` + `.map` staged in Game Pak RAM Bank $71 whenever
+; `GSU_INIT_FLAG == 0`, orbits 360 degrees around the room (matching the tweet
+; turntable video, toggleable with SELECT or overridden with L/R), compiles
+; rotated archetype trapezoids, and renders two 128x160 4bpp half-screen passes.
+; ==============================================================================
+.debuginfo +
+.include "../gsu_iso/gsu_iso_map.i"
+
+.segment "GSURAM"
+GSU_AUTO_SPIN:  .res 2  ; 1 = 360-deg turntable auto-orbit enabled, 0 = manual only
+GSU_SPIN_TICK:  .res 2  ; Sub-frame divider for ~10-second 360-deg revolution
+.export GSU_AUTO_SPIN, GSU_SPIN_TICK
+
+.segment "GSUCODE"
+GSU_Code:
+.export GSU_Code
+
+    init_stack
+    register fb_ptr, cam_ptr, joy_val, spin_val, tmp
+
+    ; Ensure ROMBR = $04 (trig/reciprocal LUTs) and RAMBR = 0 ($70 working RAM)
+    ibt r0, #$04
+    romb
+    ibt r0, #0
+    ramb
+
+    ; Clear 10 KB half-screen buffer at $70:8000 ($1400 words)
+    iwt r0, #0
+    cmode
+    iwt fb_ptr, #$8000
+    iwt r12, #$1400
+    cache
+    move r13, r15
+        stw (fb_ptr)
+        inc fb_ptr
+        loop
+        inc fb_ptr
+    nop
+
+    ; Enable 4bpp transparency (color 0 transparent)
+    iwt r0, #$08
+    cmode
+
+    ; Import Bank-$71 `.tab` + `.map` on initial boot
+    lm tmp, (GSU_INIT_FLAG)
+    moves tmp, tmp
+    bne @scene_ready
+    nop
+    call gsu_iso_import_bank71
+
+    ; Start at yaw=19 (~57 deg South-East) and center_y=90 (+10px headroom for 2h Bookshelf)
+    iwt tmp, #0
+    sm (GSU_SPIN_TICK), tmp
+    iwt cam_ptr, #(ISO_CAM + 8)
+    iwt tmp, #90
+    from tmp
+    stw (cam_ptr)
+    iwt cam_ptr, #ISO_CAM
+    iwt tmp, #19
+    call iso_camera_set_yaw cam_ptr, tmp
+@scene_ready:
+
+    ; Check GSU_FRAME_HALF (0 = left half [0..127], 1 = right half [128..255])
+    iwt tmp, #GSU_FRAME_HALF
+    ldb (tmp)
+    lob
+    moves r0, r0
+    beq @do_pass0
+    nop
+    iwt r15, #do_pass1
+    nop
+
+@do_pass0:
+    ; Pass 0: Apply L/R yaw orbit & D-Pad pan from joypad
+    lm joy_val, (GSU_JOYPAD)
+    iwt cam_ptr, #ISO_CAM
+    call iso_camera_update_controls cam_ptr, joy_val
+
+    ; If GSU_AUTO_SPIN != 0 and neither L ($0020) nor R ($0010) is held, step turntable yaw!
+    lm spin_val, (GSU_AUTO_SPIN)
+    moves spin_val, spin_val
+    beq @after_spin
+    nop
+    lm joy_val, (GSU_JOYPAD)
+    iwt tmp, #$0030
+    from joy_val
+    and tmp
+    bne @after_spin
+    nop
+
+    ; Advance spin divider (step 3 deg every 2 Pass-0 renders => ~8s per 360-deg orbit)
+    lm tmp, (GSU_SPIN_TICK)
+    inc tmp
+    sm (GSU_SPIN_TICK), tmp
+    from tmp
+    and #1
+    bne @after_spin
+    nop
+
+    ; Decrement yaw (17 -> 16 -> ... -> 1 -> 120), matching tweet video rotation direction
+    iwt cam_ptr, #ISO_CAM
+    to tmp
+    ldw (cam_ptr)
+    dec tmp
+    from tmp
+    sub #1
+    bge @yaw_ok
+    nop
+    iwt tmp, #120
+@yaw_ok:
+    call iso_camera_set_yaw cam_ptr, tmp
+
+@after_spin:
+    ; Recompile rotated archetype trapezoids when yaw changes
+    iwt r1, #ISO_CAM
+    iwt r2, #ISO_BASIS
+    iwt r3, #LATTICE_V2
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #CACHED_YAW
+    call gsu_iso_compile_archetypes r1, r2, r3, r4, r5
+
+    ; Re-center grid origin (cols/2, rows/2) around camera focus (center_x, center_y)
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    call gsu_iso_update_origin r1, r2
+
+    ; Render Pass 0 (left half X in 0..127)
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #0
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+    bra finish_pass
+    nop
+
+do_pass1:
+    ; Render Pass 1 (right half X in 128..255) using cached archetypes & origin
+    iwt r1, #MAP_BUF
+    iwt r2, #ISO_CAM
+    iwt r3, #ISO_BASIS
+    iwt r4, #ARCH_TRAPS
+    iwt r5, #1
+    iwt r6, #0
+    call gsu_iso_render r1, r2, r3, r4, r5, r6
+
+finish_pass:
+    rpix
+    rpix
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    stop
+    nop
+    nop
+    nop
