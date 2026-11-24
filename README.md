@@ -2,8 +2,7 @@
 
 A comprehensive Super Nintendo Entertainment System (SNES) homebrew codebase, 3D graphics testbed, and development framework targeting the **SuperFX (GSU / FX3)** RISC coprocessor.
 
-[![Demo Video](https://img.youtube.com/vi/H3NiUNPcn8M/0.jpg)](https://youtu.be/H3NiUNPcn8M)  
-*Watch the SuperFX demo running on real hardware / emulator: [https://youtu.be/H3NiUNPcn8M](https://youtu.be/H3NiUNPcn8M)*
+[![Demo Video](https://img.youtube.com/vi/sfW0K4eBQG8/0.jpg)](https://youtu.be/sfW0K4eBQG8)  
 
 ---
 
