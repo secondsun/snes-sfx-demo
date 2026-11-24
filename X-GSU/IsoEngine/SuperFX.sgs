@@ -10,9 +10,11 @@
 .include "Data/TEXTURES.i"
 GSU_ISO_USE_ROM_TEXTURES = 1
 GSU_ISO_MAX_TAB_BYTES    = TEXTURE_TABLE_SIZE_BYTES
-GSU_ISO_MAX_MAP_BYTES    = 8 + (8 * 8 * 8)
+GSU_ISO_MAX_MAP_BYTES    = 8 + (10 * 10 * 8)
+GSU_ISO_CENTER_Y         = 112
+USE_FAST_COLOR_PATH      = 1
 .include "../gsu_iso/gsu_iso_map.i"
-.include "Data/showcase_map.i"
+.include "Data/citadel_bench_map.i"
 
 .segment "GSUCODE"
 GSU_Code:
@@ -51,6 +53,10 @@ init_gsu_main:
     iwt r4, #TEXTURE_TABLE_SIZE_BYTES
     iwt r5, #ATLAS_STRIDE_SHIFT
     call gsu_iso_init_rom r1, r2, r3, r4, r5
+    ; Start at classic 45-deg diamond yaw = 15 so both NS and EW cliffs are visible
+    iwt r1, #ISO_CAM
+    iwt r2, #15
+    call iso_camera_set_yaw r1, r2
 scene_initialized:
 
     ; Check GSU_FRAME_HALF:

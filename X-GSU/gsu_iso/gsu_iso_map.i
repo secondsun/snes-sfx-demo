@@ -74,6 +74,14 @@ _GSU_SKIP_ROM_TRAP_INST .set 0
 .endif
 .endmacro
 
+.macro _gsu_iso_draw_trap_batch
+.ifdef GSU_ISO_USE_ROM_TEXTURES
+    call draw_cached_trap_batch
+.else
+    call draw_cached_trap_ram_batch
+.endif
+.endmacro
+
 GSU_ISO_MAX_COLS        = 16
 GSU_ISO_MAX_ROWS        = 16
 GSU_ISO_MAX_CELLS       = 256
@@ -158,6 +166,15 @@ PANEL_TALL_2H       = (1 << 4)  ; 0 = 1h (16-unit) parapet, 1 = 2h (32-unit) fac
     bbox_ymax       .word   ; +324: Max Y offset relative to anchor across corners
     arch_lut        .res 64 * 2 ; +326: 128 bytes (offsets for (archetype << 2) | rot)
     arch_buf        .res 10240   ; +454: storage buffer for compiled cached_traps
+.endstruct
+
+; Merged vertical skirt cache (compiled once per yaw for drop >= 2 cliffs)
+.struct merged_skirt_cache
+    valid           .word   ; +0:  0 = culled/edge-on, 1 = valid
+    dy_slope        .word   ; +2:  |y1 - y0| (0..16)
+    top_trap        .tag cached_trap ; +4:  Top sloped cap triangle (if dy_slope > 0)
+    mid_trap        .tag cached_trap ; +30: Middle vertical strip (line_count = 14*drop - dy_slope)
+    bot_trap        .tag cached_trap ; +56: Bottom sloped cap triangle (shifted by (drop-1)*14)
 .endstruct
 
 ; ==============================================================================
@@ -247,6 +264,22 @@ gsu_iso_is_prebaked:        .res 2
 gsu_iso_row_anchor_x_q5:    .res 2
 gsu_iso_row_anchor_z_q5:    .res 2
 gsu_iso_row_cell_offset:    .res 2
+
+; Merged vertical skirt templates (Fix 1: 164B + 22B scratch)
+gsu_merged_skirt_ns:        .tag merged_skirt_cache
+gsu_merged_skirt_ew:        .tag merged_skirt_cache
+gsu_ms_out_ptr:             .res 2
+gsu_ms_x0:                  .res 2
+gsu_ms_y0:                  .res 2
+gsu_ms_x1:                  .res 2
+gsu_ms_y1:                  .res 2
+gsu_ms_du_dx:               .res 2
+gsu_ms_dv_dx:               .res 2
+gsu_ms_dv_dy:               .res 2
+gsu_ms_dy:                  .res 2
+gsu_ms_drop:                .res 2
+gsu_ms_u_off:               .res 2
+gsu_ms_tex_id:              .res 2
 
 ; Dynamic runtime atlas stride parameters populated from Bank-$71 `.tab` header
 gsu_runtime_stride_shift:   .res 2
@@ -2357,6 +2390,871 @@ endfunction
 ;   - Compiles PRIM_FLAT, ARCH_SKIRT_NS, and ARCH_SKIRT_EW into arch_traps_ptr
 ;   - Returns 1 (dirty recompiled)
 ; ==============================================================================
+; ==============================================================================
+; gsu_iso_compile_merged_skirt
+; Pre-compiles a 3-trapezoid vertical skirt template (top cap, stretchable middle
+; vertical strip, bottom cap) so any drop >= 2 cliff renders in <= 3 traps total
+; instead of drop * 3..4 traps.
+;
+; In:
+;   r1 = v0_ptr         (left-top corner vector2 in LATTICE_V2)
+;   r2 = v1_ptr         (right-top corner vector2 in LATTICE_V2)
+;   r3 = ref_trap_ptr   (skirt_ns_traps or skirt_ew_traps for du_dx/dv_dx)
+;   r4 = out_merged_ptr (gsu_merged_skirt_ns or gsu_merged_skirt_ew)
+;   r5 = ref_count      (0 if face is culled/edge-on)
+; ==============================================================================
+function gsu_iso_compile_merged_skirt
+    sm (gsu_ms_out_ptr), r4
+    moves r5, r5
+    bne @ms_not_culled
+    nop
+    ibt r0, #0
+    stw (r4)                ; valid = 0
+    return
+
+@ms_not_culled:
+    ; Load (x0, y0) from r1 and (x1, y1) from r2
+    ldw (r1)
+    sm (gsu_ms_x0), r0
+    inc r1
+    inc r1
+    ldw (r1)
+    sm (gsu_ms_y0), r0
+
+    ldw (r2)
+    sm (gsu_ms_x1), r0
+    inc r2
+    inc r2
+    ldw (r2)
+    sm (gsu_ms_y1), r0
+
+    ; Copy exact du_dx (+20) and dv_dx (+22) from compiled 1h reference trap
+    iwt r0, #20
+    from r3
+    to r7
+    add r0
+    ldw (r7)
+    sm (gsu_ms_du_dx), r0
+    inc r7
+    inc r7
+    ldw (r7)
+    sm (gsu_ms_dv_dx), r0
+
+    ; dv_dy_wall = fmult(gsu_v16_shifted, recip[14])
+    ibt r8, #14
+    reciprocal_lookup_rom r8, r6
+    lm r0, (gsu_v16_shifted)
+    fmult
+    sm (gsu_ms_dv_dy), r0
+
+    ; Mark valid = 1
+    lm r7, (gsu_ms_out_ptr)
+    ibt r0, #1
+    stw (r7)
+
+    ; Compare y1 vs y0
+    lm r1, (gsu_ms_y0)
+    lm r2, (gsu_ms_y1)
+    from r2
+    sub r1
+    bne @ms_sloped
+    nop
+
+    ; --- Case 0: Flat top/bottom (y0 == y1, dy_slope = 0, mid_trap only!) ---
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; dy_slope = 0
+
+    lm r7, (gsu_ms_out_ptr)
+    iwt r0, #merged_skirt_cache::mid_trap
+    with r7
+    add r0
+    lm r0, (gsu_ms_y0)
+    stw (r7)                ; +0: dy_start
+    inc r7
+    inc r7
+    ibt r0, #14
+    stw (r7)                ; +2: line_count (patched at render time)
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x0)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x1)
+    cft_to_q88
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +8: dxL_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +10: dxR_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +12: uL_start = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +14: vL_start = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +16: du_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dy)
+    stw (r7)                ; +18: dv_dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    return
+
+@ms_sloped:
+    ; r0 = y1 - y0 (non-zero)
+    moves r0, r0
+    bpl @ms_case_down
+    nop
+    iwt r15, #@ms_case_up
+    nop
+
+; --- Case 1: y0 < y1 (top edge slopes DOWN to the right, dy = y1 - y0 > 0) ---
+@ms_case_down:
+    move r8, r0             ; r8 = dy > 0
+    sm (gsu_ms_dy), r8
+    inc r7
+    inc r7
+    from r8
+    stw (r7)                ; dy_slope = dy
+
+    ; Compute dx_slope = ((x1 - x0) << 8) / dy -> r9, du_slope = $2000 / dy -> r11
+    lm r1, (gsu_ms_x1)
+    lm r2, (gsu_ms_x0)
+    from r1
+    sub r2
+    cft_to_q88
+    move r9, r0             ; r9 = (x1 - x0) << 8
+    iwt r11, #$2000
+
+    from r8
+    sub #1
+    beq @ms_d_slopes_ok
+    nop
+    from r8
+    sub #2
+    beq @ms_d_div2
+    nop
+    reciprocal_lookup_rom r8, r6
+    from r9
+    to r9
+    fmult
+    from r11
+    to r11
+    fmult
+    bra @ms_d_slopes_ok
+    nop
+@ms_d_div2:
+    with r9
+    asr
+    with r11
+    asr
+@ms_d_slopes_ok:
+    ; v_dy = dy * dv_dy_wall -> r12
+    lm r6, (gsu_ms_dv_dy)
+    from r8
+    lmult                   ; r4 = dy * dv_dy_wall
+    move r12, r4
+
+    ; Write top_trap (+4): [y0, y1), xL=x0, xR=x0, dxL=0, dxR=dx_slope, uL=0, vL=0, du_dy=0, dv_dy=dv_dy_wall
+    lm r7, (gsu_ms_out_ptr)
+    iwt r0, #merged_skirt_cache::top_trap
+    with r7
+    add r0
+    lm r0, (gsu_ms_y0)
+    stw (r7)                ; +0: dy_start
+    inc r7
+    inc r7
+    from r8
+    stw (r7)                ; +2: line_count = dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x0)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +8: dxL_dy = 0
+    inc r7
+    inc r7
+    from r9
+    stw (r7)                ; +10: dxR_dy = dx_slope
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +12: uL_start = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +14: vL_start = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +16: du_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dy)
+    stw (r7)                ; +18: dv_dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    inc r7
+    inc r7
+
+    ; Write mid_trap (+30): dy_start=y1, xL=x0, xR=x1, dxL=0, dxR=0, uL=0, vL=v_dy, du_dy=0, dv_dy=dv_dy_wall
+    lm r0, (gsu_ms_y1)
+    stw (r7)                ; +0: dy_start
+    inc r7
+    inc r7
+    ibt r0, #14
+    stw (r7)                ; +2: line_count (patched at render time)
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x0)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x1)
+    cft_to_q88
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +8: dxL_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +10: dxR_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +12: uL_start = 0
+    inc r7
+    inc r7
+    from r12
+    stw (r7)                ; +14: vL_start = v_dy
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +16: du_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dy)
+    stw (r7)                ; +18: dv_dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    inc r7
+    inc r7
+
+    ; Write bot_trap (+56): dy_start=y0+14, line_count=dy, xL=x0, xR=x1, dxL=dx_slope, dxR=0, uL=0, vL=v16, du_dy=du_slope, dv_dy=0
+    lm r0, (gsu_ms_y0)
+    add #14
+    stw (r7)                ; +0: dy_start = y0 + 14
+    inc r7
+    inc r7
+    from r8
+    stw (r7)                ; +2: line_count = dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x0)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x1)
+    cft_to_q88
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    from r9
+    stw (r7)                ; +8: dxL_dy = dx_slope
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +10: dxR_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +12: uL_start = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_v16_shifted)
+    stw (r7)                ; +14: vL_start = v16
+    inc r7
+    inc r7
+    from r11
+    stw (r7)                ; +16: du_dy = du_slope
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +18: dv_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    return
+
+; --- Case 2: y0 > y1 (top edge slopes UP to the right, dy = y0 - y1 > 0) ---
+@ms_case_up:
+    from r1
+    sub r2
+    move r8, r0             ; r8 = dy = y0 - y1 > 0
+    sm (gsu_ms_dy), r8
+    inc r7
+    inc r7
+    from r8
+    stw (r7)                ; dy_slope = dy
+
+    ; Compute dx_slope = ((x0 - x1) << 8) / dy -> r9 (neg), du_slope = (-$2000) / dy -> r11 (neg)
+    lm r1, (gsu_ms_x0)
+    lm r2, (gsu_ms_x1)
+    from r1
+    sub r2
+    cft_to_q88
+    move r9, r0             ; r9 = (x0 - x1) << 8 (negative)
+    iwt r11, #$E000         ; -$2000
+
+    from r8
+    sub #1
+    beq @ms_u_slopes_ok
+    nop
+    from r8
+    sub #2
+    beq @ms_u_div2
+    nop
+    reciprocal_lookup_rom r8, r6
+    from r9
+    to r9
+    fmult
+    from r11
+    to r11
+    fmult
+    bra @ms_u_slopes_ok
+    nop
+@ms_u_div2:
+    with r9
+    asr
+    with r11
+    asr
+@ms_u_slopes_ok:
+    ; v_dy = dy * dv_dy_wall -> r12
+    lm r6, (gsu_ms_dv_dy)
+    from r8
+    lmult
+    move r12, r4
+
+    ; Write top_trap (+4): [y1, y0), xL=x1, xR=x1, dxL=dx_slope, dxR=0, uL=$2000, vL=0, du_dy=du_slope, dv_dy=0
+    lm r7, (gsu_ms_out_ptr)
+    iwt r0, #merged_skirt_cache::top_trap
+    with r7
+    add r0
+    lm r0, (gsu_ms_y1)
+    stw (r7)                ; +0: dy_start
+    inc r7
+    inc r7
+    from r8
+    stw (r7)                ; +2: line_count = dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x1)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    from r9
+    stw (r7)                ; +8: dxL_dy = dx_slope
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +10: dxR_dy = 0
+    inc r7
+    inc r7
+    iwt r0, #$2000
+    stw (r7)                ; +12: uL_start = $2000
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +14: vL_start = 0
+    inc r7
+    inc r7
+    from r11
+    stw (r7)                ; +16: du_dy = du_slope
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +18: dv_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    inc r7
+    inc r7
+
+    ; Write mid_trap (+30): dy_start=y0, xL=x0, xR=x1, dxL=0, dxR=0, uL=0, vL=0, du_dy=0, dv_dy=dv_dy_wall
+    lm r0, (gsu_ms_y0)
+    stw (r7)                ; +0: dy_start
+    inc r7
+    inc r7
+    ibt r0, #14
+    stw (r7)                ; +2: line_count (patched at render time)
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x0)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x1)
+    cft_to_q88
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +8: dxL_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +10: dxR_dy = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +12: uL_start = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +14: vL_start = 0
+    inc r7
+    inc r7
+    stw (r7)                ; +16: du_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dy)
+    stw (r7)                ; +18: dv_dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    inc r7
+    inc r7
+
+    ; Write bot_trap (+56): dy_start=y1+14, line_count=dy, xL=x0, xR=x1, dxL=0, dxR=dx_slope, uL=0, vL=v16-v_dy, du_dy=0, dv_dy=dv_dy_wall
+    lm r0, (gsu_ms_y1)
+    add #14
+    stw (r7)                ; +0: dy_start = y1 + 14
+    inc r7
+    inc r7
+    from r8
+    stw (r7)                ; +2: line_count = dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x0)
+    cft_to_q88
+    stw (r7)                ; +4: xL_start
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_x1)
+    cft_to_q88
+    stw (r7)                ; +6: xR_start
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +8: dxL_dy = 0
+    inc r7
+    inc r7
+    from r9
+    stw (r7)                ; +10: dxR_dy = dx_slope
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +12: uL_start = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_v16_shifted)
+    sub r12
+    stw (r7)                ; +14: vL_start = v16 - v_dy
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +16: du_dy = 0
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dy)
+    stw (r7)                ; +18: dv_dy
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_du_dx)
+    stw (r7)                ; +20: du_dx
+    inc r7
+    inc r7
+    lm r0, (gsu_ms_dv_dx)
+    stw (r7)                ; +22: dv_dx
+    inc r7
+    inc r7
+    ibt r0, #0
+    stw (r7)                ; +24: tex_id
+    return
+endfunction
+
+; ==============================================================================
+; gsu_iso_flush_trap_batch
+; Flushes all queued trapezoids in `gsu_trap_batch_buf` in a single 512B-cached
+; rasterizer pass, then resets `gsu_trap_batch_count = 0` and `gsu_trap_batch_ptr`.
+; ==============================================================================
+function gsu_iso_flush_trap_batch
+    lm r2, (gsu_trap_batch_count)
+    moves r2, r2
+    bne :+
+    nop
+    return
+:
+    iwt r1, #gsu_trap_batch_buf
+    lm r7, (gsu_iso_render_frame + map_render_frame::frame_half)
+    lm r0, (gsu_trap_batch_mode)
+    moves r0, r0
+    bne @fl_flat_batch
+    nop
+    _gsu_iso_draw_trap_batch
+    bra @fl_reset
+    nop
+@fl_flat_batch:
+    call draw_flat_trap_batch
+@fl_reset:
+    ibt r0, #0
+    sm (gsu_trap_batch_count), r0
+    iwt r0, #gsu_trap_batch_buf
+    sm (gsu_trap_batch_ptr), r0
+    return
+endfunction
+
+; ==============================================================================
+; gsu_iso_queue_trap
+; Appends one trapezoid to `gsu_trap_batch_buf` and auto-flushes when full or
+; when switching between textured (`tex_id < $F0`) and flat-color (`tex_id >= $F0`).
+; Preserves r1..r9, r12, r14 across the call (clobbers only r0, r11, r13).
+;
+; In:
+;   r1 = trap_ptr
+;   r2 = line_count (0 = read from trap_ptr + 2)
+;   r3 = anchor_x
+;   r4 = anchor_y
+;   r5 = u_offset
+;   r6 = v_offset
+;   r7 = tex_id ($00..$EF = texture atlas ID, $F0..$FF = solid palette color)
+; ==============================================================================
+function gsu_iso_queue_trap
+    .align 16, $01
+@qt_cbr_start:
+    cache
+
+    ; Determine target batch mode: 0 if tex_id < $F0, 1 if tex_id >= $F0
+    iwt r11, #$00F0
+    from r7
+    cmp r11
+    blt @qt_mode_tex
+    nop
+    ibt r13, #1
+    bra @qt_mode_chk
+    nop
+@qt_mode_tex:
+    ibt r13, #0
+@qt_mode_chk:
+    lm r0, (gsu_trap_batch_count)
+    moves r0, r0
+    beq @qt_set_mode
+    nop
+    lm r11, (gsu_trap_batch_mode)
+    from r13
+    cmp r11
+    beq @qt_mode_ok
+    nop
+    ; Mode transition: flush pending homogeneous batch before queuing new mode
+    gsu_stack_push r1
+    gsu_stack_push r2
+    gsu_stack_push r3
+    gsu_stack_push r4
+    gsu_stack_push r5
+    gsu_stack_push r6
+    gsu_stack_push r7
+    gsu_stack_push r8
+    gsu_stack_push r9
+    gsu_stack_push r12
+    gsu_stack_push r13
+    gsu_stack_push r14
+    call gsu_iso_flush_trap_batch
+    gsu_stack_pop r14
+    gsu_stack_pop r13
+    gsu_stack_pop r12
+    gsu_stack_pop r9
+    gsu_stack_pop r8
+    gsu_stack_pop r7
+    gsu_stack_pop r6
+    gsu_stack_pop r5
+    gsu_stack_pop r4
+    gsu_stack_pop r3
+    gsu_stack_pop r2
+    gsu_stack_pop r1
+@qt_set_mode:
+    sm (gsu_trap_batch_mode), r13
+@qt_mode_ok:
+    lm r11, (gsu_trap_batch_ptr)
+    from r1
+    stw (r11)               ; +0: trap_ptr
+    inc r11
+    inc r11
+
+    moves r2, r2
+    bne @qt_lc_ready
+    nop
+    from r1
+    add #2
+    ldw (r0)                ; read trap_ptr->line_count
+    bra @qt_lc_store
+    nop
+@qt_lc_ready:
+    move r0, r2
+@qt_lc_store:
+    stw (r11)               ; +2: line_count
+    inc r11
+    inc r11
+
+    ; Pre-bias anchor_x_eff = ((anchor_x - 128 * frame_half) & $FF) << 8
+    lm r0, (gsu_iso_render_frame + map_render_frame::frame_half)
+    moves r0, r0
+    beq @qt_x_pass0
+    nop
+    ibt r0, #$80            ; -128
+    add r3
+    bra @qt_x_pack
+    nop
+@qt_x_pass0:
+    move r0, r3
+@qt_x_pack:
+    lob
+    swap
+    stw (r11)               ; +4: anchor_x_eff
+    inc r11
+    inc r11
+
+    from r4
+    stw (r11)               ; +6: anchor_y
+    inc r11
+    inc r11
+    from r5
+    stw (r11)               ; +8: u_offset
+    inc r11
+    inc r11
+    from r6
+    stw (r11)               ; +10: v_offset
+    inc r11
+    inc r11
+    from r7
+    stw (r11)               ; +12: tex_id
+    inc r11
+    inc r11
+    sm (gsu_trap_batch_ptr), r11
+
+    lm r0, (gsu_trap_batch_count)
+    inc r0
+    sm (gsu_trap_batch_count), r0
+    iwt r11, #GSU_TRAP_BATCH_CAP
+    cmp r11
+    blt @qt_done
+    nop
+
+    ; Rare auto-flush (1 in GSU_TRAP_BATCH_CAP traps): preserve caller registers
+    gsu_stack_push r1
+    gsu_stack_push r2
+    gsu_stack_push r3
+    gsu_stack_push r4
+    gsu_stack_push r5
+    gsu_stack_push r6
+    gsu_stack_push r7
+    gsu_stack_push r8
+    gsu_stack_push r9
+    gsu_stack_push r12
+    gsu_stack_push r14
+    call gsu_iso_flush_trap_batch
+    gsu_stack_pop r14
+    gsu_stack_pop r12
+    gsu_stack_pop r9
+    gsu_stack_pop r8
+    gsu_stack_pop r7
+    gsu_stack_pop r6
+    gsu_stack_pop r5
+    gsu_stack_pop r4
+    gsu_stack_pop r3
+    gsu_stack_pop r2
+    gsu_stack_pop r1
+@qt_done:
+    return
+endfunction
+
+; ==============================================================================
+; gsu_iso_stamp_merged_skirt
+; Queues a merged vertical skirt of height drop >= 2 in <= 3 batch entries.
+;
+; In:
+;   r1 = merged_ptr (gsu_merged_skirt_ns or gsu_merged_skirt_ew)
+;   r2 = drop (>= 2)
+;   r3 = skirt_tex_id
+;   r5 = u_offset (Q8.8)
+; ==============================================================================
+function gsu_iso_stamp_merged_skirt
+    ldw (r1)                ; valid (+0)
+    moves r0, r0
+    bne :+
+    nop
+    return
+:
+    sm (gsu_ms_out_ptr), r1
+    sm (gsu_ms_drop), r2
+    sm (gsu_ms_u_off), r5
+    sm (gsu_ms_tex_id), r3
+
+    inc r1
+    inc r1
+    ldw (r1)                ; dy_slope (+2)
+    sm (gsu_ms_dy), r0
+
+    lm r3, (gsu_iso_render_frame + map_render_frame::anchor_x)
+    lm r4, (gsu_iso_render_frame + map_render_frame::anchor_y)
+    lm r7, (gsu_ms_tex_id)
+    ibt r6, #0
+
+    moves r0, r0
+    beq @ms_stamp_mid
+    nop
+
+    ; 1. Top sloped cap triangle (+4)
+    lm r1, (gsu_ms_out_ptr)
+    with r1
+    add #merged_skirt_cache::top_trap
+    ibt r2, #0              ; use trap->line_count
+    call gsu_iso_queue_trap
+
+@ms_stamp_mid:
+    ; 2. Middle vertical strip (+30): line_count = drop * 14 - dy_slope
+    lm r8, (gsu_ms_drop)
+    with r8
+    add r8                  ; 2 * drop
+    move r9, r8
+    with r8
+    add r8                  ; 4
+    with r8
+    add r8                  ; 8
+    with r8
+    add r8                  ; 16
+    with r8
+    sub r9                  ; 14 * drop
+    lm r0, (gsu_ms_dy)
+    from r8
+    to r2
+    sub r0                  ; r2 = mid_h = 14 * drop - dy_slope
+
+    lm r1, (gsu_ms_out_ptr)
+    iwt r0, #merged_skirt_cache::mid_trap
+    with r1
+    add r0
+    call gsu_iso_queue_trap
+
+    ; 3. Bottom sloped cap triangle (+56), shifted down by (drop - 1) * 14
+    lm r0, (gsu_ms_dy)
+    moves r0, r0
+    bne :+
+    nop
+    return
+:
+    lm r8, (gsu_ms_drop)
+    dec r8                  ; r8 = drop - 1
+    move r0, r8
+    _gsu_iso_v_offset_16 r6, r2 ; r6 = (drop - 1) * 16 << stride_shift
+
+    from r8
+    to r9
+    add r8                  ; 2*(drop-1)
+    move r2, r9
+    with r9
+    add r9                  ; 4
+    with r9
+    add r9                  ; 8
+    with r9
+    add r9                  ; 16
+    with r9
+    sub r2                  ; 14*(drop-1)
+
+    with r4
+    add r9                  ; bot_y = anchor_y + 14 * (drop - 1)
+    lm r1, (gsu_ms_out_ptr)
+    iwt r0, #merged_skirt_cache::bot_trap
+    with r1
+    add r0
+    ibt r2, #0
+    call gsu_iso_queue_trap
+    return
+endfunction
+
 function gsu_iso_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps_ptr, cached_yaw_ptr : recompiled_flag
     register cam_ptr = r1, basis_ptr = r2, lattice_ptr = r3, arch_traps_ptr = r4, cached_yaw_ptr = r5
 
@@ -2901,6 +3799,17 @@ function gsu_iso_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps_
     from r3
     stw (r7)            ; store skirt_ns_count (+106)
 
+    ; Compile merged NS vertical skirt template for drop >= 2 cliffs
+    lm r1, (gsu_iso_face_def + 12)  ; v0_ptr
+    lm r2, (gsu_iso_face_def + 20)  ; v1_ptr
+    move r5, r3                     ; ref_count
+    lm r3, (gsu_iso_render_frame + 6)
+    iwt r0, #108
+    with r3
+    add r0                          ; ref_trap_ptr = arch_traps_ptr + 108
+    iwt r4, #gsu_merged_skirt_ns
+    call gsu_iso_compile_merged_skirt
+
     ; --------------------------------------------------------------------------
     ; 6. Compile ARCH_SKIRT_EW (Vertical 1h Skirt)
     ;    uv_mode = UV_MODE_WALL_EW (2)
@@ -3053,6 +3962,17 @@ function gsu_iso_compile_archetypes cam_ptr, basis_ptr, lattice_ptr, arch_traps_
     move r7, r0
     from r3
     stw (r7)            ; store skirt_ew_count (+212)
+
+    ; Compile merged EW vertical skirt template for drop >= 2 cliffs
+    lm r1, (gsu_iso_face_def + 12)  ; v0_ptr
+    lm r2, (gsu_iso_face_def + 20)  ; v1_ptr
+    move r5, r3                     ; ref_count
+    lm r3, (gsu_iso_render_frame + 6)
+    iwt r0, #214
+    with r3
+    add r0                          ; ref_trap_ptr = arch_traps_ptr + 214
+    iwt r4, #gsu_merged_skirt_ew
+    call gsu_iso_compile_merged_skirt
 
     ; --------------------------------------------------------------------------
     ; 7. Initialize Dynamic Archetype Lookup Table (arch_lut at +326):
@@ -5646,57 +6566,20 @@ function gsu_iso_stamp_edge_panel edge_idx
     ldw (r7)
     _gsu_iso_v_offset_16 r6, r2
 
-    ; Read panel_tex_id:
-    iwt r7, #gsu_iso_render_frame + map_render_frame::panel_tex_id
-    ldw (r7)
-    move r11, r0        ; r11 = panel_tex_id
-
+    ; Read panel_tex_id, anchor_x, anchor_y once for all panel traps:
+    lm r7, (gsu_iso_render_frame + map_render_frame::panel_tex_id)
+    lm r3, (gsu_iso_render_frame + map_render_frame::anchor_x)
+    lm r4, (gsu_iso_render_frame + map_render_frame::anchor_y)
+    ibt r2, #0
     move r14, r9        ; r14 = trap counter
 @panel_trap_loop:
-    ; Set trap tex_id (+24)
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    from r11
-    stw (r7)
-
-    gsu_stack_push r14
-    gsu_stack_push r1
-    gsu_stack_push r11
-    gsu_stack_push r6
-    gsu_stack_push r5
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
-    ldw (r7)
-    move r3, r0         ; anchor_x
-    inc r7
-    inc r7
-    ldw (r7)
-    move r4, r0         ; anchor_y
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
-    ldw (r7)
-    move r7, r0         ; frame_half
-
-    _gsu_iso_draw_trap
-
-    gsu_stack_pop r5
-    gsu_stack_pop r6
-    gsu_stack_pop r11
-    gsu_stack_pop r1
-    gsu_stack_pop r14
-
-    iwt r7, #.sizeof(cached_trap)
+    call gsu_iso_queue_trap
+    iwt r0, #.sizeof(cached_trap)
     with r1
-    add r7
+    add r0
     dec r14
-    beq :+
+    bne @panel_trap_loop
     nop
-    iwt r13, #@panel_trap_loop
-    jmp r13
-    nop
-:
     return
 endfunction
 
@@ -6253,6 +7136,12 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ; Ensure ROMBR is bank 4 for texture atlas and TEXTURE_TABLE
     ibt r0, #4
     romb
+
+    ; Initialize streaming trapezoid batch buffer
+    ibt r0, #0
+    sm (gsu_trap_batch_count), r0
+    iwt r0, #gsu_trap_batch_buf
+    sm (gsu_trap_batch_ptr), r0
 
     iwt r7, #gsu_iso_render_frame
 
@@ -7601,6 +8490,19 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     to r11
     ldw (r7)            ; r11 = skirt_tex_id
 
+    ; Fast path: merged vertical skirt for drop_ns >= 2 (<= 3 traps total!)
+    from r8
+    sub #2
+    blt @ns_1h_fallback
+    nop
+    iwt r1, #gsu_merged_skirt_ns
+    move r2, r8
+    move r3, r11
+    call gsu_iso_stamp_merged_skirt
+    iwt r15, #@skirt_ns_done
+    nop
+@ns_1h_fallback:
+
     ; Loop over vertical steps s = 0 .. drop_ns - 1
     iwt r12, #0         ; r12 = s = 0
 @ns_step_loop:
@@ -7628,56 +8530,19 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     _gsu_iso_v_offset_16 r6, r2
 
     ; Stamp each cached_trap in skirt_ns_traps:
-    iwt r7, #gsu_iso_render_frame + map_render_frame::arch_traps_ptr
-    ldw (r7)
+    lm r1, (gsu_iso_render_frame + map_render_frame::arch_traps_ptr)
     iwt r2, #108
-    with r0
-    add r2
-    move r1, r0         ; r1 = skirt_ns_traps
-
+    with r1
+    add r2              ; r1 = skirt_ns_traps
+    lm r3, (gsu_iso_render_frame + map_render_frame::anchor_x)
+    lm r7, (gsu_iso_render_frame + map_render_frame::skirt_tex_id)
+    ibt r2, #0
     move r14, r9        ; r14 = trap counter
 @ns_trap_loop:
-    ; Set trap tex_id (+24)
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    from r11
-    stw (r7)
-
-    gsu_stack_push r14
-    gsu_stack_push r1
-    gsu_stack_push r12
-    gsu_stack_push r11
-    gsu_stack_push r9
-    gsu_stack_push r8
-    gsu_stack_push r6
-    gsu_stack_push r5
-    gsu_stack_push r4
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
-    ldw (r7)
-    move r3, r0         ; anchor_x
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
-    ldw (r7)
-    move r7, r0         ; frame_half
-
-    _gsu_iso_draw_trap
-
-    gsu_stack_pop r4
-    gsu_stack_pop r5
-    gsu_stack_pop r6
-    gsu_stack_pop r8
-    gsu_stack_pop r9
-    gsu_stack_pop r11
-    gsu_stack_pop r12
-    gsu_stack_pop r1
-    gsu_stack_pop r14
-
-    iwt r7, #.sizeof(cached_trap)
+    call gsu_iso_queue_trap
+    iwt r0, #.sizeof(cached_trap)
     with r1
-    add r7
+    add r0
     dec r14
     bne @ns_trap_loop
     nop
@@ -7746,6 +8611,19 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     to r11
     ldw (r7)            ; r11 = skirt_tex_id
 
+    ; Fast path: merged vertical skirt for drop_ew >= 2 (<= 3 traps total!)
+    from r8
+    sub #2
+    blt @ew_1h_fallback
+    nop
+    iwt r1, #gsu_merged_skirt_ew
+    move r2, r8
+    move r3, r11
+    call gsu_iso_stamp_merged_skirt
+    iwt r15, #@skirt_ew_done
+    nop
+@ew_1h_fallback:
+
     ; Loop over vertical steps s = 0 .. drop_ew - 1
     iwt r12, #0         ; r12 = s = 0
 @ew_step_loop:
@@ -7773,56 +8651,19 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     _gsu_iso_v_offset_16 r6, r2
 
     ; Stamp each cached_trap in skirt_ew_traps:
-    iwt r7, #gsu_iso_render_frame + map_render_frame::arch_traps_ptr
-    ldw (r7)
+    lm r1, (gsu_iso_render_frame + map_render_frame::arch_traps_ptr)
     iwt r2, #214
-    with r0
-    add r2
-    move r1, r0         ; r1 = skirt_ew_traps
-
+    with r1
+    add r2              ; r1 = skirt_ew_traps
+    lm r3, (gsu_iso_render_frame + map_render_frame::anchor_x)
+    lm r7, (gsu_iso_render_frame + map_render_frame::skirt_tex_id)
+    ibt r2, #0
     move r14, r9
 @ew_trap_loop:
-    ; Set trap tex_id (+24)
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    from r11
-    stw (r7)
-
-    gsu_stack_push r14
-    gsu_stack_push r1
-    gsu_stack_push r12
-    gsu_stack_push r11
-    gsu_stack_push r9
-    gsu_stack_push r8
-    gsu_stack_push r6
-    gsu_stack_push r5
-    gsu_stack_push r4
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
-    ldw (r7)
-    move r3, r0         ; anchor_x
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
-    ldw (r7)
-    move r7, r0         ; frame_half
-
-    _gsu_iso_draw_trap
-
-    gsu_stack_pop r4
-    gsu_stack_pop r5
-    gsu_stack_pop r6
-    gsu_stack_pop r8
-    gsu_stack_pop r9
-    gsu_stack_pop r11
-    gsu_stack_pop r12
-    gsu_stack_pop r1
-    gsu_stack_pop r14
-
-    iwt r7, #.sizeof(cached_trap)
+    call gsu_iso_queue_trap
+    iwt r0, #.sizeof(cached_trap)
     with r1
-    add r7
+    add r0
     dec r14
     bne @ew_trap_loop
     nop
@@ -7904,50 +8745,17 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ldw (r7)
     _gsu_iso_v_offset_32 r6, r2
 
-    ; Load cell top_tex_id:
-    iwt r7, #gsu_iso_render_frame + map_render_frame::top_tex_id
-    to r11
-    ldw (r7)            ; r11 = top_tex_id
-
+    ; Load cell top_tex_id, anchor_x, anchor_y once for all flat traps:
+    lm r7, (gsu_iso_render_frame + map_render_frame::top_tex_id)
+    lm r3, (gsu_iso_render_frame + map_render_frame::anchor_x)
+    lm r4, (gsu_iso_render_frame + map_render_frame::anchor_y)
+    ibt r2, #0
     move r14, r9        ; r14 = trap counter
 @flat_trap_loop:
-    ; Set trap tex_id (+24) to top_tex_id
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    from r11
-    stw (r7)
-
-    gsu_stack_push r14
-    gsu_stack_push r1
-    gsu_stack_push r11
-    gsu_stack_push r6
-    gsu_stack_push r5
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
-    ldw (r7)
-    move r3, r0         ; anchor_x
-    inc r7
-    inc r7
-    ldw (r7)
-    move r4, r0         ; anchor_y
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
-    ldw (r7)
-    move r7, r0         ; frame_half
-
-    _gsu_iso_draw_trap
-
-    gsu_stack_pop r5
-    gsu_stack_pop r6
-    gsu_stack_pop r11
-    gsu_stack_pop r1
-    gsu_stack_pop r14
-
-    iwt r7, #.sizeof(cached_trap)
+    call gsu_iso_queue_trap
+    iwt r0, #.sizeof(cached_trap)
     with r1
-    add r7
+    add r0
     dec r14
     bne @flat_trap_loop
     nop
@@ -8100,93 +8908,42 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     ldw (r7)
     _gsu_iso_v_offset_32 r6, r2
 
-    ; Load cell top_tex_id and skirt_tex_id
-    iwt r7, #gsu_iso_render_frame + map_render_frame::top_tex_id
-    to r11
-    ldw (r7)            ; r11 = top_tex_id
-    iwt r7, #gsu_iso_render_frame + map_render_frame::skirt_tex_id
-    to r12
-    ldw (r7)            ; r12 = skirt_tex_id
-
+    ; Load cell top_tex_id, skirt_tex_id, anchor_x, anchor_y once:
+    lm r8, (gsu_iso_render_frame + map_render_frame::top_tex_id)
+    lm r12, (gsu_iso_render_frame + map_render_frame::skirt_tex_id)
+    lm r3, (gsu_iso_render_frame + map_render_frame::anchor_x)
+    lm r4, (gsu_iso_render_frame + map_render_frame::anchor_y)
+    ibt r2, #0
     move r14, r9
 @archetype_trap_loop:
-    ; Read compiled surface type (+24) from current cached_trap (r1 + 24)
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    ldw (r7)
-    move r8, r0         ; r8 = original template surface type (0 = top, 1 = skirt, 2 = panel)
-    from r8
-    add #0
+    ; Read compiled surface type (+24) without mutating ARCH_TRAPS!
+    iwt r0, #24
+    from r1
+    to r7
+    add r0
+    ldw (r7)            ; r0 = template surface type (0 = top, 1 = skirt, 2 = panel)
+    moves r0, r0
     beq @use_top_tex
     nop
-    from r8
     sub #1
     beq @use_skirt_tex
     nop
-    ; r8 == 2: substitute panel_tex_id
-    iwt r2, #gsu_iso_render_frame + map_render_frame::panel_tex_id
-    ldw (r2)
-    stw (r7)
+    lm r7, (gsu_iso_render_frame + map_render_frame::panel_tex_id)
     bra @tex_applied
     nop
 @use_skirt_tex:
-    from r12
-    stw (r7)            ; substitute skirt_tex_id
+    move r7, r12
     bra @tex_applied
     nop
 @use_top_tex:
-    from r11
-    stw (r7)            ; substitute top_tex_id
+    move r7, r8
 @tex_applied:
-
-    gsu_stack_push r14
-    gsu_stack_push r8
-    gsu_stack_push r1
-    gsu_stack_push r12
-    gsu_stack_push r11
-    gsu_stack_push r6
-    gsu_stack_push r5
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::anchor_x
-    ldw (r7)
-    move r3, r0         ; anchor_x
-    inc r7
-    inc r7
-    ldw (r7)
-    move r4, r0         ; anchor_y
-
-    iwt r7, #gsu_iso_render_frame + map_render_frame::frame_half
-    ldw (r7)
-    move r7, r0         ; frame_half
-
-    _gsu_iso_draw_trap
-
-    gsu_stack_pop r5
-    gsu_stack_pop r6
-    gsu_stack_pop r11
-    gsu_stack_pop r12
-    gsu_stack_pop r1
-    gsu_stack_pop r8
-    gsu_stack_pop r14
-
-    ; Restore original template surface type (r8) to trap (+24)
-    move r7, r1
-    iwt r2, #24
-    with r7
-    add r2
-    from r8
-    stw (r7)
-
-    iwt r7, #.sizeof(cached_trap)
+    call gsu_iso_queue_trap
+    iwt r0, #.sizeof(cached_trap)
     with r1
-    add r7
+    add r0
     dec r14
-    beq @step_3b_cell_highlight
-    nop
-    iwt r13, #@archetype_trap_loop
-    jmp r13
+    bne @archetype_trap_loop
     nop
 
 @step_3b_cell_highlight:
@@ -8224,7 +8981,9 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     moves r0, r0
     beq @step_4_unit_hook
     nop
-    move r1, r0                 ; r1 = highlight code (1..3)
+    gsu_stack_push r0
+    call gsu_iso_flush_trap_batch
+    gsu_stack_pop r1            ; r1 = highlight code (1..3)
     call gsu_iso_stamp_cell_highlight r1
 .endif
 
@@ -8261,7 +9020,9 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     cmp r1
     beq @step_4_unit_done
     nop
-    move r2, r0                 ; r2 = entity slot index (0..7)
+    gsu_stack_push r0
+    call gsu_iso_flush_trap_batch
+    gsu_stack_pop r2            ; r2 = entity slot index (0..7)
     lm r1, (gsu_iso_active_desc_ptr)
     call gsu_sprite_mask_stamp_cell r1, r2
 @step_4_unit_done:
@@ -8445,6 +9206,7 @@ function gsu_iso_render map_ptr, cam_ptr, basis_ptr, arch_traps_ptr, frame_half,
     nop
 
 @render_done:
+    call gsu_iso_flush_trap_batch
     return
 endfunction
 

@@ -1,9 +1,9 @@
 -- test.lua - Mesen test script for Map Grid Painter's Traversal & Archetype Stamping
 io.stdout:setvbuf("no")
-test_setup = 0x3309
-test_stop  = 0x3971
-TEST_CASE_IDX = 0x454C
-TEST_RESULT   = 0x454E
+test_setup = 0x39DB
+test_stop  = 0x403F
+TEST_CASE_IDX = 0x4EA4
+TEST_RESULT   = 0x4EA6
 
 local index = 1
 local fail_count = 0

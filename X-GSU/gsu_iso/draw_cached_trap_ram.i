@@ -41,5 +41,6 @@ _GSU_SKIP_ROM_TRAP_INST .set 0
 ;   r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r11, r12, r13, r14
 ; ==============================================================================
 _gsu_define_trap_rasterizer draw_cached_trap_ram, 1
+_gsu_define_trap_batch_rasterizer draw_cached_trap_ram_batch, 1
 
 .endif ; __GSU_ISO_DRAW_CACHED_TRAP_RAM__
